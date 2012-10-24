@@ -1,0 +1,212 @@
+/*
+ * $Id: v_node_commands.h 933 2011-08-25 20:22:43Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2010, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#if !defined V_NODE_COMMAND_H
+#define V_NODE_COMMAND_H
+
+#include <stdio.h>
+#include <sys/types.h>
+
+#include "verse.h"
+
+/*
+ * Note: All structures storing command has to begin with id, because this
+ * id is used in array of unions as identifier for the command. Without this
+ * id the structure could not be save to this array. It also used in queue
+ * of commands.
+ */
+
+/* -------------- Node Create -------------- */
+
+#if 0
+
+#define NODE_CREATE_CMD_DATA_LEN		(2+4+4)
+#define NODE_CREATE_CMD_LEN				(1+1+1+NODE_CREATE_CMD_DATA_LEN)
+
+/* Unique address of Node Create Command */
+typedef struct Node_Create_Addr {
+	uint16		user_id;
+	uint32		parent_id;
+} Node_Create_Addr;
+
+/* Data structure used for queuing */
+typedef struct Node_Create_Cmd {
+	uint8					id;
+	struct Node_Create_Addr	addr;
+	uint32					node_id;
+} Node_Create_Cmd;
+
+#endif
+
+/* -------------- Node Destroy -------------- */
+
+#define NODE_DESTROY_CMD_DATA_LEN		(4)
+#define NODE_DESTROY_CMD_LEN			(1+1+NODE_DESTROY_CMD_DATA_LEN)
+
+/* Unique address of Node Destroy Command */
+typedef struct Node_Destroy_Addr {
+	uint32		node_id;
+} Node_Destroy_Addr;
+
+/* Data structure used for queuing */
+typedef struct Node_Destroy_Cmd {
+	uint8						id;
+	struct Node_Destroy_Addr	addr;
+} Node_Destroy_Cmd;
+
+
+/* -------------- Node Subscribe -------------- */
+
+#define NODE_SUBSCRIBE_CMD_DATA_LEN		(4+4)
+#define NODE_SUBSCRIBE_CMD_LEN			(1+1+NODE_SUBSCRIBE_CMD_DATA_LEN)
+
+/* Unique address of Node Subscribe Command */
+typedef struct Node_Subscribe_Addr {
+	uint32		node_id;
+} Node_Subscribe_Addr;
+
+/* Data structure used for queuing */
+typedef struct Node_Subscribe_Cmd {
+	uint8						id;
+	struct Node_Subscribe_Addr	addr;
+	uint32						level;
+} Node_Subscribe_Cmd;
+
+
+/* -------------- Node UnSubscribe -------------- */
+
+#define NODE_UNSUBSCRIBE_CMD_DATA_LEN	(4)
+#define NODE_UNSUBSCRIBE_CMD_LEN		(1+1+NODE_UNSUBSCRIBE_CMD_DATA_LEN)
+
+/* Unique address of Node UnSubscribe Command */
+typedef struct Node_Unsubscribe_Addr {
+	uint32		node_id;
+} Node_Unsubscribe_Addr;
+
+/* Data structure used for queuing */
+typedef struct Node_Unsubscribe_Cmd {
+	uint8							id;
+	struct Node_Unsubscribe_Addr	addr;
+} Node_Unsubscribe_Cmd;
+
+struct VInQueue;
+
+#if 0
+void v_node_create_print(const unsigned char level,
+		struct Node_Create_Cmd *node_create_cmd);
+uint8 v_node_create_cmds_cmp(struct Node_Create_Cmd *cmd1,
+		struct Node_Create_Cmd *cmd2,
+		const uint8 current_size);
+int16 v_node_create_cmds_len(uint16 count, uint8 share);
+int v_node_create_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue);
+int v_node_create_pack(char *buffer,
+		const struct Node_Create_Cmd *node_create_cmd,
+		const uint16 length,
+		const uint8 share);
+struct VCommandQueue *v_node_create_cmd_queue(uint16 flag);
+void v_node_create_init(struct Node_Create_Cmd *node_create,
+		uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id);
+struct Node_Create_Cmd *v_node_create_create(uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id);
+void v_node_create_clear(struct Node_Create_Cmd *node_create);
+void v_node_create_destroy(struct Node_Create_Cmd **node_create);
+#endif
+
+struct Generic_Cmd *_v_node_create_create(uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id);
+
+
+void v_node_destroy_print(const unsigned char level,
+		struct Node_Destroy_Cmd *node_destroy_cmd);
+uint16 v_node_destroy_cmds_len(uint16 count);
+int v_node_destroy_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue);
+int v_node_destroy_pack(char *buffer,
+		const struct Node_Destroy_Cmd *node_destroy_cmd,
+		const uint16 length);
+struct VCommandQueue *v_node_destroy_cmd_queue(uint16 flag);
+void v_node_destroy_init(struct Node_Destroy_Cmd *node_destroy,
+		uint32 node_id);
+struct Node_Destroy_Cmd *v_node_destroy_create(uint32 node_id);
+void v_node_destroy_clear(struct Node_Destroy_Cmd *node_destroy);
+void v_node_destroy_destroy(struct Node_Destroy_Cmd **node_destroy);
+struct Generic_Cmd *_v_node_destroy_create(uint32 node_id);
+
+void v_node_subscribe_print(const unsigned char level,
+		struct Node_Subscribe_Cmd *node_subscribe_cmd);
+uint16 v_node_subscribe_cmds_len(uint16 count);
+int v_node_subscribe_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue);
+struct VCommandQueue *v_node_subscribe_cmd_queue(uint16 flag);
+int v_node_subscribe_pack(char *buffer,
+		const struct Node_Subscribe_Cmd *node_subscribe_cmd,
+		const uint16 length);
+void v_node_subscribe_init(struct Node_Subscribe_Cmd *node_subscribe,
+		uint32 node_id,
+		uint32 level);
+struct Node_Subscribe_Cmd *v_node_subscribe_create(uint32 node_id, uint32 level);
+void v_node_subscribe_clear(struct Node_Subscribe_Cmd *node_subscribe);
+void v_node_subscribe_destroy(struct Node_Subscribe_Cmd **node_subscribe);
+
+struct Generic_Cmd *_v_node_subscribe_create(uint32 node_id, uint32 level);
+
+void v_node_unsubscribe_print(const unsigned char level,
+		struct Node_Unsubscribe_Cmd *node_unsubscribe_cmd);
+uint16 v_node_unsubscribe_cmds_len(uint16 count);
+int v_node_unsubscribe_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue);
+int v_node_unsubscribe_pack(char *buffer,
+		const struct Node_Unsubscribe_Cmd *node_unsubscribe_cmd,
+		const uint16 length);
+struct VCommandQueue *v_node_unsubscribe_cmd_queue(uint16 flag);
+void v_node_unsubscribe_init(struct Node_Unsubscribe_Cmd *node_unsubscribe,
+		uint32 node_id);
+struct Node_Unsubscribe_Cmd *v_node_unsubscribe_create(uint32 node_id);
+void v_node_unsubscribe_clear(struct Node_Unsubscribe_Cmd *node_unsubscribe);
+void v_node_unsubscribe_destroy(struct Node_Unsubscribe_Cmd **node_unsubscribe);
+
+struct Generic_Cmd *_v_node_unsubscribe_create(uint32 node_id);
+
+#endif

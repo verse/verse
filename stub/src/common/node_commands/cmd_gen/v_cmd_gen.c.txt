@@ -1,0 +1,373 @@
+/*
+ * $Id$
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "verse.h"
+#include "v_cmd_gen.h"
+#include "v_commands.h"
+#include <openssl/ssl.h>
+
+static const char *bsd_license = "\
+/*\n\
+* $Id$\n\
+*\n\
+* ***** BEGIN BSD LICENSE BLOCK *****\n\
+*\n\
+* Copyright (c) 2009-2011, Jiri Hnidek\n\
+* All rights reserved.\n\
+*\n\
+* Redistribution and use in source and binary forms, with or without\n\
+* modification, are permitted provided that the following conditions are\n\
+* met:\n\
+*\n\
+*  * Redistributions of source code must retain the above copyright\n\
+*    notice, this list of conditions and the following disclaimer.\n\
+*  * Redistributions in binary form must reproduce the above copyright\n\
+*    notice, this list of conditions and the following disclaimer in the\n\
+*    documentation and/or other materials provided with the distribution.\n\
+*\n\
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS\n\
+* IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\n\
+* TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\n\
+* PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER\n\
+* OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\n\
+* EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\n\
+* PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\n\
+* PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\n\
+* LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\n\
+* NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\n\
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\
+*\n\
+* ***** END BSD LICENSE BLOCK *****\n\
+*\n\
+* Authors: Jiri Hnidek <jiri.hnidek@tul.cz>\n\
+*\n\
+*/\n\
+\n";
+
+static const char *includes = "\
+#include <assert.h>\n\
+\n\
+#include \"verse.h\"\n\
+\n\
+#include \"v_node_commands.h\"\n\
+#include \"v_in_queue.h\"\n\
+#include \"v_common.h\"\n\
+#include \"v_unpack.h\"\n\
+#include \"v_pack.h\"\n\
+#include \"v_network.h\"\n\
+\n\
+";
+
+void v_gen_print_license(FILE *file)
+{
+	fprintf(file,"%s", bsd_license);
+}
+
+void v_gen_include(FILE *file)
+{
+	fprintf(file, "%s", includes);
+}
+
+/**
+ * \brief This function generates code for printing content of the command.
+ *
+ * TODO: generate prototype to the header file and call it from v_cmd_print().
+ */
+void v_gen_print_cmd(FILE *file, struct Template_Cmd *t_cmd)
+{
+	int i;
+
+	fprintf(file, "\
+/**\n\
+ * \\brief Print content of structure containing %s command\n\
+ */\n", t_cmd->name);
+
+	fprintf(file,"\
+void v_%s_print(const unsigned char level,\n\
+		struct %s *%s)\n",
+		t_cmd->name, t_cmd->struct_name, t_cmd->var_name);
+
+	fprintf(file, "{\n");
+
+	fprintf(file, "\tv_print_log_simple(level, \"\\t%s, ", t_cmd->NAME);
+	for(i=0; (i<MAX_CMD_PARAMS) && (t_cmd->addr.params[i].type != PAR_RESERVED); i++) {
+		fprintf(file, "%s: ", t_cmd->addr.params[i].name);
+		switch(t_cmd->addr.params[i].type) {
+		case PAR_INT8:
+		case PAR_UINT8:
+		case PAR_INT16:
+		case PAR_UINT16:
+		case PAR_INT32:
+		case PAR_UINT32:
+			fprintf(file, "%cd", '%');
+			break;
+		case PAR_INT64:
+		case PAR_UINT64:
+			fprintf(file, "%cld", '%');
+			break;
+		case PAR_REAL32:
+			fprintf(file, "%c6.3f", '%');
+			break;
+		case PAR_REAL64:
+			fprintf(file, "%c6.3f", '%');
+			break;
+		case PAR_STRING8:
+		case PAR_STRING16:
+			fprintf(file, "%cs", '%');
+			break;
+		default:
+			assert(0);
+			break;
+		}
+
+		if(t_cmd->addr.params[i+1].type != PAR_RESERVED || t_cmd->params[0].type != PAR_RESERVED) {
+			fprintf(file, ", ");
+		} else if(t_cmd->params[0].type == PAR_RESERVED){
+			fprintf(file, "\\n\",\n\t\t");
+		}
+	}
+
+	for(i=0; (i<MAX_CMD_PARAMS) && (t_cmd->params[i].type != PAR_RESERVED); i++) {
+		fprintf(file, "%s: ", t_cmd->params[i].name);
+		switch(t_cmd->params[i].type) {
+		case PAR_INT8:
+		case PAR_UINT8:
+		case PAR_INT16:
+		case PAR_UINT16:
+		case PAR_INT32:
+		case PAR_UINT32:
+			fprintf(file, "%cd", '%');
+			break;
+		case PAR_INT64:
+		case PAR_UINT64:
+			fprintf(file, "%cld", '%');
+			break;
+		case PAR_REAL32:
+			fprintf(file, "%c6.3f", '%');
+			break;
+		case PAR_REAL64:
+			fprintf(file, "%c6.3f", '%');
+			break;
+		case PAR_STRING8:
+		case PAR_STRING16:
+			fprintf(file, "%cs", '%');
+			break;
+		default:
+			assert(0);
+			break;
+		}
+
+		if(t_cmd->params[i+1].type != PAR_RESERVED) {
+			fprintf(file, ", ");
+		} else {
+			fprintf(file, "\\n\",\n\t\t");
+		}
+	}
+
+	for(i=0; (i<MAX_CMD_PARAMS) && (t_cmd->addr.params[i].type != PAR_RESERVED); i++) {
+		fprintf(file, "%s->%s", t_cmd->var_name, t_cmd->addr.params[i].name);
+
+		if(t_cmd->addr.params[i+1].type != PAR_RESERVED || t_cmd->params[0].type != PAR_RESERVED) {
+			fprintf(file, ", ");
+		} else if(t_cmd->params[0].type == PAR_RESERVED){
+			fprintf(file, ");\n");
+		}
+	}
+
+	for(i=0; (i<MAX_CMD_PARAMS) && (t_cmd->params[i].type != PAR_RESERVED); i++) {
+		fprintf(file, "%s->%s", t_cmd->var_name, t_cmd->params[i].name);
+
+		if(t_cmd->params[i+1].type != PAR_RESERVED) {
+			fprintf(file, ", ");
+		} else {
+			fprintf(file, ");\n");
+		}
+	}
+
+	fprintf(file, "}\n");
+}
+
+void v_Template_Addr_init(struct Template_Addr *t_addr)
+{
+	t_addr->params[0].name = NULL;
+	t_addr->params[0].type = PAR_RESERVED;
+}
+
+/**
+ * \brief This generates template of command
+ */
+struct Template_Cmd *v_Template_Cmd_create(char *name, uint8 id)
+{
+	struct Template_Cmd *t_cmd = (struct Template_Cmd *)malloc(sizeof(struct Template_Cmd));
+
+	if(t_cmd != NULL) {
+		size_t i;
+
+		t_cmd->name = strdup(name);
+		t_cmd->id = id;
+
+		/* Derived variable names */
+		t_cmd->const_name = (char*)malloc(sizeof(char)*(4+strlen(name)+1));
+		strncpy(&t_cmd->const_name[0], "CMD_", 4);
+		for(i=0; i<strlen(name); i++) {
+			t_cmd->const_name[4+i] = toupper(name[i]);
+		}
+		t_cmd->const_name[i] = '\0';
+
+		t_cmd->NAME = (char*)malloc(sizeof(char)*(strlen(name)+1));
+		for(i=0; i<strlen(name); i++) {
+			t_cmd->NAME[i] = toupper(name[i]);
+		}
+		t_cmd->NAME[i] = '\0';
+
+		t_cmd->struct_name = malloc(sizeof(char)*(strlen(name)+4+1));
+		for(i=0; i<strlen(name); i++) {
+			if(i==0 || (i>=1 && name[i-1]=='_')) {
+				t_cmd->struct_name[i] = toupper(name[i]);
+			} else {
+				t_cmd->struct_name[i] = name[i];
+			}
+		}
+		strncpy(&t_cmd->struct_name[i], "_Cmd", 4);
+
+		t_cmd->var_name = malloc(sizeof(char)*(strlen(name)+4+1));
+		for(i=0; i<strlen(name); i++) {
+			t_cmd->var_name[i] = name[i];
+		}
+		strncpy(&t_cmd->var_name[i], "_cmd", 4);
+
+		/* Initialize address */
+		v_Template_Addr_init(&t_cmd->addr);
+
+		/* Initialize params */
+		t_cmd->params[0].name = NULL;
+		t_cmd->params[0].type = PAR_RESERVED;
+	}
+
+	return t_cmd;
+}
+
+void v_Template_Cmd_destroy(struct Template_Cmd **t_cmd)
+{
+	if(*t_cmd != NULL) {
+		int i;
+
+		free((*t_cmd)->name);
+		free((*t_cmd)->NAME);
+		free((*t_cmd)->const_name);
+		free((*t_cmd)->struct_name);
+		free((*t_cmd)->var_name);
+
+		for(i=0; i< MAX_CMD_PARAMS; i++) {
+			if((*t_cmd)->addr.params[i].type != PAR_RESERVED) {
+				(*t_cmd)->addr.params[i].type = PAR_RESERVED;
+				free((*t_cmd)->addr.params[i].name);
+				(*t_cmd)->addr.params[i].name = NULL;
+			} else {
+				break;
+			}
+		}
+
+		for(i=0; i< MAX_CMD_PARAMS; i++) {
+			if((*t_cmd)->params[i].type != PAR_RESERVED) {
+				(*t_cmd)->params[i].type = PAR_RESERVED;
+				free((*t_cmd)->params[i].name);
+				(*t_cmd)->params[i].name = NULL;
+			} else {
+				break;
+			}
+		}
+	}
+	free(*t_cmd);
+	*t_cmd = NULL;
+}
+
+void v_Template_Cmd_add_param(struct Template_Cmd *t_cmd,
+		char *name,
+		enum ParamType type)
+{
+	int i;
+
+	for(i=0; i< MAX_CMD_PARAMS; i++) {
+		if(t_cmd->params[i].type == PAR_RESERVED) {
+			t_cmd->params[i].type = type;
+			t_cmd->params[i].name = strdup(name);
+			t_cmd->params[i+1].type = PAR_RESERVED;
+			break;
+		}
+	}
+
+}
+
+void v_Template_Addr_add_param(struct Template_Addr *t_addr,
+		char *name,
+		enum ParamType type)
+{
+	int i;
+
+	for(i=0; i< MAX_CMD_PARAMS; i++) {
+		if(t_addr->params[i].type == PAR_RESERVED) {
+			t_addr->params[i].type = type;
+			t_addr->params[i].name = strdup(name);
+			t_addr->params[i+1].type = PAR_RESERVED;
+			break;
+		}
+	}
+}
+
+int main(void)
+{
+	struct Template_Cmd *node_create_cmd;
+
+	node_create_cmd = v_Template_Cmd_create("node_create", CMD_NODE_CREATE);
+	v_Template_Addr_add_param(&node_create_cmd->addr, "user_id", PAR_UINT16);
+	v_Template_Addr_add_param(&node_create_cmd->addr, "parent_id", PAR_UINT32);
+	v_Template_Cmd_add_param(node_create_cmd, "node_id", PAR_UINT32);
+
+	v_gen_print_license(stdout);
+	v_gen_include(stdout);
+
+	v_gen_print_cmd(stdout, node_create_cmd);
+
+	v_Template_Cmd_destroy(&node_create_cmd);
+
+	return EXIT_SUCCESS;
+}

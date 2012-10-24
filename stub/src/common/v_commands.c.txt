@@ -1,0 +1,1233 @@
+/*
+ * $Id: v_commands.c 933 2011-08-25 20:22:43Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <assert.h>
+
+#include "verse.h"
+
+#include "v_common.h"
+#include "v_network.h"
+#include "v_unpack.h"
+#include "v_pack.h"
+#include "v_list.h"
+
+#include "v_commands.h"
+#include "v_fake_commands.h"
+#include "v_node_commands.h"
+#include "v_taggroup_commands.h"
+#include "v_cmd_queue.h"
+#include "v_in_queue.h"
+
+/**
+ * Definition of structure of all supported commands. Following array should be
+ * automatically generated from configuration file. With following structure:
+ *
+ * Node_Cmd(SHARE_ADDR) {
+ * }
+ */
+const struct Cmd_Struct cmd_struct[MAX_CMD_ID+1] = {
+		{ 0 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 1 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 2 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 3 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 4 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 5 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 6 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 7 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 8 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 9 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 10,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 11,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 12,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 13,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 14,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 15,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 16,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 17,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 18,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 19,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 20,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 21,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 22,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 23,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 24,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 25,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 26,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 27,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 28,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 29,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 30,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 31,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{
+				CMD_NODE_CREATE,	/* 32 */
+				NODE_CMD | SHARE_ADDR,
+				UINT16_SIZE + UINT32_SIZE,	/* Address size */
+				UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE  + UINT8_SIZE  + UINT8_SIZE  + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				3,	/* Number of items */
+				2,	/* Number of items that are part of address */
+				"Node_Create",	/* Name of command */
+				{	/* Items */
+						{ITEM_UINT16, UINT16_SIZE, 0, "User_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE, "Parent_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE + UINT32_SIZE, "Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_DESTROY,	/* 33 */
+				NODE_CMD | REM_DUP,
+				UINT32_SIZE, /* Address size */
+				UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE  + UINT8_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				1, /* Number of items */
+				1, /* Number of items that are part of address */
+				"Node_Destroy",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_SUBSCRIBE,	/* 34 */
+				NODE_CMD | REM_DUP,
+				UINT32_SIZE, /* Address size */
+				UINT32_SIZE + UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				2, /* Number of items */
+				1, /* Number of items that are part of address */
+				"Node_Subscribe",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE, "Level"}
+				}
+		},
+		{
+				CMD_NODE_UNSUBSCRIBE,	/* 35 */
+				NODE_CMD | REM_DUP,
+				UINT32_SIZE, /* Address size */
+				UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				1,
+				1,
+				"Node_UnSubscribe",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+				}
+		},
+		{ 36,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 37,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 38,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 39,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 40,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 41,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 42,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 43,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{
+				CMD_TAGGROUP_CREATE,
+				NODE_CMD | REM_DUP | VAR_LEN,
+				UINT32_SIZE,	/* Address size */
+				UINT32_SIZE + UINT16_SIZE + STRING8_SIZE, /* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT8_SIZE + UINT16_SIZE, /* Minimal command size in packet */
+				3,
+				1,
+				"TagGroup_Create",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_STRING8, UINT8_SIZE + UINT8_SIZE, UINT32_SIZE + UINT16_SIZE, "Name"} /* Minimal size of string */
+				}
+		},
+		{ 45,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 46,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 47,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 48,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 49,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 50,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 51,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 52,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 53,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 54,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 55,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 56,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 57,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 58,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 59,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 60,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 61,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 62,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 63,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 64,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 65,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 66,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 67,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 68,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 69,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 70,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 71,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 72,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 73,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 74,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 75,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 76,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 77,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 78,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 79,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 80,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 81,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 82,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 83,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 84,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 85,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 86,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 87,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 88,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 89,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 90,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 91,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 92,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 93,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 94,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 95,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 96,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 97,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 98,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 99,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+
+		{100,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{101,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{102,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{103,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{104,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{105,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{106,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{107,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{108,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{109,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{110,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{111,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{112,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{113,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{114,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{115,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{116,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{117,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{118,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{119,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{120,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{121,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{122,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{123,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{124,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{125,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{126,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{127,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{128,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{129,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{130,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{131,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{132,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{133,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{134,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{135,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{136,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{137,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{138,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{139,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{140,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{141,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{142,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{143,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{144,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{145,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{146,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{147,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{148,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{149,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{150,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{151,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{152,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{153,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{154,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{155,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{156,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{157,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{158,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{159,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{160,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{161,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{162,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{163,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{164,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{165,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{166,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{167,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{168,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{169,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{170,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{171,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{172,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{173,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{174,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{175,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{176,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{177,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{178,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{179,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{180,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{181,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{182,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{183,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{184,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{185,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{186,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{187,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{188,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{189,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{190,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{191,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{192,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{193,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{194,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{195,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{196,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{197,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{198,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{199,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+
+		{200,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{201,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{202,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{203,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{204,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{205,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{206,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{207,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{208,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{209,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{210,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{211,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{212,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{213,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{214,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{215,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{216,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{217,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{218,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{219,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{220,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{221,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{222,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{223,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{224,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{225,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{226,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{227,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{228,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{229,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{230,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{231,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{232,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{233,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{234,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{235,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{236,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{237,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{238,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{239,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{240,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{241,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{242,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{243,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{244,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{245,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{246,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{247,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{248,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{249,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{250,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{251,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{252,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{253,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{254,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{255,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}}
+};
+
+/**
+ * \brief This function prints content of the command
+ */
+void _v_cmd_print(const unsigned char level,
+		const struct Generic_Cmd *cmd)
+{
+	if( (cmd_struct[cmd->id].flag & NODE_CMD) || (cmd_struct[cmd->id].flag & FAKE_CMD)) {
+		int i;
+		v_print_log_simple(level, "\t%s, ", cmd_struct[cmd->id].name);
+		for(i=0; i< cmd_struct[cmd->id].item_count; i++) {
+			v_print_log_simple(level, "%s: ",  cmd_struct[cmd->id].items[i].name);
+			switch(cmd_struct[cmd->id].items[i].type) {
+			case ITEM_RESERVED:
+				assert(0);
+				break;
+			case ITEM_INT8:
+				v_print_log_simple(level, "%d, ", INT8(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT8:
+				v_print_log_simple(level, "%d, ", UINT8(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_INT16:
+				v_print_log_simple(level, "%d, ", INT16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT16:
+				v_print_log_simple(level, "%d, ", UINT16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_INT32:
+				v_print_log_simple(level, "%d, ", INT32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT32:
+				v_print_log_simple(level, "%d, ", UINT32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_INT64:
+				v_print_log_simple(level, "%ld, ", INT64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT64:
+				v_print_log_simple(level, "%ld, ", UINT64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_REAL32:
+				v_print_log_simple(level, "%6.3f, ", REAL32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_REAL64:
+				v_print_log_simple(level, "%6.3f, ", REAL64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_STRING8:
+			case ITEM_STRING16:
+				v_print_log_simple(level, "%s, ", (char*)&cmd->data[cmd_struct[cmd->id].items[i].offset]);
+				break;
+			}
+		}
+		v_print_log_simple(level,"\n");
+	}
+}
+
+/**
+ * \brief Print content of node and fake commands according command ID
+ */
+void v_cmd_print(const unsigned char level,
+		const struct Generic_Cmd *cmd)
+{
+	if(cmd->id >= MIN_CMD_ID) {
+		switch(cmd->id) {
+		case CMD_NODE_CREATE:
+			v_node_create_print(level, (struct Node_Create_Cmd*)cmd);
+			break;
+		case CMD_NODE_DESTROY:
+			v_node_destroy_print(level, (struct Node_Destroy_Cmd*)cmd);
+			break;
+		case CMD_NODE_SUBSCRIBE:
+			v_node_subscribe_print(level, (struct Node_Subscribe_Cmd*)cmd);
+			break;
+		case CMD_NODE_UNSUBSCRIBE:
+			v_node_unsubscribe_print(level, (struct Node_Unsubscribe_Cmd*)cmd);
+			break;
+		case CMD_TAGGROUP_CREATE:
+			v_taggroup_create_print(level, (struct TagGroup_Create_Cmd*)cmd);
+			break;
+		default:
+			v_print_log_simple(level, "This command ID: %d is not supported yet\n", cmd->id);
+			assert(0);
+			break;
+		}
+	} else {
+		v_fake_cmd_print(level, cmd);
+	}
+}
+
+void _v_cmd_destroy(struct Generic_Cmd **cmd)
+{
+	if( (*cmd)->id >= MIN_CMD_ID ) {
+		if( cmd_struct[(*cmd)->id].flag & VAR_LEN ) {
+			int i;
+			for(i=0; i< cmd_struct[(*cmd)->id].item_count; i++) {
+				if(cmd_struct[(*cmd)->id].items[i].type == ITEM_STRING8 ||
+						cmd_struct[(*cmd)->id].items[i].type == ITEM_STRING16) {
+					/* Free string */
+					free(PTR((*cmd)->data[cmd_struct[(*cmd)->id].items[i].offset]));
+				}
+			}
+		}
+		free(*cmd);
+		*cmd = NULL;
+	}
+}
+
+/**
+ * \brief This function destroy command.
+ *
+ * This function should be called, when command is removed from the queue or
+ * history of sent commands.
+ */
+void v_cmd_destroy(struct Generic_Cmd **cmd)
+{
+	if((*cmd)->id >= MIN_CMD_ID) {
+		switch((*cmd)->id) {
+		case CMD_NODE_CREATE:
+			v_node_create_destroy((struct Node_Create_Cmd**)cmd);
+			break;
+		case CMD_NODE_DESTROY:
+			v_node_destroy_destroy((struct Node_Destroy_Cmd**)cmd);
+			break;
+		case CMD_NODE_SUBSCRIBE:
+			v_node_subscribe_destroy((struct Node_Subscribe_Cmd**)cmd);
+			break;
+		case CMD_NODE_UNSUBSCRIBE:
+			v_node_unsubscribe_destroy((struct Node_Unsubscribe_Cmd**)cmd);
+			break;
+		case CMD_TAGGROUP_CREATE:
+			v_taggroup_create_destroy((struct TagGroup_Create_Cmd**)cmd);
+			break;
+		default:
+			v_print_log(VRS_PRINT_ERROR, "This command id: %d could not be destroyed\n", (*cmd)->id);
+			assert(0);
+			break;
+		}
+	} else {
+		v_fake_cmd_destroy(cmd);
+	}
+}
+
+int _v_cmd_struct_size(const struct Generic_Cmd *cmd)
+{
+	return UINT8_SIZE + cmd_struct[cmd->id].size;
+}
+
+/**
+ * \brief This function returns size of structure for storing of commands.
+ * Returned value is in bytes
+ */
+int v_cmd_struct_size(const struct Generic_Cmd *cmd)
+{
+	int size = 0;
+
+	if(cmd->id >= MIN_CMD_ID) {
+		switch(cmd->id) {
+		case CMD_NODE_CREATE:
+			size = sizeof(struct Node_Create_Cmd);
+			break;
+		case CMD_NODE_DESTROY:
+			size = sizeof(struct Node_Destroy_Cmd);
+			break;
+		case CMD_NODE_SUBSCRIBE:
+			size = sizeof(struct Node_Subscribe_Cmd);
+			break;
+		case CMD_NODE_UNSUBSCRIBE:
+			size = sizeof(struct Node_Unsubscribe_Cmd);
+			break;
+		case CMD_TAGGROUP_CREATE:
+			size = sizeof(struct TagGroup_Create_Cmd);
+			break;
+		default:
+			v_print_log_simple(VRS_PRINT_ERROR, "This command ID: %d is not supported yet\n", cmd->id);
+			assert(0);
+			break;
+		}
+	} else {
+		v_fake_cmd_struct_size(cmd);
+	}
+
+	return size;
+}
+
+int _v_cmd_size(const struct Generic_Cmd *cmd)
+{
+	if( cmd_struct[cmd->id].flag & NODE_CMD ) {
+		if( ! (cmd_struct[cmd->id].flag & VAR_LEN) ) {
+			return cmd_struct[cmd->id].cmd_size;
+		} else {
+			size_t size = cmd_struct[cmd->id].cmd_size;
+			int i;
+			for(i=0; i< cmd_struct[cmd->id].item_count; i++) {
+				if(cmd_struct[cmd->id].items[i].type == ITEM_STRING8 ||
+						cmd_struct[cmd->id].items[i].type == ITEM_STRING16) {
+					/* Get length of the string */
+					size += strlen((char*)&cmd->data[cmd_struct[cmd->id].items[i].offset]);
+				}
+			}
+			return size;
+		}
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * \brief This function returns minimal size command in the buffer send in
+ * packet to the peer.
+ */
+int v_cmd_size(const struct Generic_Cmd *cmd)
+{
+	int size = 0;
+
+	switch(cmd->id) {
+	case CMD_NODE_CREATE:
+		size = NODE_CREATE_CMD_LEN;
+		break;
+	case CMD_NODE_DESTROY:
+		size = NODE_DESTROY_CMD_LEN;
+		break;
+	case CMD_NODE_SUBSCRIBE:
+		size = NODE_SUBSCRIBE_CMD_LEN;
+		break;
+	case CMD_NODE_UNSUBSCRIBE:
+		size = NODE_UNSUBSCRIBE_CMD_LEN;
+		break;
+	case CMD_TAGGROUP_CREATE:
+		size = v_taggroup_create_len((struct TagGroup_Create_Cmd*)cmd);
+		break;
+	default:
+		v_print_log_simple(VRS_PRINT_ERROR, "This command ID: %d is not supported yet\n", cmd->id);
+		assert(0);
+		break;
+	}
+
+	return size;
+}
+
+int _v_cmd_unpack(const char *buffer,
+		unsigned short buffer_len,
+		struct VInQueue *v_in_queue)
+{
+	struct Generic_Cmd *cmd, *first_cmd;
+	uint32 buffer_pos = 0;
+	uint16 length, cmd_data_len;
+	uint8 cmd_id, cmd_addr_len, share, skip_items=0;
+	int i, j;
+
+	while( buffer_pos < buffer_len )
+	{
+		/* At least command id and its length has to be unpacked */
+		if((buffer_len-buffer_pos) >= 2) {
+			skip_items=0;
+
+			/* Get ID (OpCode) of the command */
+			buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &cmd_id);
+
+			/* Unpack Length of the command */
+			buffer_pos += v_cmd_unpack_len(&buffer[buffer_pos], &length, &cmd_addr_len);
+
+			/* Check if this command is supported */
+			if( !( cmd_struct[cmd_id].flag & NODE_CMD) ) {
+				/* Skip this command */
+				if(length >= 2 && length < (buffer_len - buffer_pos)) {
+					v_print_log(VRS_PRINT_WARNING, "Can't unpack node command ID: %d, Length: %d, skipping this command.\n", cmd_id, length);
+					buffer_pos += length;
+				} else {
+					v_print_log(VRS_PRINT_WARNING, "Wrong length: %d of the command: %d, dropping rest of packet\n", length, cmd_id);
+					buffer_pos = buffer_len;
+				}
+				break;
+			}
+
+			/* Basic command size of data */
+			cmd_data_len = cmd_struct[cmd_id].size;
+
+			/* Unpack size of address that is shared, when command support sharing of command */
+			if( cmd_struct[cmd_id].flag & SHARE_ADDR ) {
+				buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &share);
+				cmd_addr_len += 1;
+
+				/* Check if size of sharing is supported for this command */
+				if(share != 0) {
+					size_t shared_size;
+
+					for(i=0, shared_size=0;
+							(shared_size<share) &&
+							(i<cmd_struct[cmd_id].key_count);
+							i++)
+					{
+						shared_size += cmd_struct[cmd_id].items[i].size;
+						skip_items++;
+					}
+
+					/* When the share isn't supported, then skip this command */
+					if(shared_size != share) {
+						v_print_log(VRS_PRINT_ERROR, "Bad share: %d of %s command, skipping this command.\n",
+								share, cmd_struct[cmd_id].name);
+						return length;
+					}
+
+					cmd_addr_len += share;
+					cmd_data_len -= share;
+				}
+			}
+
+			/* Check the length of the command, when length of command isn't variable */
+			if( !( cmd_struct[cmd_id].flag & VAR_LEN) ) {
+				if( ((length - cmd_addr_len) % cmd_data_len) != 0) {
+					v_print_log(VRS_PRINT_WARNING, "Bad length: %d != %d+(N*%d) of Node_Create command, skipping this command.\n",
+							length, cmd_addr_len, cmd_data_len);
+					return length;
+				}
+			}
+
+			/* Unpack remaining commands compressed to this command */
+			for(i=0; i<((length - cmd_addr_len) / cmd_data_len); i++) {
+				/* This create new command */
+				cmd = (struct Generic_Cmd*)malloc((UINT8_SIZE + cmd_struct[cmd_id].size)*sizeof(uint8));
+				cmd->id = cmd_id;
+
+				if(i==0) {
+					first_cmd = cmd;
+				} else {
+					memcpy(cmd->data, first_cmd->data, share);
+				}
+
+				for(j = (i==0) ? 0 : skip_items ; j<cmd_struct[cmd_id].item_count; j++) {
+					switch(cmd_struct[cmd_id].items[j].type) {
+					case ITEM_RESERVED:
+						assert(cmd_struct[cmd_id].items[j].type==ITEM_RESERVED);
+						break;
+					case ITEM_INT8:
+					case ITEM_UINT8:
+						buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos],
+								(uint8*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+						break;
+					case ITEM_INT16:
+					case ITEM_UINT16:
+						buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos],
+								(uint16*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+						break;
+					case ITEM_INT32:
+					case ITEM_UINT32:
+						buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos],
+								(uint32*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+						break;
+					case ITEM_INT64:
+						/* Implement it, when some command will need it */
+						assert(0);
+						break;
+					case ITEM_UINT64:
+						/* Implement it, when some command will need it */
+						assert(0);
+						break;
+					case ITEM_REAL32:
+						buffer_pos += vnp_raw_unpack_real32(&buffer[buffer_pos],
+								(real32*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+						break;
+					case ITEM_REAL64:
+						buffer_pos += vnp_raw_unpack_real64(&buffer[buffer_pos],
+								(real64*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+						break;
+					case ITEM_STRING8:
+						PTR(cmd->data[cmd_struct[cmd->id].items[j].offset]) = NULL;
+						buffer_pos += vnp_raw_unpack_string8(&buffer[buffer_pos],
+								buffer_len - buffer_pos,
+								(char**)&(cmd->data[cmd_struct[cmd->id].items[j].offset]));
+						break;
+					case ITEM_STRING16:
+						/* Implement it, when some command will need it */
+						assert(0);
+						break;
+					}
+				}
+
+				/* Put command to the queue of incoming commands */
+				v_in_queue_push(v_in_queue, cmd);
+
+				/* Print content of received command */
+				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+					printf("%c[%d;%dm", 27, 1, 34);
+					_v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+					printf("%c[%dm", 27, 0);
+				}
+			}
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief	Get node commands from received buffer and store them in VPacket
+ * \param[in]	*buffer		The received buffer
+ * \param[in]	buffer_len	The size of buffer, that contains node commands
+ * \param[out]	*v_in_queue	The structure of queue, that will be filled with
+ * commands from the buffer.
+ * \return	This function returns relative buffer position of buffer proceeding. */
+int v_cmd_unpack(const char *buffer,
+		unsigned short buffer_len,
+		struct VInQueue *v_in_queue)
+{
+	int32 not_used, buffer_pos = 0;
+	uint8 cmd_id, length;
+
+	while( buffer_pos < buffer_len )
+	{
+		/* At least command id and its length has to be unpacked */
+		if((buffer_len-buffer_pos) >= 2) {
+
+			/* Get ID (OpCode) of the command */
+			not_used += vnp_raw_unpack_uint8(&buffer[buffer_pos], &cmd_id);
+
+			switch(cmd_id) {
+			case CMD_NODE_CREATE:
+				buffer_pos += v_node_create_unpack(&buffer[buffer_pos],
+						buffer_len - buffer_pos,
+						v_in_queue);
+				break;
+			case CMD_NODE_DESTROY:
+				buffer_pos += v_node_destroy_unpack(&buffer[buffer_pos],
+						buffer_len - buffer_pos,
+						v_in_queue);
+				break;
+			case CMD_NODE_SUBSCRIBE:
+				buffer_pos += v_node_subscribe_unpack(&buffer[buffer_pos],
+						buffer_len - buffer_pos,
+						v_in_queue);
+				break;
+			case CMD_NODE_UNSUBSCRIBE:
+				buffer_pos += v_node_unsubscribe_unpack(&buffer[buffer_pos],
+						buffer_len - buffer_pos,
+						v_in_queue);
+				break;
+			case CMD_TAGGROUP_CREATE:
+				buffer_pos += v_taggroup_create_unpack(&buffer[buffer_pos],
+						buffer_len - buffer_pos,
+						v_in_queue);
+				break;
+			default:
+				/* This is unknown node command. Unpack length of
+				 * the command and skip this command. */
+				not_used = vnp_raw_unpack_uint8(&buffer[buffer_pos+1], &length);
+				/* Warning print */
+				v_print_log(VRS_PRINT_WARNING, "Can't unpack node command ID: %d, Length: %d, skipping this command.\n", cmd_id, length);
+				/* Skip this command */
+				if(length >= 2 && length < (buffer_len - buffer_pos))
+					buffer_pos += length;
+				else {
+					v_print_log(VRS_PRINT_WARNING, "Wrong length: %d of the command: %d, dropping rest of packet\n", length, cmd_id);
+					buffer_pos = buffer_len;
+				}
+				break;
+			}
+		} else {
+			v_print_log(VRS_PRINT_WARNING, "Unable to decode command, length: %d < 2\n",
+					buffer_len - buffer_pos);
+			buffer_pos = buffer_len;
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * This is function for unpacking length of the command from the buffer
+ */
+uint16 v_cmd_unpack_len(const char *buffer,
+		uint16 *length,
+		uint8 *cmd_addr_len)
+{
+	uint16 length16, buffer_pos = 0;
+	uint8 length8;
+
+	/* Unpack Length of the command */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &length8);
+	/* When the length has 0xFF value, then real value is in next two bytes */
+	if(length8 == 0xFF) {
+		buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &length16);
+		*length = length16;
+		*cmd_addr_len = 1 + 1 + 2; /* Size of: CmdOpCode + 0xFF + Length16 */
+	} else {
+		*length = length8;
+		*cmd_addr_len = 1 + 1; /* Size of: CmdOpCode + Length8 */
+	}
+	cmd_addr_len += 1; /* Size of: Share */
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function packs the length of the command to buffer
+ *
+ * When the length of the command is packed to the buffer, then the length
+ * has to be computed with respect of packing length bigger then 254 bytes.
+ * Such length is not packed to the one byte, but it is packed to 3 bytes.
+ *
+ * \param[in]	*buffer	The buffer to be send
+ * \param[in]	length	The length of the command that has to be packed to the
+ * buffer
+ *
+ * \return This function returns number of bytes packed to the buffer
+ */
+uint16 v_cmd_pack_len(char *buffer, const uint16 length)
+{
+	uint16 buffer_pos = 0;
+
+    /* Pack length of the command */
+    if(length >= 0xFF){
+    	/* When the first byte has value 0xFF, then decoder of this command
+    	 * knows that next two bytes contains length of the command. */
+        buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], 0xFF);
+		/* Pack length to the 2 bytes  */
+        buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], length);
+    }else{
+    	/* Pack length to 1 byte */
+        buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], (uint8)length);
+    }
+
+    return buffer_pos;
+}
+
+int _v_cmd_pack(char *buffer,
+		const struct Generic_Cmd *cmd,
+		const uint16 length,
+		const uint8 share)
+{
+	uint16 buffer_pos = 0;
+	uint8 skip_items=0;
+	int i;
+
+	if(length != 0) {
+		/* Pack Command ID */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], cmd->id);
+
+		/* Pack length of the command */
+		buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
+
+		/* When command support sharing, then pack sharing */
+		if( cmd_struct[cmd->id].flag & SHARE_ADDR ) {
+			/* Pack size (in bytes) of address that will be shared */
+			buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], share);
+		}
+	} else if( (cmd_struct[cmd->id].flag & SHARE_ADDR) && (share!=0) ) {
+		size_t shared_size;
+		/* Compute, how many items could be skipped */
+
+		/* TODO: create more effective algorithm */
+		for(i=0, shared_size=0;
+				(shared_size<share) &&
+				(i<cmd_struct[cmd->id].key_count);
+				i++)
+		{
+			shared_size += cmd_struct[cmd->id].items[i].size;
+			skip_items++;
+		}
+
+		assert(shared_size == share);
+	}
+
+	for(i=skip_items; i<cmd_struct[cmd->id].item_count; i++) {
+		switch(cmd_struct[cmd->id].items[i].type) {
+		case ITEM_RESERVED:
+			assert(cmd_struct[cmd->id].items[i].type==ITEM_RESERVED);
+			break;
+		case ITEM_INT8:
+		case ITEM_UINT8:
+			buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos],
+					UINT8(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_INT16:
+		case ITEM_UINT16:
+			buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos],
+					UINT16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_INT32:
+		case ITEM_UINT32:
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos],
+					UINT32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_INT64:
+			/* Implement it, when some command will need it */
+			assert(0);
+			break;
+		case ITEM_UINT64:
+			/* Implement it, when some command will need it */
+			assert(0);
+			break;
+		case ITEM_REAL32:
+			buffer_pos += vnp_raw_pack_real32(&buffer[buffer_pos],
+					REAL32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_REAL64:
+			buffer_pos += vnp_raw_pack_real64(&buffer[buffer_pos],
+					REAL64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_STRING8:
+			buffer_pos += vnp_raw_pack_string8(&buffer[buffer_pos],
+					PTR(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_STRING16:
+			/* Implement it, when some command will need it */
+			assert(0);
+			break;
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function pack command to the buffer that will be sent to the
+ * peer.
+ *
+ * \param[in] *buffer	The buffer to be send
+ * \param[in] *cmd		The pointer at generic command
+ * \param[in] length	The length of the command. If this value is zero, then
+ * the command will be piggy-packed to the previous command with the same id.
+ * \param[in] share		The size of address, that will be shared. This value is
+ * used, when previous parameter (length) is equal to zero.
+ *
+ * \return This function returns size of data that successfully packed to the
+ * buffer. When command is not known, the this function returns 0.
+ */
+int v_cmd_pack(char *buffer,
+		const struct Generic_Cmd *cmd,
+		const uint16 length,
+		const uint8 share)
+{
+	switch(cmd->id) {
+	case CMD_NODE_CREATE:
+		return v_node_create_pack(buffer, (struct Node_Create_Cmd*)cmd, length, share);
+		break;
+	case CMD_NODE_DESTROY:
+		return v_node_destroy_pack(buffer, (struct Node_Destroy_Cmd*)cmd, length);
+		break;
+	case CMD_NODE_SUBSCRIBE:
+		return v_node_subscribe_pack(buffer, (struct Node_Subscribe_Cmd*)cmd, length);
+		break;
+	case CMD_NODE_UNSUBSCRIBE:
+		return v_node_unsubscribe_pack(buffer, (struct Node_Unsubscribe_Cmd*)cmd, length);
+		break;
+	case CMD_TAGGROUP_CREATE:
+		return v_taggroup_create_pack(buffer, (struct TagGroup_Create_Cmd*)cmd, length, 0);
+		break;
+	default:
+		v_print_log_simple(VRS_PRINT_ERROR, "This command ID: %d is not supported yet\n", cmd->id);
+		assert(0);
+		break;
+	}
+
+	return 0;
+}
+
+uint8 _v_cmd_cmp_addr(struct Generic_Cmd *cmd1,
+		struct Generic_Cmd *cmd2,
+		const uint8 current_size)
+{
+	size_t share_size = 0;
+
+	assert(cmd1->id == cmd2->id);
+
+	if( (cmd_struct[cmd1->id].flag & SHARE_ADDR) &&
+			(current_size > 0))
+	{
+		int i;
+		for(i=0, share_size=0;
+				(share_size < current_size) &&
+				(i<cmd_struct[cmd1->id].key_count);
+				i++)
+		{
+			if( memcmp(&cmd1->data[cmd_struct[cmd1->id].items[i].offset],
+					&cmd2->data[cmd_struct[cmd2->id].items[i].offset],
+					cmd_struct[cmd1->id].items[i].size) == 0)
+			{
+				share_size += cmd_struct[cmd1->id].items[i].size;
+			} else {
+				return share_size;
+			}
+		}
+	}
+
+	return share_size;
+}
+
+/**
+ * \brief This function compares addresses and return size of address that
+ * could be shared. If commands can't share addresses, then this function will
+ * return -1.
+ */
+uint8 v_cmd_cmp_addr(struct Generic_Cmd *cmd1,
+		struct Generic_Cmd *cmd2,
+		const uint8 current_size)
+{
+	assert(cmd1->id == cmd2->id);
+
+	switch(cmd1->id) {
+	case CMD_NODE_CREATE:
+		return v_node_create_cmds_cmp((struct Node_Create_Cmd*)cmd1,
+				(struct Node_Create_Cmd*)cmd2,
+				current_size);
+		break;
+#if 0
+	case CMD_TAGGROUP_CREATE:
+		return v_taggroup_create_cmds_cmp((struct TagGroup_Create_Cmd*)cmd1,
+				(struct TagGroup_Create_Cmd*)cmd2,
+				current_size);
+		break;
+#endif
+	/* Some commands can't share any item of address */
+	case CMD_NODE_DESTROY:
+	case CMD_NODE_SUBSCRIBE:
+	case CMD_NODE_UNSUBSCRIBE:
+	case CMD_TAGGROUP_CREATE:
+		return -1;
+		break;
+	default:
+		v_print_log_simple(VRS_PRINT_ERROR, "This command ID: %d is not supported yet\n", cmd1->id);
+		assert(0);
+		break;
+	}
+
+	return 0;
+}
+
+uint16 _v_cmds_len(struct Generic_Cmd *cmd,
+		uint16 count,
+		uint8 share,
+		uint16 len)
+{
+	uint16 data_len = 0;
+
+	if(cmd_struct[cmd->id].flag & SHARE_ADDR) {
+
+		data_len = count*(cmd_struct[cmd->id].size - share);
+
+		if((UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + share + data_len) < 0xFF) {
+			/* OpCode + Length(1B) + Size of sharing + Shared address + Data */
+			return UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + share + data_len;
+		} else {
+			/* OpCode + 0xFF + Length(2B) + Size of sharing + Shared address + Data */
+			return UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + UINT8_SIZE + share + data_len;
+		}
+	} else {
+
+		if( ! (cmd_struct[cmd->id].flag & VAR_LEN) ) {
+			data_len = count*(cmd_struct[cmd->id].size);
+
+			if((UINT8_SIZE + UINT8_SIZE + data_len) < 0xFF) {
+				/* OpCode + Length(1B) + Data */
+				return UINT8_SIZE + UINT8_SIZE + data_len;
+			} else {
+				/* OpCode + 0xFF + Length(2B) + Data */
+				return UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + data_len;
+			}
+		} else {
+			/* TODO: for TagGroup_Create and Tag_Create */
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * \brief This function compute length of compressed commands.
+ */
+uint16 v_cmds_len(struct Generic_Cmd *cmd,
+		uint16 count,
+		uint8 share,
+		uint16 len)
+{
+	switch(cmd->id) {
+	case CMD_NODE_CREATE:
+		return v_node_create_cmds_len(count, share);
+		break;
+	case CMD_NODE_DESTROY:
+		return v_node_destroy_cmds_len(count);
+		break;
+	case CMD_NODE_SUBSCRIBE:
+		return v_node_subscribe_cmds_len(count);
+		break;
+	case CMD_NODE_UNSUBSCRIBE:
+		return v_node_unsubscribe_cmds_len(count);
+		break;
+	case CMD_TAGGROUP_CREATE:
+		return v_taggroup_create_cmds_len((struct TagGroup_Create_Cmd*)cmd, len);
+		break;
+	default:
+		v_print_log_simple(VRS_PRINT_ERROR, "This command ID: %d is not supported yet\n", cmd->id);
+		assert(0);
+		break;
+	}
+
+	return 0;
+}
+
+struct VCommandQueue *_v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	uint16 flag = (copy_bucket==1) ? HASH_COPY_BUCKET : 0;
+	struct Generic_Cmd cmd;
+
+	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
+	cmd_queue->item_size = UINT8_SIZE + cmd_struct[id].size;
+	if(cmd_struct[id].flag & REM_DUP) {
+		cmd_queue->flag = REMOVE_HASH_DUPS;
+	} else {
+		cmd_queue->flag = 0;
+	}
+	v_hash_array_init(&cmd_queue->cmds,
+			HASH_MOD_256 | flag,
+			(char*)&(cmd.data) - (char*)&(cmd),
+			cmd_struct[id].key_size);
+
+	return cmd_queue;
+}
+
+struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	uint16 flag = (copy_bucket==1) ? HASH_COPY_BUCKET : 0;
+
+	switch(id) {
+
+		case CMD_NODE_CREATE:
+			cmd_queue = v_node_create_cmd_queue(flag);
+			break;
+		case CMD_NODE_DESTROY:
+			cmd_queue = v_node_destroy_cmd_queue(flag);
+			break;
+		case CMD_NODE_SUBSCRIBE:
+			cmd_queue = v_node_subscribe_cmd_queue(flag);
+			break;
+		case CMD_NODE_UNSUBSCRIBE:
+			cmd_queue = v_node_unsubscribe_cmd_queue(flag);
+			break;
+		case CMD_TAGGROUP_CREATE:
+			cmd_queue = v_taggroup_create_cmd_queue(flag);
+			break;
+		default:
+			cmd_queue = NULL;
+			break;
+	}
+
+	return cmd_queue;
+}

@@ -1,0 +1,289 @@
+/*
+ * $Id$
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <stdio.h>
+#include <assert.h>
+
+#include "v_taggroup_commands.h"
+
+#include "v_in_queue.h"
+#include "v_common.h"
+#include "v_unpack.h"
+#include "v_pack.h"
+#include "v_network.h"
+#include "v_cmd_queue.h"
+
+/**
+ * \brief Print content of structure containing TagGroup_Destroy command
+ */
+void v_taggroup_destroy_print(const unsigned char level,
+		struct TagGroup_Destroy_Cmd *taggroup_destroy)
+{
+	v_print_log_simple(level, "\tCOMMAND_NAME, NodeID: %d, TagGroupID: %d\n",
+			taggroup_destroy->addr.node_id, taggroup_destroy->taggroup_id);
+}
+
+/**
+ * \brief This function computes the length of compressed commands
+ */
+uint16 v_taggroup_destroy_cmds_len(uint16 count)
+{
+	uint16 data_len;
+
+	data_len = count*2;
+
+	if( (1+1+data_len) < 0xFF ) {
+		return 1 + 1 + 1 + 4 + data_len;
+	} else {
+		return 1 + 1 + 2 + 1 + 4 + data_len;
+	}
+}
+
+/**
+ * \brief Unpack TagGroup_Destroy command from the buffer of the received packet
+ */
+int v_taggroup_destroy_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue)
+{
+	struct TagGroup_Destroy_Cmd *taggroup_destroy = NULL;
+	uint16 buffer_pos = 0;
+	uint8 id, share, cmd_addr_len, cmd_data_len;
+	uint16 length, taggroup_id;
+	uint32 node_id;
+	int i;
+
+	/* Is the remaining size of buffer big enough for TagGroup_Destroy command */
+	if(buffer_size < TAGGROUP_DESTROY_CMD_LEN) {
+		v_print_log(VRS_PRINT_WARNING, "Buffer size: %d < minimal command length: %d, skipping rest of packet.\n",
+				buffer_size, TAGGROUP_DESTROY_CMD_LEN);
+		return buffer_size;
+	}
+
+	/* Unpack ID */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &id);
+	/* Assert command id */
+	assert(id == CMD_TAGGROUP_DESTROY);
+
+	/* Unpack length of the command */
+	buffer_pos += v_cmd_unpack_len(&buffer[buffer_pos], &length, &cmd_addr_len);
+
+	/* Unpack size of address that is shared (UserID, ParentID) */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &share);
+	cmd_addr_len += 1; /* Size of: Share */
+
+	/* Default length of the command, when no sharing of address is used */
+	cmd_data_len = TAGGROUP_DESTROY_CMD_DATA_LEN;
+
+	/* Update base_len and data_len according type of sharing command address */
+	switch(share) {
+	case 0:
+		/* No sharing and no compression is used */
+		break;
+	case 4:
+		cmd_addr_len += share;
+		cmd_data_len -= share;
+		break;
+	default:
+		v_print_log(VRS_PRINT_WARNING, "Bad share: %d != [0,4] of TagGroup_Destroy command, skipping this command.\n", share);
+		return length;
+	}
+
+	/* Check length of the command */
+	if( ((length - cmd_addr_len) % cmd_data_len) != 0 ) {
+		v_print_log(VRS_PRINT_WARNING, "Bad length: %d != %d of TagGroup_Destroy command.\n", length, TAGGROUP_DESTROY_CMD_LEN);
+		return length;
+	}
+
+	buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+	buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &taggroup_id);
+
+	/* Create TagGroup_Destroy command */
+	taggroup_destroy = v_taggroup_destroy_create(node_id, taggroup_id);
+
+	/* Push command to the queue of incoming commands */
+	v_in_queue_push(v_in_queue, (struct Generic_Cmd*)taggroup_destroy);
+
+	/* Print content of received command */
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 34);
+		v_taggroup_destroy_print(VRS_PRINT_DEBUG_MSG, taggroup_destroy);
+		printf("%c[%dm", 27, 0);
+	}
+
+	for(i = 1; i< ((length - cmd_addr_len) / cmd_data_len); i++) {
+
+		if(share==0) {
+			buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+			buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &taggroup_id);
+		} else if(share==4) {
+			buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &taggroup_id);
+		}
+
+		/* Create TagGroup_Destroy command */
+		taggroup_destroy = v_taggroup_destroy_create(node_id, taggroup_id);
+
+		/* Push command to the queue of incoming commands */
+		v_in_queue_push(v_in_queue, (struct Generic_Cmd*)taggroup_destroy);
+
+		/* Print content of received command */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 34);
+			v_taggroup_destroy_print(VRS_PRINT_DEBUG_MSG, taggroup_destroy);
+			printf("%c[%dm", 27, 0);
+		}
+	}
+
+	/* Buffer_pos has to be equal to command length. */
+	assert(buffer_pos == length);
+
+	return buffer_pos;
+}
+
+/**
+ * \brief Pack TagGroup_Destroy command to the buffer
+ */
+int v_taggroup_destroy_pack(char *buffer,
+		const struct TagGroup_Destroy_Cmd *taggroup_destroy,
+		const uint16 length,
+		const uint8 share)
+{
+	uint16 buffer_pos = 0;
+
+	if(length != 0) {
+		/* Pack Command ID */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], CMD_TAGGROUP_DESTROY);
+
+		/* Pack length of the command */
+		buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
+
+		/* Pack size of address that will be shared */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], share);
+
+		/* Pack address */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], taggroup_destroy->addr.node_id);
+		/* Pack data */
+		buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], taggroup_destroy->taggroup_id);
+
+	} else {
+		switch(share) {
+		case 0:
+			/* Pack address */
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], taggroup_destroy->addr.node_id);
+			/* Pack data */
+			buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], taggroup_destroy->taggroup_id);
+			break;
+		case 4:
+			/* Pack data */
+			buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], taggroup_destroy->taggroup_id);
+			break;
+		default:
+			assert(0);
+			break;
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function initialize command queue with TagGroup_Destroy commands
+ */
+struct VCommandQueue *v_taggroup_destroy_cmd_queue(uint16 flag)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	struct TagGroup_Destroy_Cmd taggroup_destroy;
+
+	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
+	cmd_queue->item_size = sizeof(struct TagGroup_Destroy_Cmd);
+	cmd_queue->flag = 0;
+	v_hash_array_init(&cmd_queue->cmds,
+			HASH_MOD_256 | flag,
+			(char*)&(taggroup_destroy.addr) - (char*)&(taggroup_destroy),
+			sizeof(struct TagGroup_Destroy_Addr));
+
+	return cmd_queue;
+}
+
+/**
+ * \brief This function initialize structure of command
+ */
+void v_taggroup_destroy_init(struct TagGroup_Destroy_Cmd *taggroup_destroy,
+		uint32 node_id,
+		uint16 taggroup_id)
+{
+	if(taggroup_destroy != NULL) {
+		taggroup_destroy->id = CMD_TAGGROUP_DESTROY;
+		taggroup_destroy->addr.node_id = node_id;
+		taggroup_destroy->taggroup_id = taggroup_id;
+	}
+}
+
+/**
+ * \brief This function creates new structure of command
+ */
+struct TagGroup_Destroy_Cmd *v_taggroup_destroy_create(uint32 node_id,
+		uint16 taggroup_id)
+{
+	struct TagGroup_Destroy_Cmd *taggroup_destroy = NULL;
+	taggroup_destroy = (struct TagGroup_Destroy_Cmd*)calloc(1, sizeof(struct TagGroup_Destroy_Cmd));
+	v_taggroup_destroy_init(taggroup_destroy, node_id, taggroup_id);
+	return taggroup_destroy;
+}
+
+/**
+ * \brief This function clear structure of command. It should free allocated
+ * memory inside this structure.
+ */
+void v_taggroup_destroy_clear(struct TagGroup_Destroy_Cmd *taggroup_destroy)
+{
+	if(taggroup_destroy != NULL) {
+		taggroup_destroy->addr.node_id = -1;
+		taggroup_destroy->taggroup_id = -1;
+	}
+}
+
+/**
+ * \brief This function destroy structure of command
+ */
+void v_taggroup_destroy_destroy(struct TagGroup_Destroy_Cmd **taggroup_destroy)
+{
+	if(taggroup_destroy != NULL) {
+		v_taggroup_destroy_clear(*taggroup_destroy);
+		free(*taggroup_destroy);
+		*taggroup_destroy = NULL;
+	}
+}

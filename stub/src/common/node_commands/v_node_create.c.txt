@@ -1,0 +1,392 @@
+/*
+ * $Id: v_node_create.c 930 2011-08-23 12:59:42Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <assert.h>
+
+#include "verse.h"
+
+#include "v_node_commands.h"
+#include "v_cmd_queue.h"
+#include "v_in_queue.h"
+#include "v_common.h"
+#include "v_unpack.h"
+#include "v_pack.h"
+#include "v_network.h"
+
+/**
+ * \brief Print content of structure containing node_create command
+ */
+void v_node_create_print(const unsigned char level,
+		struct Node_Create_Cmd *node_create_cmd)
+{
+	v_print_log_simple(level, "\tNODE_CREATE, NodeID: %d, ParentID: %d, UserID: %d\n",
+			node_create_cmd->node_id,
+			node_create_cmd->addr.parent_id,
+			node_create_cmd->addr.user_id);
+}
+
+/**
+ * This function compares addresses of two Node_Create commands and it returns
+ * size of address that could be shared
+ */
+uint8 v_node_create_cmds_cmp(struct Node_Create_Cmd *cmd1,
+		struct Node_Create_Cmd *cmd2,
+		const uint8 current_size)
+{
+	int same = 0;
+
+	if(current_size > 0 && cmd1->addr.user_id == cmd2->addr.user_id) {
+		same += 2;
+		if(current_size > 2 && cmd1->addr.parent_id == cmd2->addr.parent_id) {
+			same += 4;
+		}
+	}
+
+	return same;
+}
+
+/**
+ * \brief This function compute length of compressed NodeCreate commands.
+ */
+int16 v_node_create_cmds_len(uint16 count, uint8 share)
+{
+	uint16 data_len;
+
+	switch(share) {
+	case 0:
+		/* All items of addresses are unique */
+		data_len = count*(2 + 4 + 4);
+		break;
+	case 2:
+		/* When share = 2 (UserID is shared), then ParenID and NodeID are unique */
+		data_len = count*(4 + 4);
+		break;
+	case 6:
+		/* When share = 6  (UserID and ParentID is shared), then only NodeID is unique */
+		data_len = count*(4);
+		break;
+	default:
+		/* Node_Create doesn't support this size of address sharing. */
+		assert(0);
+		break;
+	}
+
+	if((1 + 1 + 1 + share + data_len) < 0xFF) {
+		/* OpCode + Length(1B) + Size of sharing + Shared address + Data */
+		return 1 + 1 + 1 + share + data_len;
+	} else {
+		/* OpCode + 0xFF + Length(2B) + Size of sharing + Shared address + Data */
+		return 1 + 1 + 2 + 1 + share + data_len;
+	}
+}
+
+/**
+ * \brief This function tries to unpack Node_Create command(s) from the
+ * buffer of the received packet.
+ *
+ * \param[in] *buffer		The pointer to the received buffer that has not been unpacked yet.
+ * \param[in] buffer_size	The size of received buffer that has not been unpacked yet.
+ * \param[out] *vpacket		The pointer at VPacket, when unpacked commands will stored.
+ * \param[out] *count		The pointer at integer storing information about unpacked commands.
+ *
+ * \return This function returns number of unpacked bytes. When the length of the
+ * command is bigger then buffere_size, then buffer_size is returned. When the
+ * length of the command is wrong, then command(s) are not unpacked, but the
+ * propagated length is returned.
+ */
+int v_node_create_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue)
+{
+	struct Node_Create_Cmd *node_create = NULL;
+	uint16 buffer_pos = 0;
+	uint8 cmd_id;
+	uint16 user_id;
+	uint32 parent_id;
+	uint32 node_id;
+	uint8 share, cmd_addr_len;
+	uint16 cmd_data_len, length;
+	int i = 0;
+
+	/* Is the remaining size of buffer big enough for Node_Create command */
+	if(buffer_size < NODE_CREATE_CMD_LEN) {
+		v_print_log(VRS_PRINT_WARNING, "Buffer size: %d < minimal Node_Create command length: %d, skipping rest of packet.\n",
+				buffer_size, NODE_CREATE_CMD_LEN);
+		return buffer_size;
+	}
+
+	/* Unpack ID */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &cmd_id);
+	/* Assert command id */
+	assert(cmd_id==CMD_NODE_CREATE);
+
+	/* Unpack Length of the command */
+	buffer_pos += v_cmd_unpack_len(&buffer[buffer_pos], &length, &cmd_addr_len);
+
+	/* Unpack size of address that is shared (UserID, ParentID) */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &share);
+	cmd_addr_len += 1; /* Size of: Share */
+
+	/* Default length of the command, when no sharing of address is used */
+	cmd_data_len = NODE_CREATE_CMD_DATA_LEN;
+
+	/* Update base_len and data_len according type of sharing command address */
+	switch(share) {
+	case 0:
+		/* No sharing and no compression is used */
+		break;
+	case 2:
+	case 6:
+		cmd_addr_len += share;
+		cmd_data_len -= share;
+		break;
+	default:
+		v_print_log(VRS_PRINT_WARNING, "Bad share: %d != [0,2,6] of Node_Create command, skipping this command.\n", share);
+		return length;
+	}
+
+	/* Check the length of the command */
+	if( ((length - cmd_addr_len) % cmd_data_len) != 0) {
+		v_print_log(VRS_PRINT_WARNING, "Bad length: %d != %d+(N*%d) of Node_Create command, skipping this command.\n",
+				length, cmd_addr_len, cmd_data_len);
+		return length;
+	}
+
+	/* Unpack commands compressed to this command */
+	for(i=0; i<((length - cmd_addr_len) / cmd_data_len); i++) {
+		/* First command */
+		if(i==0) {
+			/* Unpack User ID */
+			buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &user_id);
+			/* Unpack Parent ID */
+			buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &parent_id);
+			/* Unpack Node ID */
+			buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+		/* Remaining compressed commands */
+		} else {
+			if(share==0) {
+				/* Unpack User ID */
+				buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &user_id);
+				/* Unpack Parent ID */
+				buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &parent_id);
+				/* Unpack Node ID */
+				buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+			} else if(share==2) {
+				/* Unpack Parent ID */
+				buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &parent_id);
+				/* Unpack Node ID */
+				buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+			} else if(share==6) {
+				/* Unpack Node ID */
+				buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+			}
+		}
+
+		/* Create new node_create command */
+		node_create = v_node_create_create(node_id, parent_id, user_id);
+
+		/* Put command to the queue of incoming commands */
+		v_in_queue_push(v_in_queue, (struct Generic_Cmd*)node_create);
+
+		/* Print content of received command */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 34);
+			v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)node_create);
+			printf("%c[%dm", 27, 0);
+		}
+	}
+
+	/* Buffer_pos has to be equal to command length. */
+	assert(buffer_pos == length);
+
+	/* Update number of unpacked commands from packet */
+	return buffer_pos;
+}
+
+/**
+ * \brief Pack node_create command to the buffer
+ */
+int v_node_create_pack(char *buffer,
+		const struct Node_Create_Cmd *node_create_cmd,
+		const uint16 length,
+		const uint8 share)
+{
+	uint16 buffer_pos = 0;
+
+	if(length != 0) {
+		/* Pack Command ID */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], CMD_NODE_CREATE);
+		/* Pack length of the command */
+		buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
+		/* Pack size (in bytes) of address that will be shared */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], share);
+		/* Pack User ID */
+		buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], node_create_cmd->addr.user_id);
+		/* Pack Parent ID */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->addr.parent_id);
+		/* Pack Node ID */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->node_id);
+	} else {
+		switch(share) {
+		/* All items of addresses are unique */
+		case 0:
+			/* Pack User ID */
+			buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], node_create_cmd->addr.user_id);
+			/* Pack Parent ID */
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->addr.parent_id);
+			/* Pack Node ID */
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->node_id);
+			break;
+		/* When share = 2 (UserID is shared), then pack only ParenID and NodeID */
+		case 2:
+			/* Pack Parent ID */
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->addr.parent_id);
+			/* Pack Node ID */
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->node_id);
+			break;
+		/* When share = 6  (UserID and ParentID is shared), then pack only NodeID */
+		case 6:
+			/* Pack Node ID */
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_create_cmd->node_id);
+			break;
+		/* Node_Create doesn't support this share. */
+		default:
+			assert(0);
+			break;
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function initialize command queue with Node_Create commands
+ */
+struct VCommandQueue *v_node_create_cmd_queue(uint16 flag)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	struct Node_Create_Cmd node_create_cmd;
+
+	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
+	cmd_queue->item_size = sizeof(struct Node_Create_Cmd);
+	cmd_queue->flag = 0;
+	v_hash_array_init(&cmd_queue->cmds,
+			HASH_MOD_256 | flag,
+			(char*)&(node_create_cmd.addr) - (char*)&(node_create_cmd),
+			sizeof(struct Node_Create_Addr));
+
+	return cmd_queue;
+}
+
+static void _v_node_create_init(struct Generic_Cmd *node_create,
+		uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id)
+{
+    if(node_create != NULL) {
+        /* initialize members with values */
+    	node_create->id = CMD_NODE_CREATE;
+    	UINT16(node_create->data[0]) = user_id;
+    	UINT32(node_create->data[UINT16_SIZE]) = parent_id;
+    	UINT32(node_create->data[UINT16_SIZE + UINT32_SIZE]) = node_id;
+    }
+}
+
+/**
+ * \brief This function initialize members of structure for Node_Create command
+ */
+void v_node_create_init(struct Node_Create_Cmd *node_create,
+		uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id)
+{
+    if(node_create != NULL) {
+        /* initialize members with values */
+    	node_create->id = CMD_NODE_CREATE;
+    	node_create->addr.parent_id = parent_id;
+    	node_create->addr.user_id = user_id;
+    	node_create->node_id = node_id;
+    }
+}
+
+extern struct Cmd_Struct cmd_struct[];
+
+struct Generic_Cmd *_v_node_create_create(uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id)
+{
+    struct Generic_Cmd *node_create = NULL;
+    node_create = (struct Generic_Cmd *)malloc(cmd_struct[CMD_NODE_CREATE].size);
+    _v_node_create_init(node_create, node_id, parent_id, user_id);
+    return node_create;
+}
+
+/**
+ * \brief this function creates new structure of Node_Create command
+ */
+struct Node_Create_Cmd *v_node_create_create(uint32 node_id,
+		uint32 parent_id,
+		uint16 user_id)
+{
+    struct Node_Create_Cmd *node_create = NULL;
+    node_create = (struct Node_Create_Cmd*)calloc(1, sizeof(struct Node_Create_Cmd));
+    v_node_create_init(node_create, node_id, parent_id, user_id);
+    return node_create;
+}
+
+/**
+ * \brief This function clear members of structure for Node_Create command
+ */
+void v_node_create_clear(struct Node_Create_Cmd *node_create)
+{
+    if(node_create != NULL) {
+        node_create->addr.parent_id = -1;
+        node_create->addr.user_id = -1;
+        node_create->node_id = -1;
+    }
+}
+
+/**
+ * \brief This function destroy Node_Create command
+ */
+void v_node_create_destroy(struct Node_Create_Cmd **node_create)
+{
+    if(node_create != NULL) {
+        v_node_create_clear(*node_create);
+        free(*node_create);
+        *node_create = NULL;
+    }
+}

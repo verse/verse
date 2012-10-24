@@ -1,0 +1,21 @@
+General Information
+===================
+
+Each directory contains some Promela source code, that could simulate
+or verify some part of Verse protocol. Each directory could contain some
+subdirectories concerned to some subproblem. Spin program is used
+for simulation and verification. Spin could be downloaded from:
+
+  http://http://spinroot.com/
+
+To simulate some simplified part of Verse protocol go to a directory
+containing Makefile and type:
+
+  make sim
+
+To verify this part of Verse protocol type:
+
+  make ver
+
+Keep in mind that verification of some parts of Verse protocol could
+require lot of memory and can take few minutes.

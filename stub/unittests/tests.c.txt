@@ -1,0 +1,1003 @@
+/*
+ * $Id: tests.c.txt 1267 2012-07-23 19:10:28Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2010, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+#include "verse.h"
+
+#include "v_in_queue.h"
+#include "v_out_queue.h"
+#include "v_sys_commands.h"
+#include "v_fake_commands.h"
+#include "v_node_commands.h"
+#include "v_common.h"
+#include "v_history.h"
+#include "v_list.h"
+
+int test_ack_nak_history(void)
+{
+	int i;
+
+	struct Ack_Nak_Cmd ack_nak;
+	struct AckNakHistory hist;
+
+	v_ack_nak_history_init(&hist);
+
+	ack_nak.id = CMD_ACK_ID;
+	ack_nak.pay_id = 0;
+	printf("Added: ACK CMD, 0\n");
+	v_ack_nak_history_add_cmd(&hist, &ack_nak);
+
+	v_ack_nak_history_print(&hist);
+
+	for(i=1; i<10; i++) {
+		if((rand() / (RAND_MAX + 1.0)) > 0.5) {
+			ack_nak.id = CMD_ACK_ID;
+			printf("Added: ACK CMD, %d\n", i);
+		} else {
+			ack_nak.id = CMD_NAK_ID;
+			printf("Added: NAK CMD, %d\n", i);
+		}
+
+		ack_nak.pay_id = i;
+		v_ack_nak_history_add_cmd(&hist, &ack_nak);
+
+		v_ack_nak_history_print(&hist);
+	}
+
+	ack_nak.id = CMD_ACK_ID;
+	ack_nak.pay_id = 10;
+	printf("Added: ACK CMD, 10\n");
+	v_ack_nak_history_add_cmd(&hist, &ack_nak);
+
+	v_ack_nak_history_print(&hist);
+
+	printf("\n\n");
+
+	for(i=0; i<11; i+=2) {
+		printf("Removed: ANK_ID: %d\n", i);
+		v_ack_nak_history_remove_cmds(&hist, i);
+
+		v_ack_nak_history_print(&hist);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+#if 0
+
+void *add_fake_cmds_thread(void *arg)
+{
+	struct VNetQueueList *queue_list = (struct VNetQueueList*)arg;
+	struct Connect_Accept_Cmd data;
+	int i;
+
+	printf("Add items\n\n");
+
+	v_queue_print(queue_list->queues[FAKE_CMD_CONNECT_ACCEPT]);
+
+	for(i=0; i<15; i++) {
+		data.avatar_id = i;
+		data.user_id = i;
+
+		v_queue_push_item(queue_list->queues[FAKE_CMD_CONNECT_ACCEPT], &data);
+		printf("ADDED: avatar_id: %d, user_id: %d\n\n", data.avatar_id, data.user_id);
+		v_queue_print(queue_list->queues[FAKE_CMD_CONNECT_ACCEPT]);
+
+		sleep(1);
+	}
+
+	pthread_exit(NULL);
+
+	return NULL;
+}
+
+void *remove_fake_cmds_thread(void *arg)
+{
+	struct VNetQueueList *queue_list = (struct VNetQueueList*)arg;
+	struct Connect_Accept_Cmd data;
+	int i;
+
+	printf("Remove items\n\n");
+
+	sleep(5);
+
+	for(i=0; i<10; i++) {
+		if(v_queue_pop_item(queue_list->queues[FAKE_CMD_CONNECT_ACCEPT], &data)!=NULL) {
+			printf("REMOVED: avatar_id: %d, user_id: %d\n\n", data.avatar_id, data.user_id);
+		}
+		v_queue_print(queue_list->queues[FAKE_CMD_CONNECT_ACCEPT]);
+
+		sleep(2);
+	}
+
+	pthread_exit(NULL);
+
+	return NULL;
+}
+
+int test_queues_fake(void)
+{
+	struct VNetQueueList queue_list;
+	pthread_t add_thread, rem_thread;
+	void *thread_result;
+
+	v_out_queue_init(&queue_list);
+
+	if( (pthread_create(&add_thread, NULL, add_fake_cmds_thread, (void*)&queue_list)) != 0 ) {
+		perror("Thread (A) creation failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	if( (pthread_create(&rem_thread, NULL, remove_fake_cmds_thread, (void*)&queue_list)) != 0 ) {
+		perror("Thread (B) creation failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	if( (pthread_join(add_thread, &thread_result)) != 0 ) {
+		perror("Thread (A) join failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	if( (pthread_join(rem_thread, &thread_result)) != 0 ) {
+		perror("Thread (B) join failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	v_out_queue_destroy(&queue_list);
+
+	return EXIT_SUCCESS;
+}
+
+void *add_node_cmds_thread(void *arg)
+{
+	struct VNetQueueList *queue_list = (struct VNetQueueList*)arg;
+	struct Node_Destroy_Cmd node_cmd;
+	int i;
+
+	printf("Add node cmds\n\n");
+
+	v_queue_print(queue_list->queues[FAKE_CMD_CONNECT_ACCEPT]);
+
+	for(i=0; i<128; i++) {
+		node_cmd.id = CMD_NODE_DESTROY;
+		node_cmd.addr.node_id = i/2;
+
+		v_queue_push_item(queue_list->queues[CMD_NODE_DESTROY], &node_cmd);
+		printf("ADDED: id: %d, node_id: %d\n\n",
+				node_cmd.id, node_cmd.addr.node_id);
+		v_queue_print(queue_list->queues[CMD_NODE_DESTROY]);
+
+		usleep(10000);
+	}
+
+	pthread_exit(NULL);
+
+	return NULL;
+}
+
+void *remove_node_cmds_thread(void *arg)
+{
+	struct VNetQueueList *queue_list = (struct VNetQueueList*)arg;
+	struct Node_Destroy_Cmd node_cmd;
+	int i;
+
+	printf("Remove node cmds\n\n");
+
+	sleep(2);
+
+	for(i=0; i<64; i++) {
+		if(v_queue_pop_item(queue_list->queues[CMD_NODE_DESTROY], &node_cmd)!=NULL) {
+			printf("REMOVED: id: %d, node_id: %d\n\n",
+					node_cmd.id, node_cmd.addr.node_id);
+		}
+		v_queue_print(queue_list->queues[CMD_NODE_DESTROY]);
+
+		usleep(10000);
+	}
+
+	pthread_exit(NULL);
+
+	return NULL;
+}
+
+
+int test_queues_node(void)
+{
+	struct VNetQueueList queue_list;
+	pthread_t add_thread, rem_thread;
+	void *thread_result;
+
+	v_out_queue_init(&queue_list);
+
+	if( (pthread_create(&add_thread, NULL, add_node_cmds_thread, (void*)&queue_list)) != 0 ) {
+		perror("Thread (A) creation failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	if( (pthread_create(&rem_thread, NULL, remove_node_cmds_thread, (void*)&queue_list)) != 0 ) {
+		perror("Thread (B) creation failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	if( (pthread_join(add_thread, &thread_result)) != 0 ) {
+		perror("Thread (A) join failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	if( (pthread_join(rem_thread, &thread_result)) != 0 ) {
+		perror("Thread (B) join failed.\n");
+		return EXIT_FAILURE;
+	}
+
+	v_out_queue_destroy(&queue_list);
+
+	return EXIT_SUCCESS;
+}
+
+#endif
+
+/* Example item structure, that could be added to the linked list. It has to
+ * contain prev and next pointer. It should contain its unique id. */
+typedef struct ExampleItem {
+	struct ExampleItem	*prev, *next;
+	uint32				id;
+} ExampleItem;
+
+int test_list(void)
+{
+	struct VArrayBase ab;
+	struct ExampleItem	*item;
+	int i;
+	uint32 index, ret;
+
+	v_array_init(&ab);
+
+	for(i=0; i<10; i++) {
+		item = (struct ExampleItem*)malloc(sizeof(struct ExampleItem));
+
+		ret = v_array_add_item(&ab, item, &index);
+		if(ret == 1) {
+			item->id = index;
+			printf("Added item, id: %d\n", index);
+		} else {
+			printf("Failed to add item\n");
+		}
+	}
+
+	for(i=11; i>=0; i--) {
+		item = v_array_find_item(&ab, i);
+
+		if(item != NULL) {
+			ret = v_array_remove_item(&ab, item->id);
+			if(ret == 1) {
+				printf("Item, id: %d removed\n", i);
+			} else {
+				printf("Failed to remove item, id %d\n", i);
+			}
+		} else {
+			printf("Unable to remove item, id: %d\n", i);
+		}
+	}
+
+	v_array_free(&ab);
+
+	return EXIT_SUCCESS;
+}
+
+/**
+ * Simple address for testing collisions
+ */
+typedef struct Simple_Cmd_Addr {
+	uint16 					id;
+} Simple_Cmd_Addr;
+
+/**
+ * Simple structure for testing hashed linked list
+ */
+typedef struct Simple_Cmd {
+	uint8					id;
+	struct Simple_Cmd_Addr	addr;
+} Simple_Cmd;
+
+/**
+ * \brief This function does basic test for adding simple structure
+ */
+int test_hash(void)
+{
+	struct VHashArrayBase *hash_array;
+	struct VBucket *vbucket;
+	struct Simple_Cmd cmd;
+	uint16 cmd_id;
+	uint8 id;
+	int ret;
+
+	hash_array = (struct VHashArrayBase *)malloc(sizeof(struct VHashArrayBase));
+
+	v_hash_array_init(hash_array,
+			HASH_MOD_256 | HASH_COPY_BUCKET,
+			(char*)&(cmd.addr) - (char*)&(cmd),
+			sizeof(struct Simple_Cmd_Addr));
+
+	printf("sizeof cmd: %ld\n", (long int)sizeof(struct Simple_Cmd));
+	printf("key offset: %d, key size: %d\n", hash_array->key_offset, hash_array->key_size);
+
+	/* Adding first command */
+	cmd.id = id = 0;
+	cmd.addr.id = cmd_id = 5;
+	printf("Adding item: %d ...\n",	cmd_id);
+	vbucket = v_hash_array_add_item(hash_array, &cmd, sizeof(cmd));
+	if(vbucket != NULL) printf("Item added\n");
+	else printf("Item not added\n");
+
+	/* Adding second command with collision */
+	cmd.id = id = 1;
+	cmd.addr.id = cmd_id = 256 + 5;
+	printf("Adding cmd: %d ...\n",	cmd_id);
+	vbucket = v_hash_array_add_item(hash_array, &cmd, sizeof(cmd));
+	if(vbucket != NULL) printf("Item added\n");
+	else printf("Item not added\n");
+
+	/* Adding third command with collision */
+	cmd.id = id = 2;
+	cmd.addr.id = cmd_id = 2*256 + 5;
+	printf("Adding cmd: %d ...\n",	cmd_id);
+	vbucket = v_hash_array_add_item(hash_array, &cmd, sizeof(cmd));
+	if(vbucket != NULL) printf("Item added\n");
+	else printf("Item not added\n");
+
+	if(0) {
+		/* Finding first command */
+		cmd.id = id = 0;
+		cmd.addr.id = cmd_id = 5;
+		printf("Finding item: %d ...\n", cmd_id);
+		vbucket = v_hash_array_find_item(hash_array, (void*)&cmd);
+		if(vbucket != NULL) {
+			printf("Found: %d\n", ((struct Simple_Cmd*)(vbucket->data))->addr.id);
+		} else {
+			printf("Item not found\n");
+		}
+
+		/* Finding second command */
+		cmd.id = id = 1;
+		cmd.addr.id = cmd_id = 256 + 5;
+		printf("Finding item: %d ...\n", cmd_id);
+		vbucket = v_hash_array_find_item(hash_array, (void*)&cmd);
+		if(vbucket != NULL) {
+			printf("Found: %d\n", ((struct Simple_Cmd*)(vbucket->data))->addr.id);
+		} else {
+			printf("Item not found\n");
+		}
+
+		/* Finding third command */
+		cmd.id = id = 2;
+		cmd.addr.id = cmd_id = 2*256 + 5;
+		printf("Finding item: %d ...\n", cmd_id);
+		vbucket = v_hash_array_find_item(hash_array, (void*)&cmd);
+		if(vbucket != NULL) {
+			printf("Found: %d\n", ((struct Simple_Cmd*)(vbucket->data))->addr.id);
+		} else {
+			printf("Item not found\n");
+		}
+	}
+
+	if(1) {
+		/* Removing first item */
+		cmd.id = id = 0;
+		cmd.addr.id = cmd_id = 5;
+		printf("Removing item: %d ...\n", cmd_id);
+		ret = v_hash_array_remove_item(hash_array, &cmd);
+		if(ret == 1) printf("Item removed\n");
+		else printf("Item not removed\n");
+	}
+
+	if(1) {
+		/* Removing second item */
+		cmd.id = id = 1;
+		cmd.addr.id = cmd_id = 256 + 5;
+		printf("Removing item: %d ...\n", cmd_id);
+		ret = v_hash_array_remove_item(hash_array, &cmd);
+		if(ret == 1) printf("Item removed\n");
+		else printf("Item not removed\n");
+	}
+
+	if(1) {
+		/* Removing last item */
+		cmd.id = id = 2;
+		cmd.addr.id = cmd_id = 2*256 + 5;
+		printf("Removing item: %d ...\n", cmd_id);
+		ret = v_hash_array_remove_item(hash_array, &cmd);
+		if(ret == 1) printf("Item removed\n");
+		else printf("Item not removed\n");
+	}
+
+	/* Adding 4th command with collision */
+	cmd.id = id = 3;
+	cmd.addr.id = cmd_id = 3*256 + 5;
+	printf("Adding cmd: %d ...\n",	cmd_id);
+	vbucket = v_hash_array_add_item(hash_array, &cmd, sizeof(cmd));
+	if(vbucket != NULL) printf("Item added\n");
+	else printf("Item not added\n");
+
+	v_hash_array_destroy(hash_array);
+
+	free(hash_array);
+
+	return EXIT_SUCCESS;
+}
+
+typedef struct Example_Cmd_Addr {
+	uint32	node_id;
+	uint16	taggroup_id;
+	uint16	tag_id;
+} Example_Cmd_Addr;
+
+typedef struct Example_Cmd {
+	uint8	id;
+	struct Example_Cmd_Addr	addr;
+} Example_Cmd;
+
+int test_hash_256(void)
+{
+	struct VHashArrayBase *hash_array;
+	struct VBucket *vbucket;
+	struct Example_Cmd cmd;
+	uint32 node_id, init_node_id;
+	uint16 taggroup_id;
+	uint16 tag_id, init_tag_id;
+	uint16 count, collisions;
+	int i, ret;
+
+	hash_array = (struct VHashArrayBase *)malloc(sizeof(struct VHashArrayBase));
+
+	v_hash_array_init(hash_array,
+			HASH_MOD_256 | HASH_COPY_BUCKET,
+			(char*)&(cmd.addr) - (char*)&(cmd),
+			sizeof(struct Example_Cmd_Addr));
+
+	printf("sizeof cmd: %ld\n", (long int)sizeof(struct Example_Cmd));
+	printf("key offset: %d, key size: %d\n", hash_array->key_offset, hash_array->key_size);
+
+	init_node_id = rand();
+	init_tag_id = rand();
+
+	/* Adding items */
+	for(node_id=init_node_id, taggroup_id=init_tag_id, tag_id=init_tag_id;
+			node_id < init_node_id+1000;
+			node_id+=1, taggroup_id+=3, tag_id+=6)
+	{
+		cmd.addr.node_id = node_id;
+		cmd.addr.taggroup_id = taggroup_id;
+		cmd.addr.tag_id = tag_id;
+
+		printf("Adding cmd: %d, %d, %d ...\n",
+							node_id, taggroup_id, tag_id);
+
+		vbucket = v_hash_array_add_item(hash_array, &cmd, sizeof(struct Example_Cmd));
+
+		if(vbucket != NULL) {
+			printf("Added cmd: %d, %d, %d to the bucket: %p\n",
+					node_id, taggroup_id, tag_id, (void*)vbucket);
+		} else {
+			printf("Adding cmd: %d, %d, %d FAILED.\n",
+					node_id, taggroup_id, tag_id);
+		}
+	}
+
+	count = v_hash_array_count_items(hash_array);
+
+	collisions = 0;
+	for(i=0; i<hash_array->length; i++) {
+		if(hash_array->buckets[i].next != NULL) {
+			struct VBucketP *vbucket_p = hash_array->buckets[i].next;
+
+			while(vbucket_p != NULL) {
+				collisions++;
+				vbucket_p = vbucket_p->next;
+			}
+		}
+	}
+
+	printf("\n\n%d collisions in %d items\n", collisions, count);
+
+	/* Finding items */
+	for(node_id=init_node_id, taggroup_id=init_tag_id, tag_id=init_tag_id;
+			node_id < init_node_id+1000;
+			node_id+=1, taggroup_id+=3, tag_id+=6)
+	{
+		cmd.addr.node_id = node_id;
+		cmd.addr.taggroup_id = taggroup_id;
+		cmd.addr.tag_id = tag_id;
+
+		printf("Trying to find cmd: %d, %d, %d ...\n",
+							node_id, taggroup_id, tag_id);
+		/*printf("\t");
+		for(m=0; m < sizeof(struct Example_Cmd_Addr); m++) {
+			printf("%2X ", *(((uint8*)&cmd.addr)+m));
+		}
+		printf("\n");*/
+
+		vbucket = v_hash_array_find_item(hash_array, (void*)&cmd);
+
+		if(vbucket != NULL) {
+			struct Example_Cmd *fcmd;
+			printf("Cmd: %d, %d, %d found: %p\n",
+					node_id, taggroup_id, tag_id, (void*)vbucket);
+			fcmd = (struct Example_Cmd *)vbucket->data;
+			printf("\tFound Cmd: %d, %d, %d\n",
+					fcmd->addr.node_id, fcmd->addr.taggroup_id, fcmd->addr.tag_id);
+		} else {
+			printf("Cmd: %d, %d, %d NOT FOUND.\n",
+					node_id, taggroup_id, tag_id);
+		}
+	}
+
+	/* Removing items */
+	for(node_id=init_node_id, taggroup_id=init_tag_id, tag_id=init_tag_id;
+			node_id < init_node_id+50;
+			node_id+=1, taggroup_id+=3, tag_id+=6)
+	{
+		cmd.addr.node_id = node_id;
+		cmd.addr.taggroup_id = taggroup_id;
+		cmd.addr.tag_id = tag_id;
+
+		printf("Trying to remove cmd: %d, %d, %d ...\n",
+							node_id, taggroup_id, tag_id);
+
+		ret = v_hash_array_remove_item(hash_array, &cmd);
+
+		if(ret==1) {
+			printf("Cmd: %d, %d, %d removed\n",
+					node_id, taggroup_id, tag_id);
+		} else {
+			printf("Cmd: %d, %d, %d NOT REMOVED.\n",
+					node_id, taggroup_id, tag_id);
+		}
+	}
+	v_hash_array_destroy(hash_array);
+
+	free(hash_array);
+
+	return EXIT_SUCCESS;
+}
+
+int test_hash_65536(void)
+{
+	struct VHashArrayBase *hash_array;
+	struct VBucket *vbucket;
+	struct Example_Cmd cmd;
+	uint32 node_id, init_node_id;
+	uint16 taggroup_id;
+	uint16 tag_id, init_tag_id;
+	uint16 count, collisions;
+	int i, ret;
+
+	hash_array = (struct VHashArrayBase *)malloc(sizeof(struct VHashArrayBase));
+
+	v_hash_array_init(hash_array,
+			HASH_MOD_65536 | HASH_COPY_BUCKET,
+			(char*)&(cmd.addr) - (char*)&(cmd),
+			sizeof(struct Example_Cmd_Addr));
+
+	printf("sizeof cmd: %ld\n", (long int)sizeof(struct Example_Cmd));
+	printf("offset: %d, size: %d\n", hash_array->key_offset, hash_array->key_size);
+
+	init_node_id = rand();
+	init_tag_id = rand();
+
+	/* Adding items */
+	for(node_id=init_node_id, taggroup_id=init_tag_id, tag_id=init_tag_id;
+			node_id < init_node_id+100000;
+			node_id+=1011, taggroup_id+=317, tag_id+=632)
+	{
+		cmd.addr.node_id = node_id;
+		cmd.addr.taggroup_id = taggroup_id;
+		cmd.addr.tag_id = tag_id;
+
+		printf("Adding cmd: %d, %d, %d ...\n",
+							node_id, taggroup_id, tag_id);
+
+		vbucket = v_hash_array_add_item(hash_array, &cmd, sizeof(struct Example_Cmd));
+
+		if(vbucket != NULL) {
+			printf("Added cmd: %d, %d, %d to the bucket: %p\n",
+					node_id, taggroup_id, tag_id, (void*)vbucket);
+		} else {
+			printf("Adding cmd: %d, %d, %d FAILED.\n",
+					node_id, taggroup_id, tag_id);
+		}
+	}
+
+	count = v_hash_array_count_items(hash_array);
+
+	collisions = 0;
+	for(i=0; i<hash_array->length; i++) {
+		if(hash_array->buckets[i].next != NULL) {
+			struct VBucketP *vbucket_p = hash_array->buckets[i].next;
+
+			while(vbucket_p != NULL) {
+				collisions++;
+				vbucket_p = vbucket_p->next;
+			}
+		}
+	}
+
+	printf("\n\n%d collisions in %d items\n", collisions, count);
+
+	/* Finding items */
+	for(node_id=init_node_id, taggroup_id=init_tag_id, tag_id=init_tag_id;
+			node_id < init_node_id+100000;
+			node_id+=1011, taggroup_id+=317, tag_id+=632)
+	{
+		cmd.addr.node_id = node_id;
+		cmd.addr.taggroup_id = taggroup_id;
+		cmd.addr.tag_id = tag_id;
+
+		printf("Trying to find cmd: %d, %d, %d ...\n",
+							node_id, taggroup_id, tag_id);
+		/*printf("\t");
+		for(m=0; m < sizeof(struct Example_Cmd_Addr); m++) {
+			printf("%2X ", *(((uint8*)&cmd.addr)+m));
+		}
+		printf("\n");*/
+
+		vbucket = v_hash_array_find_item(hash_array, (void*)&cmd);
+
+		if(vbucket != NULL) {
+			struct Example_Cmd *fcmd;
+			printf("Cmd: %d, %d, %d found: %p\n",
+					node_id, taggroup_id, tag_id, (void*)vbucket);
+			fcmd = (struct Example_Cmd *)vbucket->data;
+			printf("\tFound Cmd: %d, %d, %d\n",
+					fcmd->addr.node_id, fcmd->addr.taggroup_id, fcmd->addr.tag_id);
+		} else {
+			printf("Cmd: %d, %d, %d NOT FOUND.\n",
+					node_id, taggroup_id, tag_id);
+		}
+	}
+
+	/* Removing items */
+	for(node_id=init_node_id, taggroup_id=init_tag_id, tag_id=init_tag_id;
+			node_id < init_node_id+50000;
+			node_id+=1011, taggroup_id+=317, tag_id+=632)
+	{
+		cmd.addr.node_id = node_id;
+		cmd.addr.taggroup_id = taggroup_id;
+		cmd.addr.tag_id = tag_id;
+
+		printf("Trying to remove cmd: %d, %d, %d ...\n",
+							node_id, taggroup_id, tag_id);
+
+		ret = v_hash_array_remove_item(hash_array, &cmd);
+
+		if(ret==1) {
+			printf("Cmd: %d, %d, %d removed\n",
+					node_id, taggroup_id, tag_id);
+		} else {
+			printf("Cmd: %d, %d, %d NOT REMOVED.\n",
+					node_id, taggroup_id, tag_id);
+		}
+	}
+	v_hash_array_destroy(hash_array);
+
+	free(hash_array);
+
+	return EXIT_SUCCESS;
+}
+
+int test_history(void)
+{
+	struct VPacket_History history;
+	struct VSent_Packet *vpacket;
+	uint32 packet_id = 0;
+
+	struct Node_Create_Cmd		node_create;
+	struct Node_Destroy_Cmd		node_destroy;
+	struct Node_Subscribe_Cmd	node_subscribe;
+/*	struct Node_Unsubscribe_Cmd	node_unsubscribe;*/
+
+	v_packet_history_init(&history);
+
+	packet_id = 0;
+	vpacket = v_packet_history_add_packet(&history, packet_id);
+	printf("Added packet: %d\n\n", packet_id);
+	node_subscribe.id = CMD_NODE_SUBSCRIBE;
+	node_subscribe.addr.node_id = 0;
+	v_packet_history_add_cmd(&history,
+			vpacket,
+			(struct Generic_Cmd*)&node_subscribe);
+	node_create.id = CMD_NODE_CREATE;
+	node_create.addr.user_id = 1234;
+	node_create.addr.parent_id = 65536;
+	node_create.node_id = VRS_RESERVED_NODE_ID;
+	v_packet_history_add_cmd(&history,
+			vpacket,
+			(struct Generic_Cmd*)&node_create);
+	v_print_packet_history(&history);
+	printf("\n");
+
+	packet_id = 1;
+	vpacket = v_packet_history_add_packet(&history, packet_id);
+	printf("Added packet: %d\n\n", packet_id);
+	node_subscribe.id = CMD_NODE_SUBSCRIBE;
+	node_subscribe.addr.node_id = 0;
+	v_packet_history_add_cmd(&history,
+			vpacket,
+			(struct Generic_Cmd*)&node_subscribe);
+	node_create.id = CMD_NODE_CREATE;
+	node_create.addr.user_id = 1234;
+	node_create.addr.parent_id = 65536;
+	node_create.node_id = VRS_RESERVED_NODE_ID;
+	v_packet_history_add_cmd(&history,
+			vpacket,
+			(struct Generic_Cmd*)&node_create);
+	node_destroy.id = CMD_NODE_DESTROY;
+	node_destroy.addr.node_id = 100;
+	v_packet_history_add_cmd(&history,
+				vpacket,
+				(struct Generic_Cmd*)&node_destroy);
+	node_destroy.id = CMD_NODE_DESTROY;
+	node_destroy.addr.node_id = 100+65535;	/* Test of collision */
+	v_packet_history_add_cmd(&history,
+				vpacket,
+				(struct Generic_Cmd*)&node_destroy);
+	v_print_packet_history(&history);
+	printf("\n");
+
+	packet_id = 2;
+	vpacket = v_packet_history_add_packet(&history, packet_id);
+	printf("Added packet: %d\n\n", packet_id);
+	node_subscribe.id = CMD_NODE_SUBSCRIBE;
+	node_subscribe.addr.node_id = 1;
+	v_packet_history_add_cmd(&history,
+			vpacket,
+			(struct Generic_Cmd*)&node_subscribe);
+	v_print_packet_history(&history);
+	printf("\n");
+
+	packet_id = 0;
+	v_packet_history_rem_packet(&history, packet_id);
+	printf("Removed packet: %d\n\n", packet_id);
+	v_print_packet_history(&history);
+	printf("\n");
+
+	packet_id = 1;
+	v_packet_history_rem_packet(&history, packet_id);
+	printf("Removed packet: %d\n\n", packet_id);
+	v_print_packet_history(&history);
+	printf("\n");
+
+	packet_id = 2;
+	v_packet_history_rem_packet(&history, packet_id);
+	printf("Removed packet: %d\n\n", packet_id);
+	v_print_packet_history(&history);
+	printf("\n");
+
+	return EXIT_SUCCESS;
+}
+
+int test_out_queue(void)
+{
+	struct VOutQueue queue_list;
+
+	struct Generic_Cmd 			*cmd;
+	struct Connect_Accept_Cmd	connect_accept;
+	struct Node_Create_Cmd		node_create;
+	struct Node_Destroy_Cmd		node_destroy;
+	uint8						prio, max, min;
+
+	uint16 count, len;
+	int8 share;
+
+	v_out_queue_init(&queue_list);
+
+	connect_accept.id = FAKE_CMD_CONNECT_ACCEPT;
+	connect_accept.user_id = 1001;
+	connect_accept.avatar_id = 67000;
+
+	node_create.id = CMD_NODE_CREATE;
+	node_create.addr.user_id = 100;
+	node_create.addr.parent_id = 2;
+	node_create.node_id = 1000;
+
+	node_destroy.id = CMD_NODE_DESTROY;
+	node_destroy.addr.node_id = 1001;
+
+	printf("Pushing commands to queues\n\n");
+
+	v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)&connect_accept);
+	v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)&node_create);
+	v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)&node_destroy);
+
+	v_out_queue_push_tail(&queue_list, 128, (struct Generic_Cmd*)&connect_accept);
+	v_out_queue_push_tail(&queue_list, 134, (struct Generic_Cmd*)&node_create);
+	v_out_queue_push_tail(&queue_list, 120, (struct Generic_Cmd*)&node_destroy);
+	v_out_queue_push_tail(&queue_list, 120, (struct Generic_Cmd*)&node_destroy);
+
+	printf("cmd count: %d\n", v_out_queue_get_count(&queue_list));
+	printf("prio sum high: %6.3f\n", v_out_queue_get_prio_sum_high(&queue_list));
+	printf("prio sum low: %6.3f\n", v_out_queue_get_prio_sum_low(&queue_list));
+
+	max = queue_list.max_prio;
+	min = queue_list.min_prio;
+
+	printf("Priority queues, max: %d, min: %d\n\n", max, min);
+
+	printf("Removing commands from queues with high priority\n\n");
+
+	for(prio=max; prio>=VRS_DEFAULT_PRIORITY; prio--) {
+		printf("Priority queue: %d\n", prio);
+		while( v_out_queue_get_count_prio(&queue_list, prio) > 0) {
+			cmd = v_out_queue_pop(&queue_list, prio, &count, &share, &len);
+			v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+			printf("cmd count: %d\n", v_out_queue_get_count(&queue_list));
+			printf("prio sum: %6.3f\n", v_out_queue_get_prio_sum_high(&queue_list));
+			free(cmd);
+		}
+	}
+
+	printf("\nRemoving commands from queues with low priority\n\n");
+
+	for(prio=VRS_DEFAULT_PRIORITY-1; prio>=min; prio--) {
+		printf("Priority queue: %d\n", prio);
+		while( v_out_queue_get_count_prio(&queue_list, prio) > 0) {
+			cmd = v_out_queue_pop(&queue_list, prio, &count, &share, &len);
+			v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+			printf("cmd count: %d\n", v_out_queue_get_count(&queue_list));
+			printf("prio sum: %6.3f\n", v_out_queue_get_prio_sum_low(&queue_list));
+			free(cmd);
+		}
+	}
+
+	printf("\nPriority queues, max: %d, min: %d\n\n",
+			queue_list.max_prio,
+			queue_list.min_prio);
+
+	v_out_queue_destroy(&queue_list);
+
+	return EXIT_SUCCESS;
+}
+
+int test_in_queue(void)
+{
+	struct VInQueue 			in_queue;
+
+	struct Generic_Cmd 			*cmd;
+	struct Connect_Accept_Cmd	connect_accept;
+	struct Node_Create_Cmd		node_create;
+	struct Node_Destroy_Cmd		node_destroy;
+
+	v_in_queue_init(&in_queue);
+
+	connect_accept.id = FAKE_CMD_CONNECT_ACCEPT;
+	connect_accept.user_id = 1001;
+	connect_accept.avatar_id = 67000;
+
+	node_create.id = CMD_NODE_CREATE;
+	node_create.addr.user_id = 100;
+	node_create.addr.parent_id = 2;
+	node_create.node_id = 1000;
+
+	node_destroy.id = CMD_NODE_DESTROY;
+	node_destroy.addr.node_id = 1001;
+
+	printf("Pushing commands to queue\n");
+
+	v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)&connect_accept);
+	v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)&node_create);
+	v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)&node_destroy);
+
+	v_in_queue_push(&in_queue, (struct Generic_Cmd*)&connect_accept);
+	v_in_queue_push(&in_queue, (struct Generic_Cmd*)&node_create);
+	v_in_queue_push(&in_queue, (struct Generic_Cmd*)&node_destroy);
+	v_in_queue_push(&in_queue, (struct Generic_Cmd*)&node_destroy);
+
+	printf("Cmd count: %d\n\n", v_in_queue_cmd_count(&in_queue));
+
+	printf("Poping commands from queue\n");
+
+	while( v_in_queue_cmd_count(&in_queue) > 0) {
+		cmd = v_in_queue_pop(&in_queue);
+		v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+	}
+
+	v_in_queue_destroy(&in_queue);
+
+	return EXIT_SUCCESS;
+}
+
+void print_help(char *prog)
+{
+	printf("Bad syntax:\n");
+	printf("%s [--test-ack-nak|\n", prog);
+	printf("     --test-queue-fake|\n");
+	printf("     --test-queue-node|\n");
+	printf("     --test-list|\n");
+	printf("     --test-hash|\n");
+	printf("     --test-hash-256|\n");
+	printf("     --test-hash-65536|\n");
+	printf("     --test-history|\n");
+	printf("     --test-out-queue|\n");
+	printf("     --test-in-queue]\n");
+}
+
+int main(int argc, char *argv[])
+{
+	int ret = EXIT_FAILURE;
+
+#ifdef __APPLE__
+	sranddev();
+#else
+	srand(rand());
+#endif
+
+	if(argc != 2) {
+		print_help(argv[0]);
+		ret = EXIT_FAILURE;
+	} else {
+		v_init_print_log(VRS_PRINT_DEBUG_MSG, stdout);
+
+		if( strcmp(argv[1], "--test-ack-nak") == 0 ) {
+			ret = test_ack_nak_history();
+		} /*else if( strcmp(argv[1], "--test-queue-fake") == 0 ) {
+			ret = test_queues_fake();
+		} else if( strcmp(argv[1], "--test-queue-node") == 0 ) {
+			ret = test_queues_node();
+		} */else if( strcmp(argv[1], "--test-list") == 0 ) {
+			ret = test_list();
+		} else if( strcmp(argv[1], "--test-hash") == 0) {
+			ret = test_hash();
+		} else if( strcmp(argv[1], "--test-hash-256") == 0) {
+			ret = test_hash_256();
+		} else if( strcmp(argv[1], "--test-hash-65536") == 0) {
+			ret = test_hash_65536();
+		} else if( strcmp(argv[1], "--test-history") == 0) {
+			ret = test_history();
+		} else if( strcmp(argv[1], "--test-out-queue") == 0) {
+			ret = test_out_queue();
+		} else if( strcmp(argv[1], "--test-in-queue") == 0) {
+			ret = test_in_queue();
+		} else {
+			print_help(argv[0]);
+			ret = EXIT_FAILURE;
+		}
+	}
+
+	return ret;
+}

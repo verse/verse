@@ -1,0 +1,2335 @@
+/*
+ * $Id: v_commands.c 1336 2012-09-15 14:35:23Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <assert.h>
+
+#include "verse_types.h"
+
+#include "v_common.h"
+#include "v_network.h"
+#include "v_unpack.h"
+#include "v_pack.h"
+#include "v_list.h"
+
+#include "v_commands.h"
+#include "v_fake_commands.h"
+#include "v_node_commands.h"
+#include "v_taggroup_commands.h"
+#include "v_cmd_queue.h"
+#include "v_in_queue.h"
+
+/**
+ * Definition of structure of all supported commands. Following array should be
+ * automatically generated from configuration file. With following structure:
+ *
+ * Node_Cmd(SHARE_ADDR) {
+ * }
+ */
+const struct Cmd_Struct cmd_struct[MAX_CMD_ID+1] = {
+		{ 0 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 1 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 2 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 3 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 4 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 5 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 6 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 7 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 8 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 9 ,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 10,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 11,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 12,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 13,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 14,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 15,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 16,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 17,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 18,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 19,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 20,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 21,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 22,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 23,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 24,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 25,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 26,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 27,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 28,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 29,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 30,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 31,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{
+				CMD_NODE_CREATE,	/* 32 */
+				NODE_CMD | SHARE_ADDR,
+				UINT16_SIZE + UINT32_SIZE,	/* Address size */
+				UINT16_SIZE + UINT32_SIZE + UINT32_SIZE + UINT16_SIZE, /* Command size in memory */
+				UINT8_SIZE  + UINT8_SIZE  + UINT8_SIZE  + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE + UINT16_SIZE, /* Minimal command size in packet */
+				4,	/* Number of items */
+				2,	/* Number of items that are part of address */
+				"Node_Create",	/* Name of command */
+				{	/* Items */
+						{ITEM_UINT16, UINT16_SIZE, 0, "User_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE, "Parent_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE + UINT32_SIZE, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Type"}
+				}
+		},
+		{
+				CMD_NODE_DESTROY,	/* 33 */
+				NODE_CMD | REM_DUP,
+				UINT32_SIZE, /* Address size */
+				UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE  + UINT8_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				1, /* Number of items */
+				1, /* Number of items that are part of address */
+				"Node_Destroy",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_SUBSCRIBE,	/* 34 */
+				NODE_CMD | REM_DUP,
+				UINT32_SIZE, /* Address size */
+				UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				3, /* Number of items */
+				1, /* Number of items that are part of address */
+				"Node_Subscribe",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE, "Version"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT32_SIZE, "CRC_32"}
+				}
+		},
+		{
+				CMD_NODE_UNSUBSCRIBE,	/* 35 */
+				NODE_CMD | REM_DUP,
+				UINT32_SIZE, /* Address size */
+				UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, /* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				3,
+				1,
+				"Node_UnSubscribe",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE, "Version"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT32_SIZE, "CRC_32"}
+				}
+		},
+		{ 36,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{
+				CMD_NODE_LINK,			/* 37 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE,
+				UINT32_SIZE + UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT32_SIZE,
+				2,
+				1,
+				"Node_Link",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Parent_Node_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE, "Child_Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_PERMISSION,		/* 38 */
+				NODE_CMD | SHARE_ADDR,		/* flags*/
+				UINT16_SIZE + UINT8_SIZE,	/* Address size */
+				UINT16_SIZE + UINT8_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + UINT8_SIZE + UINT32_SIZE,	/* Minimal command size in packet */
+				3,	/* Number of items */
+				2,	/* Number of items that are part of address */
+				"Node_Permision",	/* Name */
+				{
+						{ITEM_UINT16, UINT16_SIZE, 0, "User_ID"},
+						{ITEM_UINT8,  UINT8_SIZE,  UINT16_SIZE, "Permissions"},
+						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE + UINT8_SIZE, "Node_ID"},
+				}
+		},
+		{
+				CMD_DEFAULT_PERMISSION,		/* 39 */
+				0,
+				0,
+				0,
+				0,
+				0,
+				0,
+				"Default_Node_Permissions",
+				{
+						{ITEM_RESERVED,0,0,""},
+				}
+		},
+		{
+				CMD_NODE_OWNER,				/* 40*/
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT16_SIZE,				/* Address size */
+				UINT16_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + UINT32_SIZE,	/* Minimal command size in packet */
+				2,	/* Number of items */
+				1,	/* Number of items that are part of address */
+				"Node_Owner",
+				{
+						{ITEM_UINT16, UINT16_SIZE, 0, "User_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE, "Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_LOCK,				/* 41 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE,	/* Address size */
+				UINT32_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				2,	/* Number of items */
+				1,	/* Number of items, that are part of address */
+				"Node_Lock",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Avatar_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE, "Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_UNLOCK,			/* 42 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE,				/* Address size */
+				UINT32_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT32_SIZE, /* Minimal command size in packet */
+				2,		/* Number of items */
+				1,		/* Number of items, that are part of address */
+				"Node_UnLock",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Avatar_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE, "Node_ID"}
+				}
+		},
+		{
+				CMD_NODE_PRIORITY,	/* 43 */
+				NODE_CMD | SHARE_ADDR,
+				UINT8_SIZE,
+				UINT8_SIZE + UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE,
+				2,
+				1,
+				"Node_Priority",
+				{
+						{ITEM_UINT8,  UINT8_SIZE, 0, "Priority"},
+						{ITEM_UINT32, UINT32_SIZE, UINT8_SIZE, "Node_ID"}
+				}
+		},
+		{ 44,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 45,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 46,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 47,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 48,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 49,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 50,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 51,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 52,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 53,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 54,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 55,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 56,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 57,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 58,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 59,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 60,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 61,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 62,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{ 63,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		/* TagGroup and Tag Commands */
+		{
+				CMD_TAGGROUP_CREATE,	/* 64 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE,	/* Address size */
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, /* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, /* Minimal command size in packet */
+				3,
+				1,
+				"TagGroup_Create",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Type"}
+				}
+		},
+		{
+				CMD_TAGGROUP_DESTROY,	/* 65 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE,
+				UINT32_SIZE + UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE,
+				2,
+				1,
+				"TagGroup_Destroy",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"}
+				}
+		},
+		{
+				CMD_TAGGROUP_SUBSCRIBE,	/* 66 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE,
+				UINT32_SIZE + UINT16_SIZE  + UINT32_SIZE + UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				4,
+				1,
+				"TagGroup_Subscribe",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Version"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "CRC32"}
+				}
+		},
+		{
+				CMD_TAGGROUP_UNSUBSCRIBE,	/* 67 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				4,
+				1,
+				"TagGroup_Unsubscribe",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Version"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "CRC32"}
+				}
+		},
+		{
+				CMD_TAG_CREATE,		/* 68 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE + UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE + UINT16_SIZE, /* Minimal command size in packet */
+				6,
+				2,
+				"Tag_Create",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT8,  UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Data_Type"},
+						{ITEM_UINT8,  UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Count"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Type"}
+				}
+		},
+		{
+				CMD_TAG_DESTROY,	/* 69 */
+				NODE_CMD | SHARE_ADDR,
+				UINT32_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				3,
+				2,
+				"Tag_Destroy",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"}
+				}
+		},
+		/* Uint8 */
+		{
+				CMD_TAG_SET_UINT8,	/* 70 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*UINT8_SIZE,
+				4,
+				3,
+				"Tag_Set_UInt8_Scalar",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_UINT8,	/* 71 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT8_SIZE,
+				5,
+				3,
+				"Tag_Set_UInt8_Vec2",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Value[1]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_UINT8,	/* 72 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT8_SIZE,
+				6,
+				3,
+				"Tag_Set_UInt8_Vec3",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Value[1]"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Value[2]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC4_UINT8,	/* 73 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT8_SIZE,
+				7,
+				3,
+				"Tag_Set_UInt8_Vec4",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Value[1]"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Value[2]"},
+						{ITEM_UINT8,   UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE + UINT8_SIZE, "Value[3]"}
+				}
+		},
+		/* Uint16 */
+		{
+				CMD_TAG_SET_UINT16,	/* 74 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*UINT16_SIZE,
+				4,
+				3,
+				"Tag_Set_UInt16",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_UINT16,	/* 75 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT16_SIZE,
+				5,
+				3,
+				"Tag_Set_UInt16_Vec2",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[1]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_UINT16,	/* 76 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT16_SIZE,
+				6,
+				3,
+				"Tag_Set_UInt16_Vec3",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[1]"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[2]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC4_UINT16,	/* 77 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT16_SIZE,
+				7,
+				3,
+				"Tag_Set_UInt16_Vec4",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[1]"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[2]"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[3]"}
+				}
+		},
+		/* Uint32 */
+		{
+				CMD_TAG_SET_UINT32,	/* 78 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE,
+				4,
+				3,
+				"Tag_Set_UInt32",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_UINT32,	/* 79 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT32_SIZE,
+				5,
+				3,
+				"Tag_Set_UInt32_Vec2",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[1]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_UINT32,	/* 80 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT32_SIZE,
+				6,
+				3,
+				"Tag_Set_UInt32_Vec3",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[1]"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[2]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC4_UINT32,	/* 81 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT32_SIZE,
+				7,
+				3,
+				"Tag_Set_UInt32_Vec4",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[1]"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[2]"},
+						{ITEM_UINT32,  UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[3]"}
+				}
+		},
+		/* Uint64 */
+		{
+				CMD_TAG_SET_UINT64,	/* 82 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*UINT64_SIZE,
+				4,
+				3,
+				"Tag_Set_UInt64",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_UINT64,	/* 83 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*UINT64_SIZE,
+				5,
+				3,
+				"Tag_Set_Vec2_UInt64",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT64_SIZE, "Value[1]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_UINT64,	/* 84 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*UINT64_SIZE,
+				6,
+				3,
+				"Tag_Set_Vec3_UInt64",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT64_SIZE, "Value[1]"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT64_SIZE + UINT64_SIZE, "Value[2]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC4_UINT64,	/* 85 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*UINT64_SIZE,
+				7,
+				3,
+				"Tag_Set_Vec4_UInt64",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT64_SIZE, "Value[1]"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT64_SIZE + UINT64_SIZE, "Value[2]"},
+						{ITEM_UINT64,  UINT64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT64_SIZE + UINT64_SIZE + UINT64_SIZE, "Value[3]"}
+				}
+		},
+		/* Real16 */
+		{
+				CMD_TAG_SET_REAL16,	/* 86 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*REAL16_SIZE,
+				4,
+				3,
+				"Tag_Set_Real16",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_REAL16,	/* 87 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*REAL16_SIZE,
+				5,
+				3,
+				"Tag_Set_Real16_Vec2",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[1]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_REAL16,	/* 88 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*REAL16_SIZE,
+				6,
+				3,
+				"Tag_Set_Real16_Vec3",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL16_SIZE, "Value[1]"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL16_SIZE + REAL16_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_TAG_SET_VEC4_REAL16,	/* 89 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*REAL16_SIZE,
+				7,
+				3,
+				"Tag_Set_Real16_Vec4",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL16_SIZE, "Value[1]"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL16_SIZE + REAL16_SIZE, "Value[2]"},
+						{ITEM_REAL16,  REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL16_SIZE + REAL16_SIZE + REAL16_SIZE, "Value[3]"},
+				}
+		},
+		/* Real32 */
+		{
+				CMD_TAG_SET_REAL32,	/* 90 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE,
+				4,
+				3,
+				"Tag_Set_Real32",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_REAL32,	/* 91 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*REAL32_SIZE,
+				5,
+				3,
+				"Tag_Set_Real32_Vec2",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE, "Value[1]"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_REAL32,	/* 92 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*REAL32_SIZE,
+				6,
+				3,
+				"Tag_Set_Real16_Vec3",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE, "Value[1]"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE + REAL32_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_TAG_SET_VEC4_REAL32,	/* 93 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*REAL32_SIZE,
+				7,
+				3,
+				"Tag_Set_Real32_Vec4",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE, "Value[1]"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE + REAL32_SIZE, "Value[2]"},
+						{ITEM_REAL32,  REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL32_SIZE + REAL32_SIZE + REAL32_SIZE, "Value[3]"},
+				}
+		},
+		/* Real64 */
+		{
+				CMD_TAG_SET_REAL64,	/* 94 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 1*REAL64_SIZE,
+				4,
+				3,
+				"Tag_Set_Real64",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_REAL64,	/* 95 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 2*REAL64_SIZE,
+				5,
+				3,
+				"Tag_Set_Real64_Vec2",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL64_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_TAG_SET_VEC3_REAL64,	/* 96 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 3*REAL64_SIZE,
+				6,
+				3,
+				"Tag_Set_Real64_Vec3",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL64_SIZE, "Value[1]"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL64_SIZE + REAL64_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_TAG_SET_VEC2_REAL64,	/* 97 */
+				NODE_CMD | SHARE_ADDR | REM_DUP,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + 4*REAL64_SIZE,
+				7,
+				3,
+				"Tag_Set_Real64_Vec4",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[0]"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL64_SIZE, "Value[1]"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL64_SIZE + REAL64_SIZE, "Value[2]"},
+						{ITEM_REAL64,  REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + REAL64_SIZE + REAL64_SIZE + REAL64_SIZE, "Value[3]"}
+				}
+		},
+		/* String8 */
+		{
+				CMD_TAG_SET_STRING8,	/* 98 */
+				NODE_CMD | SHARE_ADDR | REM_DUP | VAR_LEN,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE,
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + STRING8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE,
+				4,
+				3,
+				"Tag_Set_String8",
+				{
+						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
+						{ITEM_STRING8, STRING8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value"}
+				}
+		},
+		{ 99,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+
+		{100,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{101,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{102,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{103,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{104,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{105,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{106,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{107,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{108,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{109,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{110,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{111,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{112,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{113,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{114,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{115,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{116,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{117,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{118,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{119,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{120,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{121,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{122,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{123,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{124,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{125,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{126,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{127,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+
+		/* Layers commands */
+		{
+				CMD_LAYER_CREATE,			/* 128 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address size */
+				UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE + UINT16_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE + UINT16_SIZE,	/* Minimal command size in packet */
+				6,							/* Number of items */
+				2,							/* Number of items that are part of address */
+				"Layer_Create",				/* Command name */
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Parent_Layer_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Layer_ID"},
+						{ITEM_UINT8, UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Data_Type"},
+						{ITEM_UINT8, UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Count"},
+						{ITEM_UINT16, UINT16_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Type"}
+				}
+		},
+		{
+				CMD_LAYER_DESTROY,			/* 129 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE,				/* Address size */
+				UINT32_SIZE + UINT16_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE,
+				2,							/* Number of items */
+				1,							/* Number of items that are part of address */
+				"Layer_Destroy",			/* Command name */
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"}
+
+				}
+		},
+		{
+				CMD_LAYER_SUBSCRIBE,		/* 130 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE,				/* Address size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				4,							/* Number of items */
+				1,							/* Number of items that are part of address */
+				"Layer_Subscribe",			/* Command name */
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Version"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "CRC32"}
+				}
+		},
+		{
+				CMD_LAYER_UNSUBSCRIBE,		/* 131 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE,				/* Address size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				4,							/* Number of items */
+				1,							/* Number of items that are part of address */
+				"Layer_UnSubscribe",		/* Command name */
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Version"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "CRC32"}
+				}
+		},
+		{
+				CMD_LAYER_UNSET_VALUE,		/* 132 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE,	/* Command size in memory */
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE,
+				3,							/* Number of items */
+				2,							/* Number of items that are part of address */
+				"Layer_UnSet_Value",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+				}
+		},
+		/* Uint8 */
+		{
+				CMD_LAYER_SET_UINT8,		/* 133 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Uint8",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_UINT8,	/* 134 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT8_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Uint8_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_UINT8,	/* 135 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT8_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Uint8_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE, "Value[1]"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE + UINT8_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_UINT8,	/* 136 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT8_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT8_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Uint8_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE, "Value[1]"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE + UINT8_SIZE, "Value[2]"},
+						{ITEM_UINT8,  UINT8_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT8_SIZE + UINT8_SIZE + UINT8_SIZE, "Value[3]"},
+				}
+		},
+		/* Uint16 */
+		{
+				CMD_LAYER_SET_UINT16,		/* 137 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Uint16",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_UINT16,	/* 138 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT16_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Uint16_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_UINT16,	/* 139 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT16_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Uint16_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE, "Value[1]"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_UINT16,	/* 140 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT16_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Uint16_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE, "Value[1]"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Value[2]"},
+						{ITEM_UINT16, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT16_SIZE + UINT16_SIZE  + UINT16_SIZE, "Value[3]"},
+				}
+		},
+		/* Uint32 */
+		{
+				CMD_LAYER_SET_UINT32,		/* 141 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Uint32",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_UINT32,	/* 142 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT32_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Uint32_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_UINT32,	/* 143 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT32_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Uint32_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[1]"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_UINT32,	/* 144 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT32_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Uint32_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[1]"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[2]"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE + UINT32_SIZE, "Value[3]"},
+				}
+		},
+		/* Uint64 */
+		{
+				CMD_LAYER_SET_UINT64,		/* 145 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Uint64",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_UINT64,	/* 146 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*UINT64_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Uint64_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_UINT64,	/* 147 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*UINT64_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Uint64_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE, "Value[1]"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE + UINT64_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_UINT64,	/* 148 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*UINT64_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Uint64_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE, "Value[1]"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE + UINT64_SIZE, "Value[2]"},
+						{ITEM_UINT64, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + UINT64_SIZE + UINT64_SIZE + UINT64_SIZE, "Value[3]"},
+				}
+		},
+		/* Real16 */
+		{
+				CMD_LAYER_SET_REAL16,		/* 149 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Real16",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_REAL16,	/* 150 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*REAL16_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Real16_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_REAL16,	/* 151 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*REAL16_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Real16_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE, "Value[1]"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE + REAL16_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_REAL16,	/* 152 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*REAL16_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*REAL16_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Real16_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE, "Value[1]"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE + REAL16_SIZE, "Value[2]"},
+						{ITEM_REAL16, REAL16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL16_SIZE + REAL16_SIZE + REAL16_SIZE, "Value[3]"},
+				}
+		},
+		/* Real32 */
+		{
+				CMD_LAYER_SET_REAL32,		/* 153 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Real32",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_REAL32,	/* 154 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*REAL32_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Real32_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_REAL32,	/* 155 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*REAL32_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Real32_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE, "Value[1]"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE + REAL32_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_REAL32,	/* 156 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*REAL32_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*REAL32_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Real32_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE, "Value[1]"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE + REAL32_SIZE, "Value[2]"},
+						{ITEM_REAL32, REAL32_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL32_SIZE + REAL32_SIZE + REAL32_SIZE, "Value[3]"},
+				}
+		},
+		/* Real64 */
+		{
+				CMD_LAYER_SET_REAL64,		/* 157 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE,
+				4,
+				2,
+				"Layer_Set_Value_Real64",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC2_REAL64,	/* 158 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 2*REAL64_SIZE,
+				5,
+				2,
+				"Layer_Set_Value_Real64_Vec2",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE, "Value[1]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC3_REAL64,	/* 159 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 3*REAL64_SIZE,
+				6,
+				2,
+				"Layer_Set_Value_Real64_Vec3",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE, "Value[1]"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE + REAL64_SIZE, "Value[2]"},
+				}
+		},
+		{
+				CMD_LAYER_SET_VEC4_REAL64,	/* 159 */
+				NODE_CMD | SHARE_ADDR,		/* Flags */
+				UINT32_SIZE + UINT16_SIZE,	/* Address Size */
+				UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*REAL64_SIZE,
+				UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + 4*REAL64_SIZE,
+				7,
+				2,
+				"Layer_Set_Value_Real64_Vec4",
+				{
+						{ITEM_UINT32, UINT32_SIZE, 0, "Node_ID"},
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE, "Layer_ID"},
+						{ITEM_UINT32, UINT32_SIZE, UINT32_SIZE + UINT16_SIZE, "Item_ID"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE, "Value[0]"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE, "Value[1]"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE + REAL64_SIZE, "Value[2]"},
+						{ITEM_REAL64, REAL64_SIZE, UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + REAL64_SIZE + REAL64_SIZE + REAL64_SIZE, "Value[3]"},
+				}
+		},
+
+		{161,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{162,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{163,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{164,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{165,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{166,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{167,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{168,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{169,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{170,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{171,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{172,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{173,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{174,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{175,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{176,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{177,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{178,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{179,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{180,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{181,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{182,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{183,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{184,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{185,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{186,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{187,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{188,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{189,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{190,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{191,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{192,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{193,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{194,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{195,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{196,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{197,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{198,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{199,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+
+		{200,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{201,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{202,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{203,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{204,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{205,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{206,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{207,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{208,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{209,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{210,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{211,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{212,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{213,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{214,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{215,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{216,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{217,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{218,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{219,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{220,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{221,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{222,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{223,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{224,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{225,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{226,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{227,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{228,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{229,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{230,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{231,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{232,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{233,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{234,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{235,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{236,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{237,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{238,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{239,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{240,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{241,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{242,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{243,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{244,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{245,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{246,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{247,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{248,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{249,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{250,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{251,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{252,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{253,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{254,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}},
+		{255,0,0,0,0,0,0,"",{{ITEM_RESERVED,0,0,""},}}
+};
+
+/**
+ * \brief This function prints content of the command
+ */
+void v_cmd_print(const unsigned char level,
+		const struct Generic_Cmd *cmd)
+{
+	if( cmd_struct[cmd->id].flag & NODE_CMD ) {
+		int i;
+		v_print_log_simple(level, "\t%s, ", cmd_struct[cmd->id].name);
+		for(i=0; i< cmd_struct[cmd->id].item_count; i++) {
+			v_print_log_simple(level, "%s: ",  cmd_struct[cmd->id].items[i].name);
+			switch(cmd_struct[cmd->id].items[i].type) {
+			case ITEM_RESERVED:
+				assert(0);
+				break;
+			case ITEM_INT8:
+				v_print_log_simple(level, "%hhd, ", INT8(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT8:
+				v_print_log_simple(level, "%hhu, ", UINT8(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_INT16:
+				v_print_log_simple(level, "%hd, ", INT16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT16:
+				v_print_log_simple(level, "%hu, ", UINT16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_INT32:
+				v_print_log_simple(level, "%d, ", INT32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT32:
+				v_print_log_simple(level, "%u, ", UINT32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_INT64:
+				v_print_log_simple(level, "%ld, ", INT64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_UINT64:
+				v_print_log_simple(level, "%lu, ", UINT64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_REAL16:
+				/* TODO: convert half-float to float and print */
+				v_print_log_simple(level, "%x, ", REAL16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_REAL32:
+				v_print_log_simple(level, "%6.3f, ", REAL32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_REAL64:
+				v_print_log_simple(level, "%6.3f, ", REAL64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			case ITEM_STRING8:
+				v_print_log_simple(level, "%s, ", PTR(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				break;
+			}
+		}
+		v_print_log_simple(level,"\n");
+	}
+}
+
+/**
+ * \brief This function destroy command.
+ *
+ * This function should be called, when command is removed from the queue or
+ * history of sent commands.
+ */
+void v_cmd_destroy(struct Generic_Cmd **cmd)
+{
+	if( (*cmd)->id >= MIN_CMD_ID ) {
+		/* Regular commands */
+		if( cmd_struct[(*cmd)->id].flag & VAR_LEN ) {
+			int i;
+			for(i=0; i< cmd_struct[(*cmd)->id].item_count; i++) {
+				if(cmd_struct[(*cmd)->id].items[i].type == ITEM_STRING8) {
+					/* Free string */
+					free(PTR((*cmd)->data[cmd_struct[(*cmd)->id].items[i].offset]));
+				}
+			}
+		}
+		free(*cmd);
+		*cmd = NULL;
+	} else {
+		/* Fake commands */
+		v_fake_cmd_destroy(cmd);
+	}
+}
+
+/**
+ * \brief This function returns size of structure for storing of commands.
+ * Returned value is in bytes
+ */
+int v_cmd_struct_size(const struct Generic_Cmd *cmd)
+{
+	return UINT8_SIZE + cmd_struct[cmd->id].size;
+}
+
+/**
+ * \brief This function returns minimal size command in the buffer send in
+ * packet to the peer.
+ */
+int v_cmd_size(const struct Generic_Cmd *cmd)
+{
+	if( cmd_struct[cmd->id].flag & NODE_CMD ) {
+		if( ! (cmd_struct[cmd->id].flag & VAR_LEN) ) {
+			return cmd_struct[cmd->id].cmd_size;
+		} else {
+			int i;
+			size_t size = cmd_struct[cmd->id].cmd_size - 1;
+			for(i=0; i< cmd_struct[cmd->id].item_count; i++) {
+				if(cmd_struct[cmd->id].items[i].type == ITEM_STRING8) {
+					/* Get length of the string */
+					size += strlen(PTR(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+				}
+			}
+			return size;
+		}
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * This is function for unpacking length of the command from the buffer
+ */
+uint16 v_cmd_unpack_len(const char *buffer,
+		uint16 *length,
+		uint8 *cmd_addr_len)
+{
+	uint16 length16, buffer_pos = 0;
+	uint8 length8;
+
+	/* Unpack Length of the command */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &length8);
+	/* When the length has 0xFF value, then real value is in next two bytes */
+	if(length8 == 0xFF) {
+		buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &length16);
+		*length = length16;
+		*cmd_addr_len = 1 + 1 + 2; /* Size of: CmdOpCode + 0xFF + Length16 */
+	} else {
+		*length = length8;
+		*cmd_addr_len = 1 + 1; /* Size of: CmdOpCode + Length8 */
+	}
+	cmd_addr_len += 1; /* Size of: Share */
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function unpack one command from the buffer
+ */
+static int _v_cmd_unpack(const char *buffer,
+		unsigned short buffer_len,
+		struct VInQueue *v_in_queue)
+{
+	struct Generic_Cmd *cmd, *first_cmd = NULL;
+	uint32 buffer_pos = 0;
+	uint16 length, cmd_data_len;
+	uint8 cmd_id, cmd_addr_len, share=0, skip_items=0;
+	int i, j;
+
+	/* Get ID (OpCode) of the command */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &cmd_id);
+
+	/* Unpack Length of the command */
+	buffer_pos += v_cmd_unpack_len(&buffer[buffer_pos], &length, &cmd_addr_len);
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Cmd: %d, length: %d\n", cmd_id, length);
+
+	/* Check if this command is supported */
+	if( !( cmd_struct[cmd_id].flag & NODE_CMD) ) {
+		/* Skip this command */
+		if(length >= 2 && length < (buffer_len - buffer_pos)) {
+			v_print_log(VRS_PRINT_WARNING, "Can't unpack node command ID: %d, Length: %d, skipping this command.\n", cmd_id, length);
+			buffer_pos += length;
+		} else {
+			/* When length is wrong, then skipping this packet */
+			v_print_log(VRS_PRINT_WARNING, "Wrong length: %d of the command: %d, dropping rest of packet\n", length, cmd_id);
+			buffer_pos = buffer_len;
+		}
+		return buffer_pos;
+	}
+
+	/* Basic command size of data */
+	cmd_data_len = cmd_struct[cmd_id].size;
+
+
+	/* Unpack size of address that is shared, when command support sharing of command */
+	if( cmd_struct[cmd_id].flag & SHARE_ADDR ) {
+		/* TODO: when the command has to share item, then check if there is enough memory */
+
+		buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &share);
+		cmd_addr_len += 1;
+
+		/* Check if size of sharing is supported for this command */
+		if(share != 0) {
+			size_t shared_size;
+
+			for(i=0, shared_size=0;
+					(shared_size<share) &&
+					(i<cmd_struct[cmd_id].key_count);
+					i++)
+			{
+				shared_size += cmd_struct[cmd_id].items[i].size;
+				skip_items++;
+			}
+
+			/* When the share isn't supported, then skip this command */
+			if(shared_size != share) {
+				v_print_log(VRS_PRINT_ERROR, "Bad share: %d of %s command, skipping this command.\n",
+						share, cmd_struct[cmd_id].name);
+				buffer_pos += length;
+				return buffer_pos;
+			}
+
+			cmd_addr_len += share;
+			cmd_data_len -= share;
+		}
+	}
+
+	/* Check the length of the command, when length of command isn't variable */
+	if( !( cmd_struct[cmd_id].flag & VAR_LEN) ) {
+		int count=0;
+		if( ((length - cmd_addr_len) % cmd_data_len) != 0) {
+			v_print_log(VRS_PRINT_WARNING, "Bad length: %d != %d+(N*%d) of Node_Create command, skipping this command.\n",
+					length, cmd_addr_len, cmd_data_len);
+			buffer_pos += length;
+			return buffer_pos;
+		}
+		count = (length - cmd_addr_len) / cmd_data_len;
+
+		/* TODO: check if commands could be unpacked (enough buffer size) */
+
+		/* Unpack own commands compressed to this command */
+		for(i=0; (i < count) && (buffer_pos < buffer_len); i++) {
+			/* This creates new command */
+			cmd = (struct Generic_Cmd*)malloc((UINT8_SIZE + cmd_struct[cmd_id].size)*sizeof(uint8));
+			cmd->id = cmd_id;
+
+			if( (share > 0) && (i > 0) ) {
+				memcpy(cmd->data, first_cmd->data, share);
+			}
+
+			for(j = (i==0) ? 0 : skip_items ; j<cmd_struct[cmd_id].item_count; j++) {
+				switch(cmd_struct[cmd_id].items[j].type) {
+				case ITEM_RESERVED:
+					assert(cmd_struct[cmd_id].items[j].type==ITEM_RESERVED);
+					break;
+				case ITEM_INT8:
+				case ITEM_UINT8:
+					buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos],
+							(uint8*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_INT16:
+				case ITEM_UINT16:
+					buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos],
+							(uint16*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_INT32:
+				case ITEM_UINT32:
+					buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos],
+							(uint32*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_INT64:
+				case ITEM_UINT64:
+					buffer_pos += vnp_raw_unpack_uint64(&buffer[buffer_pos],
+							(uint64*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_REAL16:
+					buffer_pos += vnp_raw_unpack_real16(&buffer[buffer_pos],
+							(real16*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_REAL32:
+					buffer_pos += vnp_raw_unpack_real32(&buffer[buffer_pos],
+							(real32*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_REAL64:
+					buffer_pos += vnp_raw_unpack_real64(&buffer[buffer_pos],
+							(real64*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_STRING8:
+					/* Only command with variable length can include string */
+					assert(0);
+					break;
+				}
+			}
+
+			/* Copy content of first command, when address the first command is
+			 * shared */
+			if(share > 0 && i==0) {
+				first_cmd = (struct Generic_Cmd*)calloc((UINT8_SIZE + cmd_struct[cmd_id].size), sizeof(uint8));
+				memcpy(first_cmd, cmd, (UINT8_SIZE + cmd_struct[cmd_id].size)*sizeof(uint8));
+			}
+
+			/* Print content of received command */
+			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+				printf("%c[%d;%dm", 27, 1, 34);
+				v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+				printf("%c[%dm", 27, 0);
+			}
+
+			/* Put command to the queue of incoming commands */
+			v_in_queue_push(v_in_queue, cmd);
+		}
+
+		if(first_cmd != NULL) {
+			free(first_cmd);
+			first_cmd = NULL;
+		}
+	} else {
+		for(i=0; buffer_pos<length; i++) {
+			/* This create new command */
+			cmd = (struct Generic_Cmd*)malloc((UINT8_SIZE + cmd_struct[cmd_id].size)*sizeof(uint8));
+			cmd->id = cmd_id;
+
+			if( (share > 0) && (i > 0) ) {
+				memcpy(cmd->data, first_cmd->data, share);
+			}
+
+			for(j = (i==0) ? 0 : skip_items ; j<cmd_struct[cmd_id].item_count; j++) {
+				switch(cmd_struct[cmd_id].items[j].type) {
+				case ITEM_RESERVED:
+					assert(cmd_struct[cmd_id].items[j].type==ITEM_RESERVED);
+					break;
+				case ITEM_INT8:
+				case ITEM_UINT8:
+					buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos],
+							(uint8*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_INT16:
+				case ITEM_UINT16:
+					buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos],
+							(uint16*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_INT32:
+				case ITEM_UINT32:
+					buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos],
+							(uint32*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_INT64:
+				case ITEM_UINT64:
+					buffer_pos += vnp_raw_unpack_uint64(&buffer[buffer_pos],
+							(uint64*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_REAL16:
+					buffer_pos += vnp_raw_unpack_real16(&buffer[buffer_pos],
+							(real16*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_REAL32:
+					buffer_pos += vnp_raw_unpack_real32(&buffer[buffer_pos],
+							(real32*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_REAL64:
+					buffer_pos += vnp_raw_unpack_real64(&buffer[buffer_pos],
+							(real64*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
+					break;
+				case ITEM_STRING8:
+					buffer_pos += vnp_raw_unpack_string8(&buffer[buffer_pos],
+							buffer_len - buffer_pos,
+							(char**)&(cmd->data[cmd_struct[cmd->id].items[j].offset]));
+					break;
+				}
+			}
+
+			/* Copy content of first command, when address the first command is
+			 * shared */
+			if(share > 0 && i==0) {
+				first_cmd = (struct Generic_Cmd*)calloc((UINT8_SIZE + cmd_struct[cmd_id].size), sizeof(uint8));
+				memcpy(first_cmd, cmd, (UINT8_SIZE + cmd_struct[cmd_id].size)*sizeof(uint8));
+			}
+
+			/* Print content of received command */
+			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+				printf("%c[%d;%dm", 27, 1, 34);
+				v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+				printf("%c[%dm", 27, 0);
+			}
+
+			/* Put command to the queue of incoming commands */
+			v_in_queue_push(v_in_queue, cmd);
+		}
+
+		if(first_cmd != NULL) {
+			free(first_cmd);
+			first_cmd = NULL;
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief	Get node commands from received buffer and put them to the queue.
+ *
+ * \param[in]	*buffer		The received buffer
+ * \param[in]	buffer_len	The size of buffer, that contains node commands
+ * \param[out]	*v_in_queue	The structure of queue, that will be filled with
+ * 							commands from the buffer.
+ *
+ * \return	This function returns relative buffer position of buffer proceeding.
+ */
+int v_cmd_unpack(const char *buffer,
+		unsigned short buffer_len,
+		struct VInQueue *v_in_queue)
+{
+	uint32 buffer_pos = 0;
+
+	while( buffer_pos < buffer_len )
+	{
+		/* At least command id and its length has to be unpacked */
+		if((buffer_len-buffer_pos) >= 2) {
+			buffer_pos += _v_cmd_unpack(&buffer[buffer_pos], buffer_len - buffer_pos, v_in_queue);
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function packs the length of the command to buffer
+ *
+ * When the length of the command is packed to the buffer, then the length
+ * has to be computed with respect of packing length bigger then 254 bytes.
+ * Such length is not packed to the one byte, but it is packed to 3 bytes.
+ *
+ * \param[in]	*buffer	The buffer to be send
+ * \param[in]	length	The length of the command that has to be packed to the
+ * buffer
+ *
+ * \return This function returns number of bytes packed to the buffer
+ */
+uint16 v_cmd_pack_len(char *buffer, const uint16 length)
+{
+	uint16 buffer_pos = 0;
+
+    /* Pack length of the command */
+    if(length >= 0xFF){
+    	/* When the first byte has value 0xFF, then decoder of this command
+    	 * knows that next two bytes contains length of the command. */
+        buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], 0xFF);
+		/* Pack length to the 2 bytes  */
+        buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], length);
+    }else{
+    	/* Pack length to 1 byte */
+        buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], (uint8)length);
+    }
+
+    return buffer_pos;
+}
+
+/**
+ * \brief This function pack command to the buffer that will be sent to the
+ * peer.
+ *
+ * \param[in] *buffer	The buffer to be send
+ * \param[in] *cmd		The pointer at generic command
+ * \param[in] length	The length of the command. If this value is zero, then
+ * the command will be piggy-packed to the previous command with the same id.
+ * \param[in] share		The size of address, that will be shared. This value is
+ * used, when previous parameter (length) is equal to zero.
+ *
+ * \return This function returns size of data that successfully packed to the
+ * buffer. When command is not known, the this function returns 0.
+ */
+int v_cmd_pack(char *buffer,
+		const struct Generic_Cmd *cmd,
+		const uint16 length,
+		const uint8 share)
+{
+	uint16 buffer_pos = 0;
+	uint8 skip_items=0;
+	int i;
+
+	if(length != 0) {
+		/* Pack Command ID */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], cmd->id);
+
+		/* Pack length of the command */
+		buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
+
+		/* When command support sharing, then pack sharing */
+		if( cmd_struct[cmd->id].flag & SHARE_ADDR ) {
+			/* Pack size (in bytes) of address that will be shared */
+			buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], share);
+		}
+	} else if( (cmd_struct[cmd->id].flag & SHARE_ADDR) && (share!=0) ) {
+		size_t shared_size;
+		/* Compute, how many items could be skipped */
+
+		/* TODO: create more effective algorithm */
+		for(i=0, shared_size=0;
+				(shared_size<share) &&
+				(i<cmd_struct[cmd->id].key_count);
+				i++)
+		{
+			shared_size += cmd_struct[cmd->id].items[i].size;
+			skip_items++;
+		}
+
+		assert(shared_size == share);
+	}
+
+	for(i=skip_items; i<cmd_struct[cmd->id].item_count; i++) {
+		switch(cmd_struct[cmd->id].items[i].type) {
+		case ITEM_RESERVED:
+			assert(cmd_struct[cmd->id].items[i].type==ITEM_RESERVED);
+			break;
+		case ITEM_INT8:
+		case ITEM_UINT8:
+			buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos],
+					UINT8(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_INT16:
+		case ITEM_UINT16:
+			buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos],
+					UINT16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_INT32:
+		case ITEM_UINT32:
+			buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos],
+					UINT32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_INT64:
+		case ITEM_UINT64:
+			buffer_pos += vnp_raw_pack_uint64(&buffer[buffer_pos],
+					UINT64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_REAL16:
+			buffer_pos += vnp_raw_pack_real16(&buffer[buffer_pos],
+					REAL16(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_REAL32:
+			buffer_pos += vnp_raw_pack_real32(&buffer[buffer_pos],
+					REAL32(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_REAL64:
+			buffer_pos += vnp_raw_pack_real64(&buffer[buffer_pos],
+					REAL64(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		case ITEM_STRING8:
+			buffer_pos += vnp_raw_pack_string8(&buffer[buffer_pos],
+					PTR(cmd->data[cmd_struct[cmd->id].items[i].offset]));
+			break;
+		}
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function compares addresses and return size of address that
+ * could be shared. If commands can't share addresses, then this function will
+ * return -1.
+ */
+uint8 v_cmd_cmp_addr(struct Generic_Cmd *cmd1,
+		struct Generic_Cmd *cmd2,
+		const uint8 current_size)
+{
+	size_t share_size = 0;
+
+	assert(cmd1->id == cmd2->id);
+
+	if( (cmd_struct[cmd1->id].flag & SHARE_ADDR) &&
+			(! (cmd_struct[cmd1->id].flag & VAR_LEN) ) &&
+			(current_size > 0))
+	{
+		int i;
+		for(i=0, share_size=0;
+				(share_size < current_size) &&
+				(i<cmd_struct[cmd1->id].key_count);
+				i++)
+		{
+			if( memcmp(&cmd1->data[cmd_struct[cmd1->id].items[i].offset],
+					&cmd2->data[cmd_struct[cmd2->id].items[i].offset],
+					cmd_struct[cmd1->id].items[i].size) == 0)
+			{
+				share_size += cmd_struct[cmd1->id].items[i].size;
+			} else {
+				return share_size;
+			}
+		}
+	}
+
+	return share_size;
+}
+
+/**
+ * \brief This function computes how many commands could be compressed to the
+ * buffer with the length: max_len.
+ *
+ * \param[in]	*cmd	The pointer at first command in line
+ * \param[in]	max_len	The maximal length of the buffer size
+ * \param[in]	share	The length of the address that is shared by commands
+ *
+ * \return This function return number of commands that could be packet to the
+ * buffer with limited size.
+ */
+uint16 v_cmd_count(struct Generic_Cmd *cmd,
+		uint16 max_len,
+		uint8 share)
+{
+	uint16 new_count;
+
+	if(cmd_struct[cmd->id].flag & SHARE_ADDR) {
+		if( ! (cmd_struct[cmd->id].flag & VAR_LEN) ) {
+			if(max_len < 0xFF) {
+				new_count = (max_len - (UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + share))/(cmd_struct[cmd->id].size - share);
+			} else {
+				new_count = (max_len - (UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + UINT8_SIZE + share))/(cmd_struct[cmd->id].size - share);
+			}
+		} else {
+			new_count = 0;
+		}
+	} else {
+		if( ! (cmd_struct[cmd->id].flag & VAR_LEN) ) {
+			if(max_len < 0xFF) {
+				new_count = (max_len - (UINT8_SIZE + UINT8_SIZE))/(cmd_struct[cmd->id].size - UINT8_SIZE);
+			} else {
+				new_count = (max_len - (UINT8_SIZE + UINT8_SIZE + UINT16_SIZE))/(cmd_struct[cmd->id].size - UINT8_SIZE);
+			}
+		} else {
+			new_count = 0;
+		}
+	}
+
+	return new_count;
+}
+
+/**
+ * \brief This function compute length of compressed commands.
+ */
+uint16 v_cmds_len(struct Generic_Cmd *cmd,
+		uint16 count,
+		uint8 share,
+		uint16 len)
+{
+	uint16 data_len = 0;
+
+	if(cmd_struct[cmd->id].flag & SHARE_ADDR) {
+		if( ! (cmd_struct[cmd->id].flag & VAR_LEN) ) {
+			data_len = count*(cmd_struct[cmd->id].size - share);
+
+			if((UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + share + data_len) < 0xFF) {
+				/* OpCode + Length(1B) + Size of sharing + Shared address + Data */
+				return UINT8_SIZE + UINT8_SIZE + UINT8_SIZE + share + data_len;
+			} else {
+				/* OpCode + 0xFF + Length(2B) + Size of sharing + Shared address + Data */
+				return UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + UINT8_SIZE + share + data_len;
+			}
+		} else {
+			int i, ret=0;
+
+			for(i=0, data_len=0; i<cmd_struct[cmd->id].item_count; i++) {
+				switch(cmd_struct[cmd->id].items[i].type) {
+				case ITEM_RESERVED:
+					break;
+				case ITEM_INT8:
+				case ITEM_UINT8:
+					data_len += UINT8_SIZE;
+					break;
+				case ITEM_INT16:
+				case ITEM_UINT16:
+					data_len += UINT16_SIZE;
+					break;
+				case ITEM_INT32:
+				case ITEM_UINT32:
+					data_len += UINT32_SIZE;
+					break;
+				case ITEM_INT64:
+				case ITEM_UINT64:
+					data_len += UINT64_SIZE;
+					break;
+				case ITEM_REAL16:
+					data_len += REAL16_SIZE;
+					break;
+				case ITEM_REAL32:
+					data_len += REAL32_SIZE;
+					break;
+				case ITEM_REAL64:
+					data_len += REAL64_SIZE;
+					break;
+				case ITEM_STRING8:
+					data_len += (UINT8_SIZE + strlen(PTR(cmd->data[cmd_struct[cmd->id].items[i].offset])));
+					break;
+				}
+			}
+
+			if(len==0) {
+				if((UINT8_SIZE + UINT8_SIZE + data_len) < 0xFF) {
+					/* OpCode + Length(1B) + Data */
+					ret = UINT8_SIZE + UINT8_SIZE + data_len;
+				} else {
+					/* OpCode + 0xFF + Length(2B) + Data */
+					ret = UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + data_len;
+				}
+			} else {
+				if( (len < 0xFF) && ((len + data_len) >= 0xFF) ) {
+					/* When adding new command increase length of the command behind 255,
+					 * then length will be coded with: 0xFF(1B), Length(2B) */
+					ret = len + 2 + data_len;
+				} else {
+					ret = len + data_len;
+				}
+			}
+
+			return ret;
+		}
+	} else {
+
+		data_len = count*(cmd_struct[cmd->id].size);
+
+		if((UINT8_SIZE + UINT8_SIZE + data_len) < 0xFF) {
+			/* OpCode + Length(1B) + Data */
+			return UINT8_SIZE + UINT8_SIZE + data_len;
+		} else {
+			/* OpCode + 0xFF + Length(2B) + Data */
+			return UINT8_SIZE + UINT8_SIZE + UINT16_SIZE + data_len;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * \brief This function initialize command queue that is used in queue of
+ * incoming and outgoing commands. It is also used in history of sent commands.
+ */
+struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	uint16 flag = (copy_bucket==1) ? HASH_COPY_BUCKET : 0;
+	struct Generic_Cmd cmd;
+
+	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
+	cmd_queue->item_size = UINT8_SIZE + cmd_struct[id].size;
+	/* Set up flags for command command queues */
+	cmd_queue->flag = 0;
+	if(cmd_struct[id].flag & REM_DUP) {
+		cmd_queue->flag |= REMOVE_HASH_DUPS;
+	}
+	if(cmd_struct[id].flag & VAR_LEN) {
+		cmd_queue->flag |= NOT_SHARE_ADDR;
+	}
+	v_hash_array_init(&cmd_queue->cmds,
+			HASH_MOD_256 | flag,
+			(char*)&(cmd.data) - (char*)&(cmd),
+			cmd_struct[id].key_size);
+
+	return cmd_queue;
+}

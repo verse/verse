@@ -1,0 +1,246 @@
+/*
+ * $Id: v_node_destroy.c 933 2011-08-25 20:22:43Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <assert.h>
+
+#include "verse.h"
+
+#include "v_node_commands.h"
+#include "v_cmd_queue.h"
+#include "v_in_queue.h"
+#include "v_common.h"
+#include "v_unpack.h"
+#include "v_pack.h"
+#include "v_network.h"
+
+/**
+ * \brief Print content of structure containing node_destroy command
+ */
+void v_node_destroy_print(const unsigned char level,
+		struct Node_Destroy_Cmd *node_destroy_cmd)
+{
+	v_print_log_simple(level, "\tNODE_DESTROY, NodeID: %d\n",
+			node_destroy_cmd->addr.node_id);
+}
+
+/**
+ * \brief This function computes the length of compressed commands
+ */
+uint16 v_node_destroy_cmds_len(uint16 count)
+{
+	uint16 data_len;
+
+	data_len = count*4;
+
+	if( (1+1+data_len) < 0xFF ) {
+		return 1 + 1 + data_len;
+	} else {
+		return 1 + 1 + 2 + data_len;
+	}
+}
+
+/**
+ * \brief Unpack node_destroy command from the buffer of the received packet
+ */
+int v_node_destroy_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue)
+{
+	struct Node_Destroy_Cmd *node_destroy = NULL;
+	uint16 buffer_pos = 0;
+	uint8 id, cmd_addr_len;
+	uint16 length;
+	uint32 node_id;
+	int i;
+
+	/* Is the remaining size of buffer big enough for Node_Destroy command */
+	if(buffer_size < NODE_DESTROY_CMD_LEN) {
+		v_print_log(VRS_PRINT_WARNING, "Buffer size: %d < minimal command length: %d, skipping rest of packet.\n",
+				buffer_size, NODE_DESTROY_CMD_LEN);
+		return buffer_size;
+	}
+
+	/* Unpack ID */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &id);
+	/* Assert command id */
+	assert(id == CMD_NODE_DESTROY);
+
+	/* Unpack length of the command */
+	buffer_pos += v_cmd_unpack_len(&buffer[buffer_pos], &length, &cmd_addr_len);
+
+	/* Check length of the command */
+	if( ((length - cmd_addr_len) % NODE_DESTROY_CMD_DATA_LEN) != 0 ) {
+		v_print_log(VRS_PRINT_WARNING, "Bad length: %d != %d of Node_Destroy command.\n", length, NODE_DESTROY_CMD_LEN);
+		return length;
+	}
+
+	for(i = 0; i< ((length - cmd_addr_len) / NODE_DESTROY_CMD_DATA_LEN); i++) {
+		/* Unpack Node ID */
+		buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+
+		/* Create Node_Destroy command */
+		node_destroy = v_node_destroy_create(node_id);
+
+		/* Push command to the queue of incoming commands */
+		v_in_queue_push(v_in_queue, (struct Generic_Cmd*)node_destroy);
+
+		/* Print content of received command */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 34);
+			v_node_destroy_print(VRS_PRINT_DEBUG_MSG, node_destroy);
+			printf("%c[%dm", 27, 0);
+		}
+	}
+
+	/* Buffer_pos has to be equal to command length. */
+	assert(buffer_pos == length);
+
+	return buffer_pos;
+}
+
+/**
+ * \brief Pack node_destroy command to the buffer
+ */
+int v_node_destroy_pack(char *buffer,
+		const struct Node_Destroy_Cmd *node_destroy_cmd,
+		const uint16 length)
+{
+	uint16 buffer_pos = 0;
+
+	if(length != 0) {
+		/* Pack Command ID */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], CMD_NODE_DESTROY);
+
+		/* Pack length of the command */
+		buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
+
+		/* Pack Node ID */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_destroy_cmd->addr.node_id);
+	} else {
+		/* Pack Node ID */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_destroy_cmd->addr.node_id);
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function initialize command queue with Node_Destroy commands
+ */
+struct VCommandQueue *v_node_destroy_cmd_queue(uint16 flag)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	struct Node_Destroy_Cmd node_destroy_cmd;
+
+	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
+	cmd_queue->item_size = sizeof(struct Node_Destroy_Cmd);
+	cmd_queue->flag = REMOVE_HASH_DUPS;
+	v_hash_array_init(&cmd_queue->cmds,
+			HASH_MOD_256 | flag,
+			(char*)&(node_destroy_cmd.addr) - (char*)&(node_destroy_cmd),
+			sizeof(struct Node_Destroy_Addr));
+
+	return cmd_queue;
+}
+
+/**
+ * \brief This function initialize members of structure for Node_Destroy command
+ */
+void v_node_destroy_init(struct Node_Destroy_Cmd *node_destroy,
+		uint32 node_id)
+{
+    if(node_destroy != NULL) {
+        /* initialize members with values */
+    	node_destroy->id = CMD_NODE_DESTROY;
+    	node_destroy->addr.node_id = node_id;
+    }
+}
+
+static void _v_node_destroy_init(struct Generic_Cmd *node_destroy,
+		uint32 node_id)
+{
+    if(node_destroy != NULL) {
+        /* initialize members with values */
+    	node_destroy->id = CMD_NODE_DESTROY;
+    	UINT32(node_destroy->data[0]) = node_id;
+    }
+}
+
+extern struct Cmd_Struct cmd_struct[];
+
+/**
+ * \brief this function creates new structure of Node_Destroy command
+ */
+struct Generic_Cmd *_v_node_destroy_create(uint32 node_id)
+{
+    struct Generic_Cmd *node_destroy = NULL;
+    node_destroy = (struct Generic_Cmd*)malloc(cmd_struct[CMD_NODE_DESTROY].size);
+    _v_node_destroy_init(node_destroy, node_id);
+    return node_destroy;
+}
+
+/**
+ * \brief this function creates new structure of Node_Destroy command
+ */
+struct Node_Destroy_Cmd *v_node_destroy_create(uint32 node_id)
+{
+    struct Node_Destroy_Cmd *node_destroy = NULL;
+    node_destroy = (struct Node_Destroy_Cmd*)calloc(1, sizeof(struct Node_Destroy_Cmd));
+    v_node_destroy_init(node_destroy, node_id);
+    return node_destroy;
+}
+
+/**
+ * \brief This function clear members of structure for Node_Destroy command
+ */
+void v_node_destroy_clear(struct Node_Destroy_Cmd *node_destroy)
+{
+    if(node_destroy != NULL) {
+        node_destroy->addr.node_id = -1;
+    }
+}
+
+/**
+ * \brief This function destroy Node_Destroy command
+ */
+void v_node_destroy_destroy(struct Node_Destroy_Cmd **node_destroy)
+{
+    if(node_destroy != NULL) {
+        v_node_destroy_clear(*node_destroy);
+        free(*node_destroy);
+        *node_destroy = NULL;
+    }
+}

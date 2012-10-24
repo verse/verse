@@ -1,0 +1,92 @@
+/*
+ * $Id$
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#ifndef V_CMD_TEMPLATE_H_
+#define V_CMD_TEMPLATE_H_
+
+#include "verse.h"
+
+#define MAX_CMD_PARAMS	256
+
+/**
+ * \brief Supported types of command parameters
+ */
+typedef enum ParamType {
+	PAR_RESERVED,
+	PAR_INT8,
+	PAR_UINT8,
+	PAR_INT16,
+	PAR_UINT16,
+	PAR_INT32,
+	PAR_UINT32,
+	PAR_INT64,
+	PAR_UINT64,
+	PAR_REAL32,
+	PAR_REAL64,
+	PAR_STRING8,
+	PAR_STRING16
+} ParamType;
+
+/**
+ * \brief Template of command parameter
+ */
+typedef struct Template_Param {
+	char 					*name;
+	ParamType				type;
+} Template_Param;
+
+/**
+ * \brief Template of command address
+ */
+typedef struct Template_Addr {
+	Template_Param			params[MAX_CMD_PARAMS];
+} Template_Addr;
+
+/**
+ * \brief Template of command
+ */
+typedef struct Template_Cmd {
+	char					*name;			/* The name of command, e.g.: node_create */
+	char					*NAME;			/* The upper case of name, e.g.: NODE_CREATE */
+	char					*struct_name;	/* The name of structure, e.g.: Node_Create */
+	char					*const_name;	/* The name of constant representing this command, e.g.: CMD_NODE_CREATE */
+	char					*var_name;		/* The name of variable used in functions, e.g.: node_create_cmd */
+	uint8					id;				/* The ID if command, e.g.: 32 */
+	struct Template_Addr	addr;			/* The address of command */
+	Template_Param			params[MAX_CMD_PARAMS];	/* The parameters of command */
+} Template_Cmd;
+
+#endif /* V_CMD_TEMPLATE_H_ */

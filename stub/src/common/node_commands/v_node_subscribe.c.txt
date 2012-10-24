@@ -1,0 +1,259 @@
+/*
+ * $Id: v_node_subscribe.c 933 2011-08-25 20:22:43Z jiri $
+ *
+ * ***** BEGIN BSD LICENSE BLOCK *****
+ *
+ * Copyright (c) 2009-2011, Jiri Hnidek
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ***** END BSD LICENSE BLOCK *****
+ *
+ * Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
+ */
+
+#include <assert.h>
+
+#include "verse.h"
+
+#include "v_node_commands.h"
+#include "v_in_queue.h"
+#include "v_common.h"
+#include "v_unpack.h"
+#include "v_pack.h"
+#include "v_network.h"
+#include "v_cmd_queue.h"
+
+/**
+ * \brief Print content of structure containing node_subscribe command
+ */
+void v_node_subscribe_print(const unsigned char level,
+		struct Node_Subscribe_Cmd *node_subscribe_cmd)
+{
+	v_print_log_simple(level, "\tNODE_SUBSCRIBE, NodeID: %d, level: %d\n",
+			node_subscribe_cmd->addr.node_id,
+			node_subscribe_cmd->level);
+}
+
+uint16 v_node_subscribe_cmds_len(uint16 count)
+{
+	uint16 data_len;
+
+	data_len = count*(4 + 4);
+
+	if( (1+1+data_len) < 0xFF ) {
+		return 1 + 1 + data_len;
+	} else {
+		return 1 + 1 + 2 + data_len;
+	}
+}
+
+/**
+ * \brief Unpack node_subscribe commands from the buffer of the received packet
+ */
+int v_node_subscribe_unpack(const char *buffer,
+		const ssize_t buffer_size,
+		struct VInQueue *v_in_queue)
+{
+	struct Node_Subscribe_Cmd *node_subscribe = NULL;
+	uint16 buffer_pos = 0;
+	uint8 id;
+	uint8 cmd_addr_len;
+	uint16 length;
+	uint32 node_id, level;
+	int i;
+
+	if(buffer_size < NODE_SUBSCRIBE_CMD_LEN) {
+		v_print_log(VRS_PRINT_WARNING, "Buffer size: %d < minimal command length: %d.\n", buffer_size, NODE_SUBSCRIBE_CMD_LEN);
+		return buffer_size;
+	}
+
+	/* Unpack ID */
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &id);
+	/* Assert command id */
+	assert(id == CMD_NODE_SUBSCRIBE);
+
+	/* Unpack length of the command */
+	buffer_pos += v_cmd_unpack_len(&buffer[buffer_pos], &length, &cmd_addr_len);
+
+	/* Check length of the command */
+	if( (length - cmd_addr_len) % NODE_SUBSCRIBE_CMD_DATA_LEN != 0) {
+		v_print_log(VRS_PRINT_WARNING, "Bad length: %d != %d of Node_Subscribe command.\n", length, NODE_SUBSCRIBE_CMD_LEN);
+		return length;
+	}
+
+	/* Unpack all commands from this compressed command */
+	for(i = 0; i<((length - cmd_addr_len) / NODE_SUBSCRIBE_CMD_DATA_LEN); i++) {
+		/* Unpack Node ID */
+		buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &node_id);
+
+		/* Unpack level of subscription */
+		buffer_pos += vnp_raw_unpack_uint32(&buffer[buffer_pos], &level);
+
+		/* Create new subscribe command */
+		node_subscribe = v_node_subscribe_create(node_id, level);
+
+		/* Push command to the queue of incoming commands */
+		v_in_queue_push(v_in_queue, (struct Generic_Cmd*)node_subscribe);
+
+		/* Print content of received command */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 34);
+			v_node_subscribe_print(VRS_PRINT_DEBUG_MSG, node_subscribe);
+			printf("%c[%dm", 27, 0);
+		}
+	}
+
+	/* Buffer_pos has to be equal to command length. */
+	assert(buffer_pos == length);
+
+	return buffer_pos;
+}
+
+/**
+ * \brief Pack node_subscribe command to the buffer
+ */
+int v_node_subscribe_pack(char *buffer,
+		const struct Node_Subscribe_Cmd *node_subscribe_cmd,
+		const uint16 length)
+{
+	uint16 buffer_pos = 0;
+
+	if(length != 0) {
+		/* Pack Command ID */
+		buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], CMD_NODE_SUBSCRIBE);
+
+		/* Pack length of the command */
+		buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
+
+		/* Pack Node ID */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_subscribe_cmd->addr.node_id);
+		/* Pack level of subscription */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_subscribe_cmd->level);
+	} else {
+		/* Pack Node ID */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_subscribe_cmd->addr.node_id);
+		/* Pack level of subscription */
+		buffer_pos += vnp_raw_pack_uint32(&buffer[buffer_pos], node_subscribe_cmd->level);
+	}
+
+	return buffer_pos;
+}
+
+/**
+ * \brief This function initialize command queue with Node_Subscribe commands
+ */
+struct VCommandQueue *v_node_subscribe_cmd_queue(uint16 flag)
+{
+	struct VCommandQueue *cmd_queue = NULL;
+	struct Node_Subscribe_Cmd node_subscribe_cmd;
+
+	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
+	cmd_queue->item_size = sizeof(struct Node_Subscribe_Cmd);
+	cmd_queue->flag = REMOVE_HASH_DUPS;
+	v_hash_array_init(&cmd_queue->cmds,
+			HASH_MOD_256 | flag,
+			(char*)&(node_subscribe_cmd.addr) - (char*)&(node_subscribe_cmd),
+			sizeof(struct Node_Subscribe_Addr));
+
+	return cmd_queue;
+}
+
+/**
+ * \brief This function initialize members of structure for Node_Subscribe command
+ */
+static void _v_node_subscribe_init(struct Generic_Cmd *node_subscribe,
+		uint32 node_id,
+		uint32 level)
+{
+    if(node_subscribe != NULL) {
+        /* initialize members with values */
+    	node_subscribe->id = CMD_NODE_SUBSCRIBE;
+    	UINT32(node_subscribe->data[0]) = node_id;
+    	UINT32(node_subscribe->data[UINT32_SIZE]) = level;
+    }
+}
+
+/**
+ * \brief This function initialize members of structure for Node_Subscribe command
+ */
+void v_node_subscribe_init(struct Node_Subscribe_Cmd *node_subscribe,
+		uint32 node_id,
+		uint32 level)
+{
+    if(node_subscribe != NULL) {
+        /* initialize members with values */
+    	node_subscribe->id = CMD_NODE_SUBSCRIBE;
+    	node_subscribe->addr.node_id = node_id;
+    	node_subscribe->level = level;
+    }
+}
+
+extern struct Cmd_Struct cmd_struct[];
+
+/**
+ * \brief this function creates new structure of Node_Subscribe command
+ */
+struct Generic_Cmd *_v_node_subscribe_create(uint32 node_id, uint32 level)
+{
+    struct Generic_Cmd *node_subscribe = NULL;
+    node_subscribe = (struct Generic_Cmd *)malloc(cmd_struct[CMD_NODE_SUBSCRIBE].size);
+    _v_node_subscribe_init(node_subscribe, node_id, level);
+    return node_subscribe;
+}
+
+/**
+ * \brief this function creates new structure of Node_Subscribe command
+ */
+struct Node_Subscribe_Cmd *v_node_subscribe_create(uint32 node_id, uint32 level)
+{
+    struct Node_Subscribe_Cmd *node_subscribe = NULL;
+    node_subscribe = (struct Node_Subscribe_Cmd*)calloc(1, sizeof(struct Node_Subscribe_Cmd));
+    v_node_subscribe_init(node_subscribe, node_id, level);
+    return node_subscribe;
+}
+
+/**
+ * \brief This function clear members of structure for Node_Subscribe command
+ */
+void v_node_subscribe_clear(struct Node_Subscribe_Cmd *node_subscribe)
+{
+    if(node_subscribe != NULL) {
+        node_subscribe->addr.node_id = -1;
+        node_subscribe->level = 0;
+    }
+}
+
+/**
+ * \brief This function destroy Node_Subscribe command
+ */
+void v_node_subscribe_destroy(struct Node_Subscribe_Cmd **node_subscribe)
+{
+    if(node_subscribe != NULL) {
+        v_node_subscribe_clear(*node_subscribe);
+        free(*node_subscribe);
+        *node_subscribe = NULL;
+    }
+}
