@@ -48,25 +48,17 @@ To compile Verse server, libverse.a, libverse.ao and example of Verse
 client open terminal, go to root of verse source code and type:
   
     $ mkdir ./build
-    
     $ cd ./build
-    
     $ cmake ../
-    
     $ make
   
 If you want to build Verse with Clang, then you have to do more
   
-    $ export CC=/usr/bin/clang
-      
+    $ export CC=/usr/bin/clang      
     $ export CXX=/usr/bin/clang++
-    
     $ mkdir ./build
-    
     $ cd ./build
-    
     $ cmake ../
-    
     $ make
   
 Folders
@@ -81,10 +73,10 @@ Folders
  * ./python	contains source code for Python module implemented in C
  * ./promela   contains Promela source code used for protocol verification
  * ./src		contains source code
-     ./api			source code of API
-     ./client		source code specific for Verse clients
-     ./common		source code shared with Verse server and Verse client
-     ./server		source code specified for Verse server 
+  * ./api			source code of API
+  * ./client		source code specific for Verse clients
+  * ./common		source code shared with Verse server and Verse client
+  * ./server		source code specified for Verse server 
  * ./unittests	contains source code of unit tests
 
 Installation
@@ -176,13 +168,12 @@ perform tests you have to go to the build directory and run make with target
 test
 
     $ cd ./build
-    
     $ make test
 
 Contact
 -------
 
-  Jiri Hnidek
-  e-mail: jiri.hnidek@tul.cz
-  phone: +420 485 35 3695
-  address: Studentska 2, 461 17, Liberec 1, Czech Republic
+ * Jiri Hnidek
+ * E-mail: jiri.hnidek@tul.cz
+ * Phone: +420 485 35 3695
+ * Address: Studentska 2, 461 17, Liberec 1, Czech Republic
