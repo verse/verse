@@ -33,6 +33,10 @@
 #
 # Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
 #
+"""
+Example of Verse client implemented in Python language
+"""
+
 
 import verse as vrs
 import time
