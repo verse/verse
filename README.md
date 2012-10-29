@@ -44,7 +44,7 @@ not be problem.
 
 ### Building ###
 
-To compile Verse server, libverse.a, libverse.ao and example of Verse
+To compile Verse server, libverse.ao and example of Verse
 client open terminal, go to root of verse source code and type:
   
     $ mkdir ./build
@@ -52,6 +52,11 @@ client open terminal, go to root of verse source code and type:
     $ cmake ../
     $ make
   
+If you want to build release version, then you have to run cmake
+with following parameter:
+
+    $ cmake -DCMAKE_BUILD_TYPE=Release ../
+
 If you want to build Verse with Clang, then you have to do more
   
     $ export CC=/usr/bin/clang      
