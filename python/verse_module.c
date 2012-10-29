@@ -84,7 +84,7 @@ static struct PyMemberDef Session_members[] = {
 static PyObject *_print_callback_arguments(const char *func_name, PyObject *self, PyObject *args)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
-	printf("%s(): session_id: %d\n", &func_name[7], session->session_id);
+	printf("%s(): session_id: %d\n", &func_name[8], session->session_id);
 	printf("arguments: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf("\n");
 	Py_RETURN_NONE;
 }
