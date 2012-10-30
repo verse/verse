@@ -135,7 +135,7 @@ install (FILES "${PROJECT_SOURCE_DIR}/include/verse.h"
 	DESTINATION include)
 
 # Install configuration file
-install (FILES "{PROJECT_SOURCE_DIR}/config/server.ini"
+install (FILES "${PROJECT_SOURCE_DIR}/config/server.ini"
 	DESTINATION etc)
 
 
