@@ -48,10 +48,10 @@ find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
 find_package (Iniparser REQUIRED)
 
-# Set output directory fo libraries
+# Set output directory for libraries
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 
-# Set output directory fo binaries
+# Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
 
 # Set up required subdirectories
