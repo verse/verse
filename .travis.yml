@@ -1,5 +1,5 @@
 before_script:
-  - add-apt-repository ppa:markhannon/ppa && apt-get install libiniparser-dev
+  - sudo add-apt-repository ppa:markhannon/ppa && sudo apt-get install libiniparser-dev
 language: c
 compiler:
   - gcc
