@@ -1,5 +1,7 @@
 before_script:
-  - echo "yes" | sudo add-apt-repository ppa:markhannon/ppa && sudo apt-get install libiniparser-dev
+  - echo "yes" | sudo add-apt-repository ppa:markhannon/ppa
+  - sudo apt-get update
+  - sudo apt-get install iniparser
 language: c
 compiler:
   - gcc
