@@ -345,7 +345,7 @@ void vrs_register_receive_tag_set_value(void (*func)(const uint8_t session_id,
 		const void *value));
 
 int vrs_send_layer_create(const uint8_t session_id,
-		const int8_t prio,
+		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t parent_layer_id,
 		const uint8_t data_type,
@@ -360,7 +360,7 @@ void vrs_register_receive_layer_create(void (*func)(const uint8_t session_id,
 		const uint16_t type));
 
 int vrs_send_layer_destroy(const uint8_t session_id,
-		const int8_t prio,
+		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id);
 void vrs_register_receive_layer_destroy(void (*func)(const uint8_t session_id,
@@ -368,7 +368,7 @@ void vrs_register_receive_layer_destroy(void (*func)(const uint8_t session_id,
 		const uint16_t layer_id));
 
 int vrs_send_layer_subscribe(const uint8_t session_id,
-		const int8_t prio,
+		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
 		const uint32_t version,
@@ -380,7 +380,7 @@ void vrs_register_receive_layer_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t crc32));
 
 int vrs_send_layer_unsubscribe(const uint8_t session_id,
-		const int8_t prio,
+		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
 		const uint8_t versing);
@@ -391,7 +391,7 @@ void vrs_register_receive_layer_unsubscribe(void (*func)(const uint8_t session_i
 		const uint32_t crc32));
 
 int vrs_send_layer_set_value(const uint8_t session_id,
-		const int8_t prio,
+		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
 		const uint32_t item_id,
@@ -407,7 +407,7 @@ void vrs_register_receive_layer_set_value(void (*func)(const uint8_t session_id,
 		const void *value));
 
 int vrs_send_layer_unset_value(const uint8_t session_id,
-		const int8_t prio,
+		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
 		const uint32_t item_id);
