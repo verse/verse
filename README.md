@@ -51,6 +51,7 @@ client open terminal, go to root of verse source code and type:
     $ cd ./build
     $ cmake ../
     $ make
+    $ sudo make install
   
 If you want to build release version, then you have to run cmake
 with following parameter:
@@ -65,6 +66,7 @@ If you want to build Verse with Clang, then you have to do more
     $ cd ./build
     $ cmake ../
     $ make
+    $ sudo make install
   
 Folders
 -------
@@ -100,7 +102,7 @@ and edit user.csv with your favorite text editor, e.g. vim:
 Using
 -----
 
-The Verse server can be executed from this directory:
+The Verse server can be executed from build directory:
 
     $ ./bin/verse_server
 
@@ -175,9 +177,10 @@ test
     $ cd ./build
     $ make test
 
-Contact
--------
+Contacts
+--------
 
+ * IRC: irc.freenode.net in channel #verse
  * Jiri Hnidek
  * E-mail: jiri.hnidek@tul.cz
  * Phone: +420 485 35 3695
