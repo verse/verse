@@ -182,8 +182,7 @@ Contacts
 
  * IRC: irc.freenode.net in channel #verse
  * Mailing list: verse-dev@blender.org
-
- * Jiri Hnidek
- * E-mail: jiri.hnidek@tul.cz
- * Phone: +420 485 35 3695
- * Address: Studentska 2, 461 17, Liberec 1, Czech Republic
+ * Main developer: Jiri Hnidek
+  * E-mail: jiri.hnidek@tul.cz
+  * Phone: +420 485 35 3695
+  * Address: Studentska 2, 461 17, Liberec 1, Czech Republic
