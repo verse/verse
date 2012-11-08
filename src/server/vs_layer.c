@@ -91,7 +91,18 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 void vs_layer_destroy(struct VSNode *node, struct VSLayer *layer)
 {
 	struct VSLayer *child_layer;
+	struct VSLayerValue *item;
+	struct VBucket *vbucket;
 
+	/* Free values in all items */
+	vbucket = (struct VBucket*)layer->values.lb.first;
+	while(vbucket != NULL) {
+		item = (struct VSLayerValue*)vbucket->data;
+		free(item->value);
+		vbucket = vbucket->next;
+	}
+
+	/* Destroy hashed array with items */
 	v_hash_array_destroy(&layer->values);
 
 	/* Set references to parent layer in all child layers to NULL */
@@ -823,6 +834,8 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	_item.id = item_id;
 	vbucket = v_hash_array_find_item(&layer->values, &_item);
 	if(vbucket == NULL) {
+		/* When this item doesn't exist yet, then allocate memory for this item
+		 * and add it to the hashed array */
 		item = calloc(1, sizeof(struct VSLayerValue));
 		item->id = item_id;
 		v_hash_array_add_item(&layer->values, item, sizeof(struct VSLayerValue));
@@ -927,6 +940,21 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	return 1;
 }
 
+/**
+ * \brief This function tries to unset value in the layer and all child layers
+ *
+ * This function is called for parent layer and it is called recursively to
+ * unset values in all child layers
+ *
+ * \param[in]	*node	The pointer at node
+ * \param[in]	*layer	The pointer at layer
+ * \param[in]	item_id	The ID of item which should be unset (deleted)
+ * \param[in]	send_command	If this argument is equal to 1, then unset_value
+ * command is sent to all subscribers (should be equal to1 only for parent layer)
+ *
+ * \return This function returns 1, when it was able to unset value. Otherwise
+ * it returns 0.
+ */
 static int vs_layer_unset_value(struct VSNode *node,
 		struct VSLayer *layer,
 		uint32 item_id,
@@ -956,12 +984,15 @@ static int vs_layer_unset_value(struct VSNode *node,
 
 		/* Free value */
 		free(item->value);
+		/* Remove value from hashed array */
 		v_hash_array_remove_item(&layer->values, item);
 		/* Free item */
 		free(item);
+	} else {
+		return 0;
 	}
 
-	/* Unset values in all child values, but don't send unset_value command
+	/* Try to unset values in all child values, but don't send unset_value command
 	 * about this unsetting, because client will receive layer_unset of parent
 	 * layer*/
 	child_layer = layer->child_layers.first;
