@@ -236,7 +236,8 @@ static void cb_receive_layer_create(const uint8_t session_id,
 		vrs_send_layer_subscribe(session_id, my_test_node_prio, node_id, layer_id, 0, 0);
 
 		/* Test of creating child layer */
-		vrs_send_layer_create(session_id, my_test_node_prio, node_id, layer_id, VRS_VALUE_TYPE_REAL32, 2, MY_TEST_CHILD_LAYER_TYPE);
+		vrs_send_layer_create(session_id, my_test_node_prio,
+				node_id, layer_id, VRS_VALUE_TYPE_REAL32, 2, MY_TEST_CHILD_LAYER_TYPE);
 
 		/* Test sending some values of tag types */
 		switch(data_type) {
@@ -268,11 +269,14 @@ static void cb_receive_layer_create(const uint8_t session_id,
 		}
 
 		/* Test of sending set value */
-		vrs_send_layer_set_value(session_id, my_test_node_prio, node_id, layer_id, 10, data_type, count, value);
+		vrs_send_layer_set_value(session_id, my_test_node_prio,
+				node_id, layer_id, 10, data_type, count, value);
 
 	}
 
-	if(node_id == my_test_node_id && layer_id == my_test_layer_id && type == MY_TEST_CHILD_LAYER_TYPE) {
+	if(node_id == my_test_node_id &&
+			parent_layer_id == my_test_layer_id &&
+			type == MY_TEST_CHILD_LAYER_TYPE) {
 		/* Test of destroying parent layer */
 		vrs_send_layer_destroy(session_id, my_test_node_prio, node_id, parent_layer_id);
 	}
