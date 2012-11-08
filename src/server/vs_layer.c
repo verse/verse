@@ -462,7 +462,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 
 	layer = vs_layer_create(node, parent_layer, data_type, count, type);
 
-	/* Try to find first free id for tag */
+	/* Try to find first free id for layer */
 	/* TODO: this could be more effective */
 	layer->id = node->last_layer_id;
 	while( v_hash_array_find_item(&node->layers, layer) != NULL ) {
@@ -825,6 +825,8 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	if(vbucket == NULL) {
 		item = calloc(1, sizeof(struct VSLayerValue));
 		item->id = item_id;
+		v_hash_array_add_item(&layer->values, item, sizeof(struct VSLayerValue));
+
 		/* Allocate memory for values and copy data to this memory */
 		switch(layer->data_type) {
 			case VRS_VALUE_TYPE_UINT8:
@@ -931,7 +933,7 @@ static int vs_layer_unset_value(struct VSNode *node,
 		uint8 send_command)
 {
 	struct VSLayer *child_layer;
-	struct VSLayerValue *item, _item;
+	struct VSLayerValue *item = NULL, _item;
 	struct VBucket *vbucket;
 	struct VSEntitySubscriber *layer_subscriber;
 
@@ -940,6 +942,18 @@ static int vs_layer_unset_value(struct VSNode *node,
 	vbucket = v_hash_array_find_item(&layer->values, &_item);
 	if(vbucket != NULL) {
 		item = (struct VSLayerValue*)vbucket->data;
+
+		/* Send unset command only for parent layer */
+		if(send_command == 1) {
+			/* Send item value unset to all layer subscribers */
+
+			layer_subscriber = layer->layer_subs.first;
+			while(layer_subscriber != NULL) {
+				vs_layer_send_unset_value(layer_subscriber, node, layer, item);
+				layer_subscriber = layer_subscriber->next;
+			}
+		}
+
 		/* Free value */
 		free(item->value);
 		v_hash_array_remove_item(&layer->values, item);
@@ -947,17 +961,9 @@ static int vs_layer_unset_value(struct VSNode *node,
 		free(item);
 	}
 
-	/* Send unset command only for parent layer */
-	if(send_command == 1) {
-		/* Send item value unset to all layer subscribers */
-		layer_subscriber = layer->layer_subs.first;
-		while(layer_subscriber != NULL) {
-			vs_layer_send_unset_value(layer_subscriber, node, layer, item);
-			layer_subscriber = layer_subscriber->next;
-		}
-	}
-
-	/* Unset values in all child values */
+	/* Unset values in all child values, but don't send unset_value command
+	 * about this unsetting, because client will receive layer_unset of parent
+	 * layer*/
 	child_layer = layer->child_layers.first;
 	while(child_layer != NULL) {
 		vs_layer_unset_value(node, child_layer, item_id, 0);
