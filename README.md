@@ -1,6 +1,9 @@
 Verse 2.0
 =========
 
+Verse 2.0 is network protocol for real-time sharing of 3D data. It is successor of old Verse protocol developed at KTH.
+Verse 2.0 is still in alpha version.
+
 License
 -------
 
