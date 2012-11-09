@@ -12,18 +12,9 @@ BSD-LICENSE and GPL-LICENSE.
 Important links
 ---------------
 
-Verse 2.0 is successor of old Verse.
-It is based on different and improved specification.
-
- * http://dev.nti.tul.cz/trac/verse2/wiki/Specification
-
-Trac of Verse 2.0 could be found at this address:
-
- * http://dev.nti.tul.cz/trac/verse2
-  
-Ohloh.net statistics:
-  
- * https://www.ohloh.net/p/verse2
+ * http://verse.github.com/
+ * http://verse.github.com/verse/
+ * https://github.com/verse/verse
 
 Compile
 -------
