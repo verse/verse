@@ -106,7 +106,8 @@ class MySession(vrs.Session):
     
     def __init__(self, hostname, service, flags):
         # Call __init__ from parent class to connect to verse server
-        vrs.Session.__init__(self, hostname, service, flags)
+        super(MySession, self).__init__(hostname, service, flags)
+        # Set initial state and settings
         self.state = "CONNECTING"
         self.fps = 30
         # Create dictionary of nodes
