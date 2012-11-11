@@ -1940,6 +1940,7 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 }
 
 static PyMethodDef Session_methods[] = {
+		/* Session commands */
 		{"receive_connect_accept",
 				(PyCFunction)Session_receive_connect_accept,
 				METH_VARARGS,
@@ -1975,6 +1976,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send FPS used by this client to the server"
 		},
+		/* Node commands */
 		{"send_node_create",
 				(PyCFunction)Session_send_node_create,
 				METH_VARARGS | METH_KEYWORDS,
@@ -1990,7 +1992,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node destroy command to the server"
 		},
-		{"receive_node_create",
+		{"receive_node_destroy",
 				(PyCFunction)Session_receive_node_destroy,
 				METH_VARARGS,
 				"Callback function for node destroy command received from the server"
@@ -2070,6 +2072,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS,
 				"Callback function for node unlock command received from server"
 		},
+		/* TagGroup commands */
 		{"send_taggroup_create",
 				(PyCFunction)Session_send_taggroup_create,
 				METH_VARARGS | METH_KEYWORDS,
@@ -2110,6 +2113,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS,
 				"Callback function for taggroup subscribe command received from server"
 		},
+		/* Tag commands */
 		{"send_tag_create",
 				(PyCFunction)Session_send_tag_create,
 				METH_VARARGS | METH_KEYWORDS,
@@ -2140,6 +2144,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS,
 				"Callback function for tag set value command received from server"
 		},
+		/* Layer commands */
 		{"send_layer_create",
 				(PyCFunction)Session_send_layer_create,
 				METH_VARARGS | METH_KEYWORDS,
