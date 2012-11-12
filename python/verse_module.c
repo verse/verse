@@ -36,7 +36,6 @@
 
 #include <Python.h>
 #include <structmember.h>
-
 #include <assert.h>
 
 #include "verse.h"
@@ -1944,37 +1943,54 @@ static PyMethodDef Session_methods[] = {
 		{"receive_connect_accept",
 				(PyCFunction)Session_receive_connect_accept,
 				METH_VARARGS,
-				"Callback function that is called, when connection with server is established"
+				"receive_connect_accept(self, user_id, avatar_id) -> None\n\n"
+				"Callback function that is called, when connection with server is established\n"
+				"user_id:	int ID of user node that represent connected user\n"
+				"avatar_id:	int ID of avatar node that represent connected client"
 		},
 		{"receive_connect_terminate",
 				(PyCFunction)Session_receive_connect_terminate,
 				METH_VARARGS,
-				"Callback function that is called, when connection with server is terminated"
+				"receive_connect_terminate(self, error) -> None\n\n"
+				"Callback function that is called, when connection with server is terminated\n"
+				"error:	int code of reason for termination of connection by server"
 		},
 		{"send_connect_terminate",
 				(PyCFunction)Session_send_connect_terminate,
 				METH_NOARGS,
-				"Send connect terminate command to the server"
+				"send_connect_terminate(self, error) -> None\n\n"
+				"Send connect terminate command to the server\n"
+				"error:	int code of reason for termination of connection by client"
 		},
 		{"receive_user_authenticate",
 				(PyCFunction)Session_receive_user_authenticate,
 				METH_VARARGS,
-				"Callback function that is called, when server requests user authentication"
+				"receive_user_authenticate(self, username, methods) -> None\n\n"
+				"Callback function that is called, when server requests user authentication\n"
+				"username:	string of client's username\n"
+				"methods:	tuple of supported authentication methods"
 		},
 		{"send_user_authenticate",
 				(PyCFunction)Session_send_user_authenticate,
 				METH_VARARGS | METH_KEYWORDS,
-				"Send user authenticate command to the server"
+				"send_user_authenticate(self, username, method, data) -> None\n\n"
+				"Send user authenticate command to the server\n"
+				"username:	string of client's username\n"
+				"method:	int code of authentication method\n"
+				"data:		authentication data (usually password)"
 		},
 		{"callback_update",
 				(PyCFunction)Session_callback_update,
 				METH_NOARGS,
+				"callback_update(self) -> None\n\n"
 				"Call callback functions for received commands"
 		},
 		{"send_fps",
 				(PyCFunction)Session_send_fps,
 				METH_VARARGS | METH_KEYWORDS,
-				"Send FPS used by this client to the server"
+				"send_fps(self, fps) -> None\n\n"
+				"Send FPS used by this client to the server\n"
+				"fps:	double value of Frames per Second"
 		},
 		/* Node commands */
 		{"send_node_create",
