@@ -56,6 +56,7 @@
 #define FTR_DED					5	/* Data Exchange Definition */
 #define FTR_RWIN_SCALE			6	/* Scale factor of rwin used for Flow Control */
 #define FTR_FPS					7	/* FPS currently used at client */
+#define FTR_CMD_COMPRESS		8	/* Command compression */
 
 /* Minimal and maximal length of negotiate command */
 #define MIN_FTR_CMD_LEN			3
@@ -74,6 +75,11 @@
 #define CC_RESERVED				0	/* Should never be used */
 #define CC_NONE					1
 #define CC_TCP_LIKE				2
+
+/* Methods of Command Compression */
+#define CMPR_RESERVED			0	/* Should never be used */
+#define CMPR_NONE				1
+#define CMPR_ADDR_SHARE			2
 
 
 /* Following commands are real system commands, that are packed to the packets
