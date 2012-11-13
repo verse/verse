@@ -47,6 +47,8 @@ set (CMAKE_THREAD_PREFER_PTHREAD)
 find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
 find_package (Iniparser REQUIRED)
+find_package (LDAP REQUIRED)
+find_package (Kerberos REQUIRED)
 
 # Set output directory for libraries
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)

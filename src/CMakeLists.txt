@@ -85,6 +85,8 @@ set (server_src
 include_directories (../include)
 include_directories (${INIPARSER_INCLUDE_DIRS})
 include_directories (${OPENSSL_INCLUDE_DIR})
+include_directories (${LDAP_INCLUDE_DIR})
+include_directories (${KERBEROS_INCLUDE_DIR})
 
 # Make build flags compiler specific
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -121,7 +123,9 @@ target_link_libraries (verse_server
 		verse_shared_lib
 		${CMAKE_THREAD_LIBS_INIT}
 		${OPENSSL_LIBRARIES}
-		${INIPARSER_LIBRARIES})
+		${INIPARSER_LIBRARIES}
+		${LDAP_LIBRARIES}
+		${KERBEROS_LIBRARY})
 
 
 # The rule to install Verse server

@@ -11,6 +11,8 @@ set (verse_client_src verse_client.c)
 # Directory with .h files
 include_directories (../include)
 include_directories (${OPENSSL_INCLUDE_DIR})
+include_directories (${LDAP_INCLUDE_DIR})
+include_directories (${KERBEROS_INCLUDE_DIR})
 
 # Define executable
 add_executable (verse_client ${verse_client_src})
@@ -18,4 +20,6 @@ add_dependencies (verse_client verse_shared_lib)
 target_link_libraries (verse_client
 		verse_shared_lib
 		${CMAKE_THREAD_LIBS_INIT}
-		${OPENSSL_LIBRARIES})
+		${OPENSSL_LIBRARIES}
+		${LDAP_LIBRARIES}
+		${KERBEROS_LIBRARY})
