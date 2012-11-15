@@ -307,6 +307,21 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = vc_ctx->rwin_scale;
 	i++;
 
+	/* Add command compression proposal */
+	if(vsession->flags & VRS_NO_CMD_CMPR) {
+		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
+		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].change_l_cmd.count = 1;
+		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
+		i++;
+	} else {
+		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
+		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].change_l_cmd.count = 1;
+		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
+		i++;
+	}
+
 	/* Add fake terminate command (this command will not be sent) */
 	s_packet->sys_cmd[i].cmd.id = CMD_RESERVED_ID;
 }

@@ -130,9 +130,11 @@ extern "C" {
 #define VRS_PRINT_DEBUG_MSG			4
 
 /* Flags used in function verse_send_connect_request */
-#define VRS_DGRAM_SEC_NONE			1
-#define VRS_DGRAM_SEC_DTLS			2
-#define VRS_DGRAM_TP_UDP			4
+#define VRS_DGRAM_SEC_NONE			1	/* No security at datagram connection */
+#define VRS_DGRAM_SEC_DTLS			2	/* DTLS at datagram connection */
+#define VRS_TP_UDP					4	/* Transport protocol: UDP*/
+#define VRS_TP_TCP					8	/* TODO: Transport protocol: TCP */
+#define VRS_NO_CMD_CMPR				16	/* TODO: No command compression */
 
 /* Type of verse value */
 #define VRS_VALUE_TYPE_RESERVED		0

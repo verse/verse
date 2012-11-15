@@ -94,7 +94,7 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->max_sockets = vs_ctx->max_sessions;
 	vs_ctx->flag = SERVER_DEBUG_MODE;		/* SERVER_MULTI_SOCKET_MODE | SERVER_REQUIRE_SECURE_CONNECTION */
 	vs_ctx->stream_protocol = TCP;			/* For new connection attempts is used TCP protocol */
-	vs_ctx->dgram_protocol = VRS_DGRAM_TP_UDP;	/* For data exchange UDP protocol could be used */
+	vs_ctx->dgram_protocol = VRS_TP_UDP;	/* For data exchange UDP protocol could be used */
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 	vs_ctx->security_protocol = VRS_DGRAM_SEC_NONE | VRS_DGRAM_SEC_DTLS;
 #else

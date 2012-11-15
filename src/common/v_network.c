@@ -96,7 +96,7 @@ int v_parse_url(const char *str, struct VURL *url)
 
 	/* There has to be "udp" protocol, because only UDP is supported now  */
 	if(strncmp(&str[str_pos], "udp", strlen("udp"))==0) {
-		url->dgram_protocol = VRS_DGRAM_TP_UDP;
+		url->dgram_protocol = VRS_TP_UDP;
 		str_pos += strlen("udp");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else {
@@ -170,7 +170,7 @@ void v_print_url(const int level, struct VURL *url)
 {
 	v_print_log(level, "URL:\n");
 	v_print_log_simple(level, "\tscheme: %s\n", url->scheme);
-	if(url->dgram_protocol==VRS_DGRAM_TP_UDP) {
+	if(url->dgram_protocol==VRS_TP_UDP) {
 		v_print_log_simple(level, "\tdgram_protocol: UDP\n");
 	} else {
 		v_print_log_simple(level, "\tdgram_protocol: unknow\n");

@@ -291,7 +291,7 @@ static int	vs_LISTEN_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 			/* This could not be never send */
 			if(change_r_cmd->value[i].uint8 == CC_RESERVED) {
 				break;
-			} else if(change_r_cmd->value[i].uint8 == vs_ctx->cc_meth) { /* TODO: better implemetation */
+			} else if(change_r_cmd->value[i].uint8 == vs_ctx->cc_meth) { /* TODO: better implementation */
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->cc_meth == CC_RESERVED) {
 					/* Congestion Control has not been proposed yet */
