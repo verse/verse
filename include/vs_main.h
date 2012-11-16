@@ -129,6 +129,7 @@ typedef struct VS_CTX {
 	unsigned char		cc_meth;					/* Allowed methods of Congestion Control */
 	unsigned char		fc_meth;					/* Allowed methods of Flow Control */
 	unsigned char		rwin_scale;					/* Scale of Flow Control Window */
+	unsigned char		cmd_cmpr;					/* Prefered command compression */
 	/* User authentication */
 	char				auth_type;					/* Type of user authentication */
 	char				*csv_user_file;				/* CSV file with definition of user account */

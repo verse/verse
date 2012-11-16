@@ -143,6 +143,8 @@ typedef struct VDgramConn {
 	float					fps_host;			/* FPS used by this host */
 	float					fps_peer;			/* Negotiated FPS used by peer */
 	unsigned char			tmp_flags;			/* Temporary flags (notification of received system commands) */
+	unsigned char			host_cmd_cmpr;		/* Command compression used by host for sedning commands */
+	unsigned char			peer_cmd_cmpr;		/* Command compression used by peer for sending commands */
 	/* States */
 	struct VConnectionState	state[STATE_COUNT];	/* Array of structure storing state specific things (callbacks, counters, etc.) */
 	/* Histories */

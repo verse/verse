@@ -188,6 +188,9 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 	dgram_conn->fps_host = DEFAULT_FPS;	/* Default value */
 	dgram_conn->fps_peer = DEFAULT_FPS;	/* Default value */
 	dgram_conn->tmp_flags = 0;
+	/* Command compression */
+	dgram_conn->host_cmd_cmpr = CMPR_RESERVED;
+	dgram_conn->peer_cmd_cmpr = CMPR_RESERVED;
 	/* Initialize array of ACK and NAK commands, that are sent to the peer */
 	v_ack_nak_history_init(&dgram_conn->ack_nak);
 	/* Initialize history of sent packets */

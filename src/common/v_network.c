@@ -58,6 +58,22 @@
 static int v_compare_ipv4_addr(const struct in_addr *addr1, const struct in_addr *addr2);
 static int v_compare_ipv6_addr(const struct in6_addr *addr1, const struct in6_addr *addr2);
 
+#if 0
+/**
+ * \brief Add next system command to verse packet
+ */
+int v_pack_sys_cmd(struct VPacket *packet,
+		unsigned char cmd_id,
+		unsigned char cmd_op_code,
+		unsigned char ftr_op_code,
+		unsigned char count,
+		...)
+{
+	/* TODO: add real implementation */
+	return 1;
+}
+#endif
+
 /**
  * \brief Parse string of URL and store items in structure VURL
  * \param[in]	*str	The string of URL

@@ -206,7 +206,6 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_l_cmd = (struct Negotiate_Cmd*)cmd;
-	int ret = 1;
 
 	/* This block of code checks if received cookie is the same as the
 	 * negotiated cookie. When cookie is not the same, then the server
@@ -217,9 +216,9 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 				change_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)change_l_cmd->value[0].string8.str, vsession->peer_cookie.str)==0 )
 		{
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
@@ -253,9 +252,9 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 
 		if(tmp==1) {
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
@@ -263,13 +262,35 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(change_l_cmd->feature == FTR_RWIN_SCALE) {
 		if(change_l_cmd->count >= 1) {
 			dgram_conn->rwin_peer_scale = change_l_cmd->value[0].uint8;
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
-	return ret;
+	/* Client wants to negotiate type of command compression */
+	if(change_l_cmd->feature == FTR_CMD_COMPRESS) {
+		int i, tmp=0;
+		for(i=0; i<change_l_cmd->count; i++) {
+			if(change_l_cmd->value[i].uint8 == CMPR_NONE ||
+					change_l_cmd->value[i].uint8 == CMPR_ADDR_SHARE)
+			{
+				dgram_conn->peer_cmd_cmpr = change_l_cmd->value[i].uint8;
+				tmp = 1;
+				break;
+			}
+		}
+
+		/* Does client sent at least one supported compress type? */
+		if(tmp==1) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	/* Received command is unknown. Ignore it. */
+	return 1;
 }
 
 /**
@@ -281,7 +302,6 @@ static int	vs_LISTEN_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_r_cmd = (struct Negotiate_Cmd*)cmd;
-	int ret = 1;
 
 	/* Check if at least one of proposed Congestion Control methods are
 	 * supported */
@@ -312,13 +332,34 @@ static int	vs_LISTEN_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 
 		if(tmp==1) {
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
-	return ret;
+	/* Client wants to negotiate type of command compression */
+	if(change_r_cmd->feature == FTR_CMD_COMPRESS) {
+		int i, tmp=0;
+		for(i=0; i<change_r_cmd->count; i++) {
+			if(change_r_cmd->value[i].uint8 == CMPR_NONE ||
+					change_r_cmd->value[i].uint8 == CMPR_ADDR_SHARE)
+			{
+				dgram_conn->host_cmd_cmpr = change_r_cmd->value[i].uint8;
+				tmp = 1;
+				break;
+			}
+		}
+
+		/* Does client sent at least one supported compress type? */
+		if(tmp==1) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 /**
@@ -411,9 +452,12 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
 		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->cc_meth;
 		i++;
+	} else {
+		/* TODO: when client didn't send some proposal, then send server preference
+		 * as proposal */
 	}
 
-	/* Send proposal of Flow Control */
+	/* Send proposal of Flow Control (server send this proposal first) */
 	if(vs_ctx->fc_meth != FC_RESERVED) {
 		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
 		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_FC_ID;
@@ -444,6 +488,50 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
 		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->rwin_peer_scale;
 		i++;
+	}
+
+	/* Send confirmation of peer command compression */
+	if(dgram_conn->host_cmd_cmpr != CMPR_RESERVED) {
+		s_packet->sys_cmd[i].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
+		s_packet->sys_cmd[i].confirm_r_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].confirm_r_cmd.count = 1;
+		s_packet->sys_cmd[i].confirm_r_cmd.value[0].uint8 = dgram_conn->host_cmd_cmpr;
+		i++;
+	} else {
+		/* When client didn't propose any command compression, then propose compression
+		 * form server settings */
+		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
+		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].change_l_cmd.count = 2;
+		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
+			s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
+			s_packet->sys_cmd[i].change_l_cmd.value[1].uint8 = CMPR_NONE;
+		} else {
+			s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
+			s_packet->sys_cmd[i].change_l_cmd.value[1].uint8 = CMPR_ADDR_SHARE;
+		}
+	}
+
+	/* Send confirmation of peer command compression */
+	if(dgram_conn->peer_cmd_cmpr != CMPR_RESERVED) {
+		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
+		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
+		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->peer_cmd_cmpr;
+		i++;
+	} else {
+		/* When client didn't propose any command compression, then propose compression
+		 * form server settings */
+		s_packet->sys_cmd[i].change_r_cmd.id = CMD_CHANGE_R_ID;
+		s_packet->sys_cmd[i].change_r_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].change_r_cmd.count = 2;
+		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
+			s_packet->sys_cmd[i].change_r_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
+			s_packet->sys_cmd[i].change_r_cmd.value[1].uint8 = CMPR_NONE;
+		} else {
+			s_packet->sys_cmd[i].change_r_cmd.value[0].uint8 = CMPR_NONE;
+			s_packet->sys_cmd[i].change_r_cmd.value[1].uint8 = CMPR_ADDR_SHARE;
+		}
 	}
 
 	/* Fake terminating system command */

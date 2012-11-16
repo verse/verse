@@ -131,6 +131,8 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->cc_meth = CC_NONE;		/* "List" of allowed methods of Congestion Control */
 	vs_ctx->fc_meth = FC_NONE;		/* "List" of allowed methods of Flow Control */
 
+	vs_ctx->cmd_cmpr = CMPR_ADDR_SHARE;
+
 	vs_ctx->rwin_scale = 7;			/*  Default scale of Flow Control Window */
 }
 

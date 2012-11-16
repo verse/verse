@@ -309,13 +309,27 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 
 	/* Add command compression proposal */
 	if(vsession->flags & VRS_NO_CMD_CMPR) {
+		/* Client isn't able to send compressed commands (local proposal) */
 		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
 		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
 		s_packet->sys_cmd[i].change_l_cmd.count = 1;
 		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
 		i++;
+		/* Client isn't able to receive compressed commands (remote proposal) */
+		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_R_ID;
+		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].change_l_cmd.count = 1;
+		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
+		i++;
 	} else {
+		/* Client wants to send compressed commands (local proposal) */
 		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
+		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
+		s_packet->sys_cmd[i].change_l_cmd.count = 1;
+		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
+		i++;
+		/* Client is able to receive compressed commands (remote proposal) */
+		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_R_ID;
 		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
 		s_packet->sys_cmd[i].change_l_cmd.count = 1;
 		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
