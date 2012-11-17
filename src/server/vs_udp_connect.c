@@ -206,6 +206,7 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_l_cmd = (struct Negotiate_Cmd*)cmd;
+	int value_rank, tmp = 0;
 
 	/* This block of code checks if received cookie is the same as the
 	 * negotiated cookie. When cookie is not the same, then the server
@@ -225,13 +226,12 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	/* Check if at least one of proposed Congestion Control methods are
 	 * supported */
 	if(change_l_cmd->feature == FTR_CC_ID) {
-		int i, tmp=0;
-		for(i=0; i<change_l_cmd->count; i++) {
+		for(value_rank=0; value_rank<change_l_cmd->count; value_rank++) {
 			/* This could not be never send */
-			if(change_l_cmd->value[i].uint8 == CC_RESERVED) {
+			if(change_l_cmd->value[value_rank].uint8 == CC_RESERVED) {
 				break;
 			/* TODO: better implementation: server could have list of supported CC methods */
-			} else if(change_l_cmd->value[i].uint8 == vs_ctx->cc_meth) {
+			} else if(change_l_cmd->value[value_rank].uint8 == vs_ctx->cc_meth) {
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->cc_meth == CC_RESERVED) {
 					/* Congestion Control has not been proposed yet */
@@ -239,14 +239,15 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Client has to propose same CC methods for client
 					 * and server. Server can't use different method then
 					 * client and vice versa. */
-					if(dgram_conn->cc_meth != change_l_cmd->value[i].uint8) {
-						v_print_log(VRS_PRINT_WARNING, "Proposed CC local :%d is not same as proposed CC remote: %d\n",
-								change_l_cmd->value[i].uint8, dgram_conn->cc_meth);
+					if(dgram_conn->cc_meth != change_l_cmd->value[value_rank].uint8) {
+						v_print_log(VRS_PRINT_WARNING,
+								"Proposed CC local :%d is not same as proposed CC remote: %d\n",
+								change_l_cmd->value[value_rank].uint8, dgram_conn->cc_meth);
 						break;
 					}
 				}
 				tmp = 1;
-				dgram_conn->cc_meth = change_l_cmd->value[i].uint8;
+				dgram_conn->cc_meth = change_l_cmd->value[value_rank].uint8;
 				break;
 			}
 		}
@@ -270,12 +271,11 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Client wants to negotiate type of command compression */
 	if(change_l_cmd->feature == FTR_CMD_COMPRESS) {
-		int i, tmp=0;
-		for(i=0; i<change_l_cmd->count; i++) {
-			if(change_l_cmd->value[i].uint8 == CMPR_NONE ||
-					change_l_cmd->value[i].uint8 == CMPR_ADDR_SHARE)
+		for(value_rank=0; value_rank<change_l_cmd->count; value_rank++) {
+			if(change_l_cmd->value[value_rank].uint8 == CMPR_NONE ||
+					change_l_cmd->value[value_rank].uint8 == CMPR_ADDR_SHARE)
 			{
-				dgram_conn->peer_cmd_cmpr = change_l_cmd->value[i].uint8;
+				dgram_conn->peer_cmd_cmpr = change_l_cmd->value[value_rank].uint8;
 				tmp = 1;
 				break;
 			}
@@ -302,16 +302,16 @@ static int	vs_LISTEN_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_r_cmd = (struct Negotiate_Cmd*)cmd;
+	int value_rank, tmp = 0;
 
 	/* Check if at least one of proposed Congestion Control methods are
 	 * supported */
 	if(change_r_cmd->feature == FTR_CC_ID) {
-		int i, tmp=0;
-		for(i=0; i<change_r_cmd->count; i++) {
+		for(value_rank=0; value_rank<change_r_cmd->count; value_rank++) {
 			/* This could not be never send */
-			if(change_r_cmd->value[i].uint8 == CC_RESERVED) {
+			if(change_r_cmd->value[value_rank].uint8 == CC_RESERVED) {
 				break;
-			} else if(change_r_cmd->value[i].uint8 == vs_ctx->cc_meth) { /* TODO: better implementation */
+			} else if(change_r_cmd->value[value_rank].uint8 == vs_ctx->cc_meth) { /* TODO: better implementation */
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->cc_meth == CC_RESERVED) {
 					/* Congestion Control has not been proposed yet */
@@ -319,14 +319,15 @@ static int	vs_LISTEN_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Client has to propose same CC methods for client
 					 * and server. Server can't use different method then
 					 * client and vice versa. */
-					if(dgram_conn->cc_meth != change_r_cmd->value[i].uint8) {
-						v_print_log(VRS_PRINT_WARNING, "Proposed CC remote :%d is not same as proposed CC local: %d\n",
-								change_r_cmd->value[i].uint8, dgram_conn->cc_meth);
+					if(dgram_conn->cc_meth != change_r_cmd->value[value_rank].uint8) {
+						v_print_log(VRS_PRINT_WARNING,
+								"Proposed CC remote :%d is not same as proposed CC local: %d\n",
+								change_r_cmd->value[value_rank].uint8, dgram_conn->cc_meth);
 						break;
 					}
 				}
 				tmp = 1;
-				dgram_conn->cc_meth = change_r_cmd->value[i].uint8;
+				dgram_conn->cc_meth = change_r_cmd->value[value_rank].uint8;
 				break;
 			}
 		}
@@ -340,12 +341,11 @@ static int	vs_LISTEN_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Client wants to negotiate type of command compression */
 	if(change_r_cmd->feature == FTR_CMD_COMPRESS) {
-		int i, tmp=0;
-		for(i=0; i<change_r_cmd->count; i++) {
-			if(change_r_cmd->value[i].uint8 == CMPR_NONE ||
-					change_r_cmd->value[i].uint8 == CMPR_ADDR_SHARE)
+		for(value_rank=0; value_rank<change_r_cmd->count; value_rank++) {
+			if(change_r_cmd->value[value_rank].uint8 == CMPR_NONE ||
+					change_r_cmd->value[value_rank].uint8 == CMPR_ADDR_SHARE)
 			{
-				dgram_conn->host_cmd_cmpr = change_r_cmd->value[i].uint8;
+				dgram_conn->host_cmd_cmpr = change_r_cmd->value[value_rank].uint8;
 				tmp = 1;
 				break;
 			}
@@ -549,18 +549,17 @@ static int vs_RESPOND_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *confirm_r_cmd = (struct Negotiate_Cmd*)cmd;
-	int ret = 1;
+	int value_rank, tmp = 0;
 
 	/* Check if at least one of proposed Flow Control methods are
 	 * supported */
 	if(confirm_r_cmd->feature == FTR_FC_ID) {
-		int i, tmp=0;
-		for(i=0; i<confirm_r_cmd->count; i++) {
+		for(value_rank=0; value_rank<confirm_r_cmd->count; value_rank++) {
 			/* This could not be never send */
-			if(confirm_r_cmd->value[i].uint8 == FC_RESERVED) {
+			if(confirm_r_cmd->value[value_rank].uint8 == FC_RESERVED) {
 				break;
 			/* TODO: better implementation: server could have list of supported FC methods */
-			} else if(confirm_r_cmd->value[i].uint8 == vs_ctx->fc_meth) {
+			} else if(confirm_r_cmd->value[value_rank].uint8 == vs_ctx->fc_meth) {
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Congestion Control has not been proposed yet */
@@ -568,26 +567,26 @@ static int vs_RESPOND_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Client has to propose same FC methods for client
 					 * and server. Server can't use different method then
 					 * client and vice versa. */
-					if(dgram_conn->fc_meth != confirm_r_cmd->value[i].uint8) {
+					if(dgram_conn->fc_meth != confirm_r_cmd->value[value_rank].uint8) {
 						v_print_log(VRS_PRINT_WARNING, "Proposed FC local :%d is not the same as proposed FC remote: %d\n",
-								confirm_r_cmd->value[i].uint8, dgram_conn->fc_meth);
+								confirm_r_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
 						break;
 					}
 				}
 				tmp = 1;
-				dgram_conn->fc_meth = confirm_r_cmd->value[i].uint8;
+				dgram_conn->fc_meth = confirm_r_cmd->value[value_rank].uint8;
 				break;
 			}
 		}
 
 		if(tmp==1) {
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
-	return ret;
+	return 1;
 }
 
 /**
@@ -599,7 +598,7 @@ static int vs_RESPOND_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *confirm_l_cmd = (struct Negotiate_Cmd*)cmd;
-	int ret = 1;
+	int value_rank, tmp = 0;
 
 	if(confirm_l_cmd->feature == FTR_COOKIE) {
 		if( vsession->host_cookie.str != NULL &&
@@ -607,22 +606,21 @@ static int vs_RESPOND_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 				confirm_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_cookie.str)==0 )
 		{
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
 	/* Check if at least one of proposed Flow Control methods are
 	 * supported */
 	if(confirm_l_cmd->feature == FTR_FC_ID) {
-		int i, tmp=0;
-		for(i=0; i<confirm_l_cmd->count; i++) {
+		for(value_rank=0; value_rank<confirm_l_cmd->count; value_rank++) {
 			/* This could not be never send */
-			if(confirm_l_cmd->value[i].uint8 == FC_RESERVED) {
+			if(confirm_l_cmd->value[value_rank].uint8 == FC_RESERVED) {
 				break;
 			/* TODO: better implementation: server could have list of supported FC methods */
-			} else if(confirm_l_cmd->value[i].uint8 == vs_ctx->fc_meth) {
+			} else if(confirm_l_cmd->value[value_rank].uint8 == vs_ctx->fc_meth) {
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Congestion Control has not been proposed yet */
@@ -630,22 +628,22 @@ static int vs_RESPOND_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Client has to propose same FC methods for client
 					 * and server. Server can't use different method then
 					 * client and vice versa. */
-					if(dgram_conn->fc_meth != confirm_l_cmd->value[i].uint8) {
+					if(dgram_conn->fc_meth != confirm_l_cmd->value[value_rank].uint8) {
 						v_print_log(VRS_PRINT_WARNING, "Proposed FC local :%d is not the same as proposed FC remote: %d\n",
-								confirm_l_cmd->value[i].uint8, dgram_conn->fc_meth);
+								confirm_l_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
 						break;
 					}
 				}
 				tmp = 1;
-				dgram_conn->fc_meth = confirm_l_cmd->value[i].uint8;
+				dgram_conn->fc_meth = confirm_l_cmd->value[value_rank].uint8;
 				break;
 			}
 		}
 
 		if(tmp==1) {
-			ret = 1;
+			return 1;
 		} else {
-			ret = 0;
+			return 0;
 		}
 	}
 
@@ -655,18 +653,18 @@ static int vs_RESPOND_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 			if(vs_ctx->rwin_scale == confirm_l_cmd->value[0].uint8) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Scale of host RWIN: %d confirmed\n", vs_ctx->rwin_scale);
 				dgram_conn->rwin_host_scale = vs_ctx->rwin_scale;
-				ret = 1;
+				return 1;
 			} else {
 				dgram_conn->rwin_host_scale = 0;
-				ret = 0;
+				return 0;
 			}
 		} else {
 			dgram_conn->rwin_host_scale = 0;
-			ret = 0;
+			return 0;
 		}
 	}
 
-	return ret;
+	return 1;
 }
 
 static void vs_RESPOND_init(struct vContext *C)

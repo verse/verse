@@ -62,43 +62,47 @@ int v_conn_dgram_handle_sys_cmds(struct vContext *C, const unsigned short state_
 {
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
-	int i, r, ret = 1;
+	int cmd_rank, r, ret = 1;
 
 	/* Parse system commands (not ACK and NAK messages ... these are proccessed separately) */
-	for(i=0; r_packet->sys_cmd[i].cmd.id!=CMD_RESERVED_ID && i < MAX_SYSTEM_COMMAND_COUNT; i++) {
-		switch (r_packet->sys_cmd[i].cmd.id) {
+	for(cmd_rank=0;
+			r_packet->sys_cmd[cmd_rank].cmd.id != CMD_RESERVED_ID &&
+					cmd_rank < MAX_SYSTEM_COMMAND_COUNT;
+			cmd_rank++)
+	{
+		switch (r_packet->sys_cmd[cmd_rank].cmd.id) {
 		case CMD_ACK_ID:
 			break;
 		case CMD_NAK_ID:
 			break;
 		case CMD_CHANGE_L_ID:
 			if(dgram_conn->state[state_id].CHANGE_L_cb) {
-				r = dgram_conn->state[state_id].CHANGE_L_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CHANGE_L_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		case CMD_CHANGE_R_ID:
 			if(dgram_conn->state[state_id].CHANGE_R_cb) {
-				r = dgram_conn->state[state_id].CHANGE_R_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CHANGE_R_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		case CMD_CONFIRM_L_ID:
 			if(dgram_conn->state[state_id].CONFIRM_L_cb) {
-				r = dgram_conn->state[state_id].CONFIRM_L_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CONFIRM_L_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
 			if(dgram_conn->state[state_id].CONFIRM_R_cb) {
-				r = dgram_conn->state[state_id].CONFIRM_R_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CONFIRM_R_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		default:
 			/* Unknown command ID */
 			if(is_log_level(VRS_PRINT_WARNING)) {
-				v_print_log(VRS_PRINT_WARNING, "Unknown system command ID: %d\n", r_packet->sys_cmd[i].cmd.id);
+				v_print_log(VRS_PRINT_WARNING, "Unknown system command ID: %d\n", r_packet->sys_cmd[cmd_rank].cmd.id);
 			}
 			break;
 		}

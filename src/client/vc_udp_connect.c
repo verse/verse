@@ -69,7 +69,7 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_l_cmd = (struct Negotiate_Cmd*)cmd;
-	int i;
+	int value_rank;
 
 	if(change_l_cmd->feature == FTR_COOKIE) {
 		/* This block of code checks, if received cookie is the same as the
@@ -89,9 +89,9 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Server proposes it's own Flow Control */
 	if(change_l_cmd->feature == FTR_FC_ID) {
-		for(i=0; i<change_l_cmd->count; i++) {
+		for(value_rank=0; value_rank<change_l_cmd->count; value_rank++) {
 			/* TODO: better implementation */
-			if(change_l_cmd->value[i].uint8 == FC_NONE) { /* list of supported methods */
+			if(change_l_cmd->value[value_rank].uint8 == FC_NONE) { /* list of supported methods */
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Flow Control has not been proposed yet */
@@ -99,13 +99,13 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Server has to propose same FC methods for client
 					 * and server. Client can't use different method then
 					 * server and vice versa. */
-					if(dgram_conn->fc_meth != change_l_cmd->value[i].uint8) {
+					if(dgram_conn->fc_meth != change_l_cmd->value[value_rank].uint8) {
 						v_print_log(VRS_PRINT_WARNING, "Proposed FC local :%d is not same as proposed FC remote: %d\n",
-								change_l_cmd->value[i].uint8, dgram_conn->fc_meth);
+								change_l_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
 						return 0;
 					}
 				}
-				dgram_conn->fc_meth = change_l_cmd->value[i].uint8;
+				dgram_conn->fc_meth = change_l_cmd->value[value_rank].uint8;
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Local Flow Control ID: %d proposed\n", change_l_cmd->value[0].uint8);
 				return 1;
 			} else {
@@ -139,12 +139,12 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 {
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_r_cmd = (struct Negotiate_Cmd*)cmd;
-	int i;
+	int value_rank;
 
 	if(change_r_cmd->feature == FTR_FC_ID) {
-		for(i=0; i<change_r_cmd->count; i++) {
+		for(value_rank=0; value_rank<change_r_cmd->count; value_rank++) {
 			/* TODO: better implementation */
-			if(change_r_cmd->value[i].uint8 == FC_NONE) { /* list of supported methods */
+			if(change_r_cmd->value[value_rank].uint8 == FC_NONE) { /* list of supported methods */
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Flow Control has not been proposed yet */
@@ -152,14 +152,17 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Server has to propose same FC methods for client
 					 * and server. Client can't use different method then
 					 * server and vice versa. */
-					if(dgram_conn->fc_meth != change_r_cmd->value[i].uint8) {
-						v_print_log(VRS_PRINT_WARNING, "Proposed FC remote :%d is not same as proposed FC local: %d\n",
-								change_r_cmd->value[i].uint8, dgram_conn->fc_meth);
+					if(dgram_conn->fc_meth != change_r_cmd->value[value_rank].uint8) {
+						v_print_log(VRS_PRINT_WARNING,
+								"Proposed FC remote :%d is not same as proposed FC local: %d\n",
+								change_r_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
 						return 0;
 					}
 				}
-				dgram_conn->fc_meth = change_r_cmd->value[i].uint8;
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Flow Control ID: %d proposed\n", change_r_cmd->value[0].uint8);
+				dgram_conn->fc_meth = change_r_cmd->value[value_rank].uint8;
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Remote Flow Control ID: %d proposed\n",
+						change_r_cmd->value[0].uint8);
 				return 1;
 			} else {
 				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control\n");
@@ -190,10 +193,14 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 				confirm_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_cookie.str)==0 )
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Local COOKIE: %s confirmed\n", confirm_l_cmd->value[0].string8.str);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Local COOKIE: %s confirmed\n",
+					confirm_l_cmd->value[0].string8.str);
 			return 1;
 		} else {
-			v_print_log(VRS_PRINT_WARNING, "COOCKIE: %s not confirmed\n", vsession->peer_cookie.str);
+			v_print_log(VRS_PRINT_WARNING,
+					"COOCKIE: %s not confirmed\n",
+					vsession->peer_cookie.str);
 			return 0;
 		}
 	}
@@ -203,7 +210,9 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		/* TODO: better implementation */
 		if(confirm_l_cmd->count == 1 &&	/* Any confirm command has to include only one value */
 				confirm_l_cmd->value[0].uint8 == CC_NONE) {	/* list of supported methods */
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Local Congestion Control ID: %d confirmed\n", confirm_l_cmd->value[0].uint8);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Local Congestion Control ID: %d confirmed\n",
+					confirm_l_cmd->value[0].uint8);
 			dgram_conn->cc_meth = CC_NONE;
 			return 1;
 		} else {
@@ -216,7 +225,8 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(confirm_l_cmd->feature == FTR_RWIN_SCALE) {
 		if(confirm_l_cmd->count == 1 ) {
 			if(vc_ctx->rwin_scale == confirm_l_cmd->value[0].uint8) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Scale of host RWIN: %d confirmed\n", vc_ctx->rwin_scale);
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Scale of host RWIN: %d confirmed\n", vc_ctx->rwin_scale);
 				dgram_conn->rwin_host_scale = vc_ctx->rwin_scale;
 				return 1;
 			} else {
