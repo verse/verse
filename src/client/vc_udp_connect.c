@@ -234,7 +234,17 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Server should confirm client proposal of command compression */
 	if(confirm_l_cmd->feature == FTR_CMD_COMPRESS) {
-		/* TODO */
+		if(confirm_l_cmd->count == 1) {
+			if(confirm_l_cmd->value[0].uint8 == CMPR_NONE ||
+					confirm_l_cmd->value[0].uint8 == CMPR_ADDR_SHARE)
+			{
+				dgram_conn->host_cmd_cmpr = confirm_l_cmd->value[0].uint8;
+				return 0;
+			} else {
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Command Compress\n");
+				return 1;
+			}
+		}
 	}
 
 	/* Ignore unknown feature */
@@ -262,6 +272,21 @@ static int vc_REQUEST_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		} else {
 			v_print_log(VRS_PRINT_ERROR, "Unsupported Congestion Control\n");
 			return 0;
+		}
+	}
+
+	/* Server should confirm client proposal of command compression */
+	if(confirm_r_cmd->feature == FTR_CMD_COMPRESS) {
+		if(confirm_r_cmd->count == 1) {
+			if(confirm_r_cmd->value[0].uint8 == CMPR_NONE ||
+					confirm_r_cmd->value[0].uint8 == CMPR_ADDR_SHARE)
+			{
+				dgram_conn->peer_cmd_cmpr = confirm_r_cmd->value[0].uint8;
+				return 1;
+			} else {
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Command Compress\n");
+				return 0;
+			}
 		}
 	}
 
