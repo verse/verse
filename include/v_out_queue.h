@@ -92,6 +92,7 @@ typedef struct VOutQueue {
 	struct VPrioOutQueue	*queues[MAX_PRIORITY+1];
 	struct VCommandQueue	*cmds[MAX_CMD_ID+1];
 	uint32					size;			/**< Size of stored commands in bytes */
+	uint32					max_size;		/**< Maximal allowed size of commands stored in this queue */
 	uint32					count;			/**< Count of stored commands */
 	uint8					max_prio;		/**< Maximal used priority queue */
 	uint8					min_prio;		/**< Minimal used priority queue */

@@ -573,6 +573,8 @@ int v_out_queue_init(struct VOutQueue *out_queue)
 	out_queue->count = 0;
 	out_queue->size = 0;
 
+	out_queue->max_size = 1 << 20;	/* 1MB */
+
 	out_queue->max_prio = VRS_DEFAULT_PRIORITY;
 	out_queue->min_prio = VRS_DEFAULT_PRIORITY;
 

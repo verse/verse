@@ -60,9 +60,10 @@ typedef struct VInQueueCommand {
 typedef struct VInQueue {
 	pthread_mutex_t			lock;	/**< Mutex for locking queue (synchronization between threads) */
 	struct VCommandQueue	*cmds[MAX_CMD_ID+1];
-	struct VListBase		queue;	/**< Linked list of commands */
-	uint32					size;	/**< Size of stored commands in bytes */
-	uint32					count;	/**< Count of stored commands */
+	struct VListBase		queue;		/**< Linked list of commands */
+	uint32					size;		/**< Size of stored commands in bytes */
+	uint32					max_size;	/**< Maximal allowed size of commands stored in this queue */
+	uint32					count;		/**< Count of stored commands */
 } VInQueue;
 
 uint32 v_in_queue_size(struct VInQueue *in_queue);

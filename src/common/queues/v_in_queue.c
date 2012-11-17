@@ -149,6 +149,8 @@ int v_in_queue_init(struct VInQueue *in_queue)
 	in_queue->count = 0;
 	in_queue->size = 0;
 
+	in_queue->max_size = 1 << 20;	/* 1MB */
+
 	in_queue->queue.first = NULL;
 	in_queue->queue.last = NULL;
 
