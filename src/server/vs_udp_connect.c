@@ -403,7 +403,7 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
 	struct VPacket *s_packet = CTX_s_packet(C);
-	int i=0;
+	int cmd_rank = 0;
 
 	/* Verse packet header */
 	s_packet->header.version = 1;
@@ -414,44 +414,29 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 	s_packet->header.ank_id = 0;
 
 	/* System commands */
-	s_packet->sys_cmd[i].ack_cmd.id = CMD_ACK_ID;
-	s_packet->sys_cmd[i].ack_cmd.pay_id = r_packet->header.payload_id;
-	i++;
+	s_packet->sys_cmd[cmd_rank].ack_cmd.id = CMD_ACK_ID;
+	s_packet->sys_cmd[cmd_rank].ack_cmd.pay_id = r_packet->header.payload_id;
+	cmd_rank++;
 
 	/* Send confirmation about cookie */
 	if(vsession->peer_cookie.str!=NULL) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_COOKIE;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-		strcpy((char*)s_packet->sys_cmd[i].confirm_l_cmd.value[0].string8.str, vsession->peer_cookie.str);
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 	}
 
 	/* Send own cookie */
 	if(vsession->host_cookie.str!=NULL) {
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_COOKIE;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-		strcpy((char*)s_packet->sys_cmd[i].change_l_cmd.value[0].string8.str, vsession->host_cookie.str);
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 	}
 
 	/* Send confirmation about Congestion Control method if client proposed
 	 * supported Congestion Control method */
 	if(dgram_conn->cc_meth != CC_RESERVED) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_CC_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->cc_meth;
-		i++;
-
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_R_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_CC_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->cc_meth;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_CC_ID, &dgram_conn->cc_meth, NULL);
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_R_ID, FTR_CC_ID, &dgram_conn->cc_meth, NULL);
 	} else {
 		/* TODO: when client didn't send some proposal, then send server preference
 		 * as proposal */
@@ -459,83 +444,61 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 
 	/* Send proposal of Flow Control (server send this proposal first) */
 	if(vs_ctx->fc_meth != FC_RESERVED) {
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_FC_ID;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = vs_ctx->fc_meth;
-		i++;
-
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_R_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_FC_ID;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = vs_ctx->fc_meth;
-		i++;
+		/* Flow control used at link between server and client */
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_FC_ID, &vs_ctx->fc_meth, NULL);
+		/* Flow control used at link between client and server */
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_R_ID, FTR_FC_ID, &vs_ctx->fc_meth, NULL);
 	}
 
 	/* Send proposal of host (local) Flow Control Window scaling */
 	if(vs_ctx->rwin_scale != 0) {
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_RWIN_SCALE;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = vs_ctx->rwin_scale;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vs_ctx->rwin_scale, NULL);
 	}
 
 	/* Send confirmation of peer Flow Control Window scaling */
 	if(dgram_conn->rwin_peer_scale != 0) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_RWIN_SCALE;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->rwin_peer_scale;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_RWIN_SCALE, &dgram_conn->rwin_peer_scale, NULL);
 	}
 
 	/* Send confirmation of peer command compression */
 	if(dgram_conn->host_cmd_cmpr != CMPR_RESERVED) {
-		s_packet->sys_cmd[i].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_packet->sys_cmd[i].confirm_r_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].confirm_r_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_r_cmd.value[0].uint8 = dgram_conn->host_cmd_cmpr;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_R_ID, FTR_CMD_COMPRESS, &dgram_conn->host_cmd_cmpr, NULL);
 	} else {
 		/* When client didn't propose any command compression, then propose compression
 		 * form server settings */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].change_l_cmd.count = 2;
+		uint8 cmpr_addr_share = CMPR_ADDR_SHARE;
+		uint8 cmpr_none = CMPR_NONE;
 		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
-			s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
-			s_packet->sys_cmd[i].change_l_cmd.value[1].uint8 = CMPR_NONE;
+			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+					CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, &cmpr_none, NULL);
 		} else {
-			s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
-			s_packet->sys_cmd[i].change_l_cmd.value[1].uint8 = CMPR_ADDR_SHARE;
+			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+					CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, &cmpr_addr_share, NULL);
 		}
 	}
 
 	/* Send confirmation of peer command compression */
 	if(dgram_conn->peer_cmd_cmpr != CMPR_RESERVED) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->peer_cmd_cmpr;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_CMD_COMPRESS, &dgram_conn->peer_cmd_cmpr, NULL);
 	} else {
 		/* When client didn't propose any command compression, then propose compression
 		 * form server settings */
-		s_packet->sys_cmd[i].change_r_cmd.id = CMD_CHANGE_R_ID;
-		s_packet->sys_cmd[i].change_r_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].change_r_cmd.count = 2;
+		uint8 cmpr_addr_share = CMPR_ADDR_SHARE;
+		uint8 cmpr_none = CMPR_NONE;
 		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
-			s_packet->sys_cmd[i].change_r_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
-			s_packet->sys_cmd[i].change_r_cmd.value[1].uint8 = CMPR_NONE;
+			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+					CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, &cmpr_none, NULL);
 		} else {
-			s_packet->sys_cmd[i].change_r_cmd.value[0].uint8 = CMPR_NONE;
-			s_packet->sys_cmd[i].change_r_cmd.value[1].uint8 = CMPR_ADDR_SHARE;
+			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+					CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_none, &cmpr_addr_share, NULL);
 		}
 	}
-
-	/* Fake terminating system command */
-	s_packet->sys_cmd[i].cmd.id = CMD_RESERVED_ID;
 
 }
 

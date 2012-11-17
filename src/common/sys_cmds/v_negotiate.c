@@ -34,12 +34,78 @@
  *
  */
 
+#include <stdarg.h>
+#include <string.h>
+
 #include "v_sys_commands.h"
 #include "v_commands.h"
 #include "v_common.h"
 #include "v_pack.h"
 #include "v_unpack.h"
-#include <string.h>
+#include "v_network.h"
+
+/**
+ * \brief Add next system command to the structure of verse packet
+ *
+ * \param[out]	packet		The pointer at packet, where negotiate commands will be added
+ * \param[in]	cmd_rank	The rank of negotiate of command sequence
+ * \param[in]	cmd_op_code	The OpCode of negotiate command
+ * \param[in]	ftr_op_code	The OpCode of features that is negotiated
+ * \param[in]	...			Arguments with pointers at values terminated with NULL pointer
+ */
+int v_add_negotiate_cmd(struct VPacket *packet,
+		uint8 cmd_rank,
+		uint8 cmd_op_code,
+		uint8 ftr_op_code,
+		...)
+{
+	va_list args;
+	void *value;
+	unsigned char ftr_rank = 0;
+
+	/* Add command OpCode */
+	packet->sys_cmd[cmd_rank].negotiate_cmd.id = cmd_op_code;
+	/* Add OpCode of features */
+	packet->sys_cmd[cmd_rank].negotiate_cmd.feature = ftr_op_code;
+
+	va_start(args, ftr_op_code);
+	while( (value = va_arg(args, void*)) != NULL) {
+		switch(ftr_op_code) {
+		case FTR_FC_ID:
+		case FTR_CC_ID:
+		case FTR_RWIN_SCALE:
+		case FTR_CMD_COMPRESS:
+			/* Add unsigned char value */
+			packet->sys_cmd[cmd_rank].negotiate_cmd.value[ftr_rank].uint8 = *(uint8*)value;
+			break;
+		case FTR_HOST_URL:
+		case FTR_COOKIE:
+		case FTR_DED:
+			/* Add string */
+			packet->sys_cmd[cmd_rank].negotiate_cmd.value[ftr_rank].string8.length = strlen((char*)value);
+			strcpy((char*)packet->sys_cmd[cmd_rank].negotiate_cmd.value[ftr_rank].string8.str, (char*)value);
+			break;
+		case FTR_FPS:
+			/* Add float value */
+			packet->sys_cmd[cmd_rank].negotiate_cmd.value[ftr_rank].real32 = *(real32*)value;
+			break;
+		default:
+			/* When unsuported feature*/
+			packet->sys_cmd[cmd_rank].cmd.id = CMD_RESERVED_ID;
+			return 0;
+		}
+		ftr_rank++;
+	}
+	va_end(args);
+
+	/* Add count of values to the command*/
+	packet->sys_cmd[cmd_rank].negotiate_cmd.count = ftr_rank;
+
+	/* Add terminating fake command */
+	packet->sys_cmd[cmd_rank+1].cmd.id = CMD_RESERVED_ID;
+
+	return 1;
+}
 
 /**
  * \brief This function prints negotiate commands: Change_L/R and Confirm_L/R

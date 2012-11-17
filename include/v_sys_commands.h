@@ -134,6 +134,12 @@ typedef struct Ack_Nak_Cmd {
 struct VPacket;
 struct VMessage;
 
+int v_add_negotiate_cmd(struct VPacket *packet,
+		uint8 cmd_rank,
+		uint8 cmd_op_code,
+		uint8 ftr_op_code,
+		...);
+
 void v_print_user_auth_success(const unsigned char level, struct User_Authentication_Success *ua_suc);
 int v_raw_unpack_user_auth_success(const char *buffer, ssize_t buffer_size, struct User_Authentication_Success *ua_suc);
 int v_raw_pack_user_auth_success(char *buffer, const struct User_Authentication_Success *ua_suc);

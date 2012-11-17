@@ -127,6 +127,7 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 	}
 
+	/* Ignore unknown feature */
 	return 1;
 }
 
@@ -167,6 +168,7 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 	}
 
+	/* Ignore unknown feature */
 	return 1;
 }
 
@@ -184,7 +186,7 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(confirm_l_cmd->feature == FTR_COOKIE) {
 		/* This block of code checks if the server confirmed send cookie. */
 		if( vsession->host_cookie.str != NULL &&
-				confirm_l_cmd->count > 0 &&
+				confirm_l_cmd->count == 1 &&
 				confirm_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_cookie.str)==0 )
 		{
@@ -212,7 +214,7 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Server should confirm client proposal of Flow Control Window scale (local) */
 	if(confirm_l_cmd->feature == FTR_RWIN_SCALE) {
-		if(confirm_l_cmd->count >= 1 ) {
+		if(confirm_l_cmd->count == 1 ) {
 			if(vc_ctx->rwin_scale == confirm_l_cmd->value[0].uint8) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Scale of host RWIN: %d confirmed\n", vc_ctx->rwin_scale);
 				dgram_conn->rwin_host_scale = vc_ctx->rwin_scale;
@@ -230,7 +232,13 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 	}
 
-	return 0;
+	/* Server should confirm client proposal of command compression */
+	if(confirm_l_cmd->feature == FTR_CMD_COMPRESS) {
+		/* TODO */
+	}
+
+	/* Ignore unknown feature */
+	return 1;
 }
 
 /**
@@ -246,7 +254,8 @@ static int vc_REQUEST_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(confirm_r_cmd->feature == FTR_CC_ID) {
 		/* TODO: better implementation */
 		if(confirm_r_cmd->count == 1 &&	/* Any confirm command has to include only one value */
-				confirm_r_cmd->value[0].uint8 == CC_NONE) {	/* list of supported methods */
+				confirm_r_cmd->value[0].uint8 == CC_NONE) /* "List" of supported methods */
+		{
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Congestion Control ID: %d confirmed\n", confirm_r_cmd->value[0].uint8);
 			dgram_conn->cc_meth = CC_NONE;
 			return 1;
@@ -265,7 +274,10 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct VPacket *s_packet = CTX_s_packet(C);
-	int i=0;
+	int cmd_rank = 0;
+	static const uint8 cc_none = CC_NONE,
+			cmpr_none = CMPR_NONE,
+			cmpr_addr_share = CMPR_ADDR_SHARE;
 
 	/* Verse packet header */
 	s_packet->header.version = 1;
@@ -278,66 +290,38 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	/* System commands */
 	if(vsession->host_cookie.str!=NULL) {
 		/* Add negotiated cookie */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_COOKIE;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-		strcpy((char*)s_packet->sys_cmd[0].change_l_cmd.value[0].string8.str, vsession->host_cookie.str);
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 	}
 
 	/* Add CC (local) proposal */
-	s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-	s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CC_ID;
-	s_packet->sys_cmd[i].change_l_cmd.count = 1;
-	s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CC_NONE;
-	i++;
+	cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			CMD_CHANGE_L_ID, FTR_CC_ID, &cc_none, NULL);
 
 	/* Add CC (remote) proposal */
-	s_packet->sys_cmd[i].change_r_cmd.id = CMD_CHANGE_R_ID;
-	s_packet->sys_cmd[i].change_r_cmd.feature = FTR_CC_ID;
-	s_packet->sys_cmd[i].change_r_cmd.count = 1;
-	s_packet->sys_cmd[i].change_r_cmd.value[0].uint8 = CC_NONE;
-	i++;
+	cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			CMD_CHANGE_R_ID, FTR_CC_ID, &cc_none, NULL);
 
 	/* Add Scale Window proposal */
-	s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-	s_packet->sys_cmd[i].change_l_cmd.feature = FTR_RWIN_SCALE;
-	s_packet->sys_cmd[i].change_l_cmd.count = 1;
-	s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = vc_ctx->rwin_scale;
-	i++;
+	cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vc_ctx->rwin_scale, NULL);
 
 	/* Add command compression proposal */
 	if(vsession->flags & VRS_NO_CMD_CMPR) {
-		/* Client isn't able to send compressed commands (local proposal) */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
-		i++;
+		/* Client doesn't want to send compressed commands (local proposal) */
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, NULL);
 		/* Client isn't able to receive compressed commands (remote proposal) */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_R_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_NONE;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
 	} else {
 		/* Client wants to send compressed commands (local proposal) */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
 		/* Client is able to receive compressed commands (remote proposal) */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_R_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CMD_COMPRESS;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CMPR_ADDR_SHARE;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
 	}
-
-	/* Add fake terminate command (this command will not be sent) */
-	s_packet->sys_cmd[i].cmd.id = CMD_RESERVED_ID;
 }
 
 /**
@@ -455,7 +439,7 @@ void vc_PARTOPEN_init_send_packet(struct vContext *C)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VPacket *s_packet = CTX_s_packet(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
-	int i=0;
+	int cmd_rank = 0;
 
 	/* Verse packet header */
 	s_packet->header.version = 1;
@@ -472,45 +456,29 @@ void vc_PARTOPEN_init_send_packet(struct vContext *C)
 	}
 
 	/* System commands */
-	s_packet->sys_cmd[i].ack_cmd.id = CMD_ACK_ID;
-	s_packet->sys_cmd[i].ack_cmd.pay_id = dgram_conn->peer_id;
-	i++;
+	s_packet->sys_cmd[cmd_rank].ack_cmd.id = CMD_ACK_ID;
+	s_packet->sys_cmd[cmd_rank].ack_cmd.pay_id = dgram_conn->peer_id;
+	cmd_rank++;
 
 	/* Confirm proposed COOKIE */
 	if(vsession->peer_cookie.str!=NULL) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_COOKIE;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-		strcpy((char*)s_packet->sys_cmd[1].confirm_l_cmd.value[0].string8.str, vsession->peer_cookie.str);
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 	}
 
 	/* Confirm proposed Flow Control ID */
 	if(dgram_conn->fc_meth != FC_RESERVED) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_FC_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->fc_meth;
-		i++;
-
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_R_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_FC_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->fc_meth;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_FC_ID, &dgram_conn->fc_meth, NULL);
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_R_ID, FTR_FC_ID, &dgram_conn->fc_meth, NULL);
 	}
 
 	/* Confirm proposed shifting of Flow Control Window */
 	if(dgram_conn->rwin_peer_scale != 0) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_RWIN_SCALE;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->rwin_peer_scale;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_RWIN_SCALE, &dgram_conn->rwin_peer_scale, NULL);
 	}
-
-	s_packet->sys_cmd[i].cmd.id = CMD_RESERVED_ID;
 }
 
 int vc_PARTOPEN_send_packet(struct vContext *C)

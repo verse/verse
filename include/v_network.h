@@ -165,10 +165,7 @@ typedef struct VPacket {
 		struct Generic_Cmd		cmd;
 		struct Ack_Nak_Cmd		ack_cmd;
 		struct Ack_Nak_Cmd		nak_cmd;
-		struct Negotiate_Cmd	change_l_cmd;
-		struct Negotiate_Cmd	change_r_cmd;
-		struct Negotiate_Cmd	confirm_l_cmd;
-		struct Negotiate_Cmd	confirm_r_cmd;
+		struct Negotiate_Cmd	negotiate_cmd;
 	} sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
 
 	/* Number of system commands in packet */

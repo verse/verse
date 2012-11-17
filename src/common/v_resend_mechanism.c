@@ -16,7 +16,7 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS.
  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
  * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
@@ -348,25 +348,14 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	/* When negotiated and used FPS is different, then pack negotiate command
 	 * for FPS */
 	if(vconn->fps_host != vconn->fps_peer) {
-		s_packet->sys_cmd[cmd_rank].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[cmd_rank].change_l_cmd.count = 1;
-		s_packet->sys_cmd[cmd_rank].change_l_cmd.feature = FTR_FPS;
-		s_packet->sys_cmd[cmd_rank].change_l_cmd.value[0].real32 = vconn->fps_host;
-
-		cmd_rank++;
-		s_packet->sys_cmd[cmd_rank].cmd.id = CMD_RESERVED_ID;
+		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_FPS, &vconn->fps_host, NULL);
 	} else {
 		if(vconn->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
-			s_packet->sys_cmd[cmd_rank].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-			s_packet->sys_cmd[cmd_rank].confirm_l_cmd.count = 1;
-			s_packet->sys_cmd[cmd_rank].confirm_l_cmd.feature = FTR_FPS;
-			s_packet->sys_cmd[cmd_rank].confirm_l_cmd.value[0].real32 = vconn->fps_peer;
-
+			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+					CMD_CONFIRM_L_ID, FTR_FPS, &vconn->fps_peer, NULL);
 			/* Send confirmation only once for received system command */
 			vconn->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
-
-			cmd_rank++;
-			s_packet->sys_cmd[cmd_rank].cmd.id = CMD_RESERVED_ID;
 		}
 	}
 
@@ -757,18 +746,18 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 			i++)
 	{
 		if(r_packet->sys_cmd[i].cmd.id == CMD_CHANGE_L_ID &&
-				r_packet->sys_cmd[i].change_l_cmd.feature == FTR_FPS &&
-				r_packet->sys_cmd[i].change_l_cmd.count > 0)
+				r_packet->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
+				r_packet->sys_cmd[i].negotiate_cmd.count > 0)
 		{
-			vconn->fps_host = vconn->fps_peer = r_packet->sys_cmd[i].change_l_cmd.value->real32;
+			vconn->fps_host = vconn->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
 			vconn->tmp_flags |= SYS_CMD_NEGOTIATE_FPS;
 		}
 
 		if(r_packet->sys_cmd[i].cmd.id == CMD_CONFIRM_L_ID &&
-				r_packet->sys_cmd[i].change_l_cmd.feature == FTR_FPS &&
-				r_packet->sys_cmd[i].change_l_cmd.count > 0)
+				r_packet->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
+				r_packet->sys_cmd[i].negotiate_cmd.count > 0)
 		{
-			vconn->fps_peer = r_packet->sys_cmd[i].confirm_l_cmd.value->real32;
+			vconn->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
 		}
 	}
 
