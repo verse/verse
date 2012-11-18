@@ -157,7 +157,8 @@ static void set_host_rwin(struct VDgramConn *dgram_conn)
 }
 
 /**
- * \brief This function packs commands to the packet from one priority queue.
+ * \brief This function packs and compress command to the packet from one
+ * priority queue.
  */
 static int pack_prio_queue(struct vContext *C,
 		struct VSent_Packet *sent_packet,
@@ -180,6 +181,7 @@ static int pack_prio_queue(struct vContext *C,
 	{
 		cmd_count = 0;
 		cmd_share = 0;
+
 		/* Compute how many commands could be compressed to the packet
 		 * and compute right length of compressed commands. */
 		cmd_len = ((prio_win - sum_len)<(vconn->io_ctx.mtu - buffer_pos)) ?
@@ -219,26 +221,38 @@ static int pack_prio_queue(struct vContext *C,
 				break;
 			} else {
 
-				/* Was ID of command changed? */
-				if( (cmd->id != last_cmd_id) || (last_cmd_count <= 0)) {
-					/* When this command is alone, then user default command size */
-					if(cmd_count == 0) {
-						cmd_len = v_cmd_size(cmd);
-					} else {
-						/* FIXME: do not recompute command length here, but do it right,
-						 * when command is added to the queue */
-						cmd_len = v_cmds_len(cmd, cmd_count, cmd_share, cmd_len);
-					}
+				/* When compression is not allowed, then add this command as is */
+				if( vconn->host_cmd_cmpr == CMPR_NONE) {
+					cmd_count = 0;
+					cmd_len = v_cmd_size(cmd);
 					/* Debug print */
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Cmd: %d, count: %d, length: %d\n", cmd->id, cmd_count, cmd_len);
+					v_print_log(VRS_PRINT_DEBUG_MSG, "Cmd: %d, count: %d, length: %d\n",
+							cmd->id, cmd_count, cmd_len);
 					/* Add command to the buffer */
-					buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, cmd_len, cmd_share);
-					/* Set up current count of commands in the line */
-					last_cmd_count = cmd_count;
-					/* Update summary of commands length */
-					sum_len += cmd_len;
+					buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, cmd_len, 0);
 				} else {
-					buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, 0, cmd_share);
+					/* When command compression is allowed and was ID of command changed? */
+					if( (cmd->id != last_cmd_id) || (last_cmd_count <= 0) )	{
+						/* When this command is alone, then use default command size */
+						if(cmd_count == 0) {
+							cmd_len = v_cmd_size(cmd);
+						} else {
+							/* FIXME: do not recompute command length here, but do it right,
+							 * when command is added to the queue */
+							cmd_len = v_cmds_len(cmd, cmd_count, cmd_share, cmd_len);
+						}
+						/* Debug print */
+						v_print_log(VRS_PRINT_DEBUG_MSG, "Cmd: %d, count: %d, length: %d\n",
+								cmd->id, cmd_count, cmd_len);
+						/* Add command to the buffer */
+						buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, cmd_len, cmd_share);
+						/* Set up current count of commands in the line */
+						last_cmd_count = cmd_count;
+						/* Update summary of commands length */
+						sum_len += cmd_len;
+					} else {
+						buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, 0, cmd_share);
+					}
 				}
 
 				/* Print command */
