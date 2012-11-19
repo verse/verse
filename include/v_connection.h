@@ -138,6 +138,7 @@ typedef struct VDgramConn {
 	unsigned int			cwin;				/* Congestion Control Window */
 	unsigned int			rwin_host;			/* Flow Control Window of host (my) */
 	unsigned int			rwin_peer;			/* Flow Control Window of peer */
+	unsigned int			sent_size;			/* Size of data that were sent and were not acknowledged */
 	unsigned char			rwin_host_scale;	/* Scaling of host Flow Control Window (my) */
 	unsigned char			rwin_peer_scale;	/* Scaling of perr Flow Control Window */
 	float					fps_host;			/* FPS used by this host */

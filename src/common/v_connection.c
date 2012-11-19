@@ -186,6 +186,7 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 	dgram_conn->srtt = 0;
 	dgram_conn->rwin_host = 0xFFFFFFFF;	/* Default value */
 	dgram_conn->rwin_peer = 0xFFFFFFFF;	/* Default value */
+	dgram_conn->sent_size = 0;
 	dgram_conn->rwin_host_scale = 0;	/* rwin_host is >> by this value for outgoing packet */
 	dgram_conn->rwin_peer_scale = 0;	/* rwin_host is << by this value for incomming packet */
 	dgram_conn->cwin = 0xFFFFFFFF;		/* TODO: Congestion Control */

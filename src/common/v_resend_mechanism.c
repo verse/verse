@@ -153,8 +153,10 @@ static void set_host_rwin(struct vContext *C)
 		break;
 	case FC_TCP_LIKE:
 		/* Compute free space in incomming queue */
-		free_space = vsession->in_queue->max_size - vsession->in_queue->size;
-		dgram_conn->rwin_host = (uint32)(free_space >=0) ? free_space : 0;
+		free_space = (long int)vsession->in_queue->max_size - (long int)vsession->in_queue->size;
+		dgram_conn->rwin_host = (uint32)(free_space >0) ? free_space : 0;
+		/*printf(">>> max_size: %d, size: %d -> free_size: %ld -> window %d<<<\n",
+				vsession->in_queue->max_size, vsession->in_queue->size, free_space, dgram_conn->rwin_host);*/
 		break;
 	case FC_RESERVED:
 		v_print_log(VRS_PRINT_WARNING, "FC_RESERVED should never be used\n");
@@ -355,9 +357,13 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	/* Set window of flow control that will sent to receiver */
 	rwin = vconn->rwin_host >> vconn->rwin_host_scale;
 	s_packet->header.window = (unsigned short)(rwin > 0xFFFF) ? 0xFFFF : rwin;
+	/*printf("\t---real window: %d---\n", s_packet->header.window);*/
+
+	/* Compute how many data could be sent to not congest receiver */
+	rwin = vconn->rwin_peer - vconn->sent_size;
 
 	/* Select smallest window for sending (congestion control window or flow control window)*/
-	swin = (vconn->cwin < vconn->rwin_peer) ? vconn->cwin : vconn->rwin_peer;
+	swin = (vconn->cwin < rwin) ? vconn->cwin : rwin;
 
 	/* Set up Payload ID, when there is need to send payload packet */
 	if(s_packet->header.flags & PAY_FLAG)
@@ -390,6 +396,8 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	/* Fill buffer */
 	buffer_pos += v_pack_packet_header(s_packet, &io_ctx->buf[buffer_pos]);
 	buffer_pos += v_pack_dgram_system_commands(s_packet, &io_ctx->buf[buffer_pos]);
+
+	/* TODO: compute sent_size */
 
 	/* When this is not pure keep alive packet */
 	if(s_packet->header.flags & PAY_FLAG) {
@@ -432,6 +440,8 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
 							prio, prio_count, r_prio, prio_win);
 
+					/* TODO: return total size of commands that were stored in queue (sent_size) */
+
 					/* Pack commands from queues with high priority to the buffer */
 					buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);
 				}
@@ -455,6 +465,8 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 						/* Debug print */
 						v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
 								prio, prio_count, r_prio, prio_win);
+
+						/* TODO: return total size of commands that were stored in queue (sent_size) */
 
 						/* Pack commands from queues with low priority to the buffer */
 						buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);

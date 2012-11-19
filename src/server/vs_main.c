@@ -133,7 +133,7 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 
 	vs_ctx->cmd_cmpr = CMPR_ADDR_SHARE;
 
-	vs_ctx->rwin_scale = 7;			/*  Default scale of Flow Control Window */
+	vs_ctx->rwin_scale = 0;			/*  Default scale of Flow Control Window */
 }
 
 /**
