@@ -119,8 +119,10 @@ static int check_ack_nak_flag(struct vContext *C)
 /**
  * \brief This function set size of congestion window (congestion control)
  */
-static void set_host_cwin(struct VDgramConn *dgram_conn)
+static void set_host_cwin(struct vContext *C)
 {
+	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
+
 	switch(dgram_conn->cc_meth) {
 	case CC_NONE:
 		dgram_conn->cwin = 0xFFFF;
@@ -139,15 +141,20 @@ static void set_host_cwin(struct VDgramConn *dgram_conn)
 /**
  * \brief This function set size of receive window (flow control)
  */
-static void set_host_rwin(struct VDgramConn *dgram_conn)
+static void set_host_rwin(struct vContext *C)
 {
+	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
+	struct VSession *vsession = CTX_current_session(C);
+	long int free_space;
+
 	switch(dgram_conn->fc_meth) {
 	case FC_NONE:
 		dgram_conn->rwin_host = 0xFFFFFFFF;
 		break;
 	case FC_TCP_LIKE:
-		/* TODO: implement real TCP like flow control */
-		dgram_conn->rwin_host = 0xFFFFFFFF;
+		/* Compute free space in incomming queue */
+		free_space = vsession->in_queue->max_size - vsession->in_queue->size;
+		dgram_conn->rwin_host = (uint32)(free_space >=0) ? free_space : 0;
 		break;
 	case FC_RESERVED:
 		v_print_log(VRS_PRINT_WARNING, "FC_RESERVED should never be used\n");
@@ -290,6 +297,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	int ret, keep_alive_packet = -1, full_packet = 0;
 	int error_num;
 	uint16 swin, prio_win;
+	uint32 rwin;
 	int cmd_rank = 0;
 
 	/* Verse packet header */
@@ -340,11 +348,15 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	s_packet->header.flags |= ANK_FLAG;
 	s_packet->header.ank_id = vconn->ank_id;
 
-	set_host_rwin(vconn);
-	set_host_cwin(vconn);
+	/* Compute current windows for flow control and congestion control */
+	set_host_rwin(C);
+	set_host_cwin(C);
 
-	s_packet->header.window = (unsigned short)(vconn->rwin_host >> vconn->rwin_host_scale);
+	/* Set window of flow control that will sent to receiver */
+	rwin = vconn->rwin_host >> vconn->rwin_host_scale;
+	s_packet->header.window = (unsigned short)(rwin > 0xFFFF) ? 0xFFFF : rwin;
 
+	/* Select smallest window for sending (congestion control window or flow control window)*/
 	swin = (vconn->cwin < vconn->rwin_peer) ? vconn->cwin : vconn->rwin_peer;
 
 	/* Set up Payload ID, when there is need to send payload packet */
@@ -741,7 +753,7 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 		r_packet->acked=0;
 	}
 
-	/* Compute RWIN */
+	/* Compute real RWIN of Flow Control */
 	vconn->rwin_peer = r_packet->header.window << vconn->rwin_peer_scale;
 
 	/* Was packet received with any ACK or NAK command? */
