@@ -35,6 +35,8 @@ be possible.
  * Check (optional) http://check.sourceforge.net/
  * Spin (optional) http://spinroot.com/
  * Python3 (optional) http://www.python.org
+ * OpenLDAP (optional) http://www.openldap.org/
+ * Kerberos V5 (optional) http://web.mit.edu/kerberos/
 
 ### Building ###
 

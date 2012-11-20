@@ -26,6 +26,8 @@ set (${PROJECT_NAME}_VERSION
 
 # Build options
 option(VERSE_CLANG "Use Clang Compiler" OFF)
+option(VERSE_LDAP "OpenLDAP" ON)
+option(VERSE_KERBEROS "Kerberos" ON)
 option(VERSE_PYTHON_MODULE "Verse Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
@@ -47,8 +49,8 @@ set (CMAKE_THREAD_PREFER_PTHREAD)
 find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
 find_package (Iniparser REQUIRED)
-find_package (LDAP REQUIRED)
-find_package (Kerberos REQUIRED)
+#find_package (LDAP REQUIRED)
+#find_package (Kerberos REQUIRED)
 
 # Set output directory for libraries
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
@@ -59,6 +61,22 @@ set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
 # Set up required subdirectories
 add_subdirectory (src)
 add_subdirectory (example)
+
+# OpenLDAP library
+if (VERSE_LDAP)
+
+	# Try to find optional package Check (unittests)
+	find_package (LDAP)
+
+endif (VERSE_LDAP)
+
+# Kerberos V5 library
+if (VERSE_KERBEROS)
+
+	# Try to find optional package Check (unittests)
+	find_package (Kerberos)
+
+endif (VERSE_KERBEROS)
 
 # Check unit test
 if (VERSE_CHECK)
@@ -146,6 +164,18 @@ message ("* Verse Configuration *")
 message ("")
 
 message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+
+if (LDAP_FOUND)
+	message (" * OpenLDAP:      ON")
+else ()
+	message (" * OpenLDAP:      OFF")
+endif (LDAP_FOUND)
+
+if (KERBEROS_FOUND)
+	message (" * Kerberos:      ON")
+else ()
+	message (" * Kerberos:      OFF")
+endif (KERBEROS_FOUND)
 	
 if (PYTHON_LIBRARY)
 	message (" * Python:        ON")
