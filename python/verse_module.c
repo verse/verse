@@ -102,7 +102,7 @@ static void cb_c_receive_layer_unset_value(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_unset_value", "(IHI)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_unset_value", "(IHI)",
 				node_id, layer_id, item_id);
 	return;
 }
@@ -195,7 +195,7 @@ static void cb_c_receive_layer_set_value(const uint8_t session_id,
 			}
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
-		PyObject_CallMethod((PyObject*)session, "receive_layer_set_value", "(IHIO)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_set_value", "(IHIO)",
 				node_id, layer_id, item_id, tuple_values);
 	}
 	return;
@@ -420,7 +420,7 @@ static void cb_c_receive_layer_unsubscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_unsubscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_unsubscribe", "(IHII)",
 				node_id, layer_id, version, crc32);
 	return;
 }
@@ -468,7 +468,7 @@ static void cb_c_receive_layer_subscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_subscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_subscribe", "(IHII)",
 				node_id, layer_id, version, crc32);
 	return;
 }
@@ -515,7 +515,7 @@ static void cb_c_receive_layer_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_destroy", "(IH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_destroy", "(IH)",
 				node_id, layer_id);
 	return;
 }
@@ -564,7 +564,7 @@ static void cb_c_receive_layer_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_create", "(IHHBBH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_create", "(IHHBBH)",
 				node_id, parent_layer_id, layer_id, data_type, count, custom_type);
 	return;
 }
@@ -666,7 +666,7 @@ static void cb_c_receive_tag_set_value(const uint8_t session_id,
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
 
-		PyObject_CallMethod((PyObject*)session, "receive_tag_set_value", "(IHHO)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_set_value", "(IHHO)",
 				node_id, taggroup_id, tag_id, tuple_values);
 	}
 	return;
@@ -907,7 +907,7 @@ static void cb_c_receive_tag_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_tag_destroy", "(IHH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_destroy", "(IHH)",
 				node_id, taggroup_id, tag_id);
 	return;
 }
@@ -957,7 +957,7 @@ static void cb_c_receive_tag_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_tag_create", "(IHHBBH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_create", "(IHHBBH)",
 				node_id, taggroup_id, tag_id, data_type, count, custom_type);
 	return;
 }
@@ -1007,7 +1007,7 @@ static void cb_c_receive_taggroup_unsubscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_unsubscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_unsubscribe", "(IHII)",
 				node_id, taggroup_id, version, crc32);
 	return;
 }
@@ -1055,7 +1055,7 @@ static void cb_c_receive_taggroup_subscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_subscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_subscribe", "(IHII)",
 				node_id, taggroup_id, version, crc32);
 	return;
 }
@@ -1102,7 +1102,7 @@ static void cb_c_receive_taggroup_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_destroy", "(IH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_destroy", "(IH)",
 				node_id, taggroup_id);
 	return;
 }
@@ -1148,7 +1148,7 @@ static void cb_c_receive_taggroup_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_create", "(IHH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_create", "(IHH)",
 				node_id, taggroup_id, custom_type);
 	return;
 }
@@ -1193,7 +1193,7 @@ static void cb_c_receive_node_unlock(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_unlock", "(II)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_unlock", "(II)",
 				node_id, avatar_id);
 	return;
 }
@@ -1237,7 +1237,7 @@ static void cb_c_receive_node_lock(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_lock", "(II)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_lock", "(II)",
 				node_id, avatar_id);
 	return;
 }
@@ -1281,7 +1281,7 @@ static void cb_c_receive_node_owner(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_owner", "(IH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_owner", "(IH)",
 				node_id, user_id);
 	return;
 }
@@ -1327,7 +1327,7 @@ static void cb_c_receive_node_perm(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_perm", "(IHB)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_perm", "(IHB)",
 				node_id, user_id, perm);
 	return;
 }
@@ -1373,7 +1373,7 @@ static void cb_c_receive_node_link(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_link", "(II)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_link", "(II)",
 				parent_node_id, child_node_id);
 	return;
 }
@@ -1447,7 +1447,7 @@ static void cb_c_receive_node_unsubscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_unsubscribe", "(III)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_unsubscribe", "(III)",
 				node_id, version, crc32);
 	return;
 }
@@ -1493,7 +1493,7 @@ static void cb_c_receive_node_subscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_subscribe", "(III)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_subscribe", "(III)",
 				node_id, version, crc32);
 	return;
 }
@@ -1537,7 +1537,7 @@ static void cb_c_receive_node_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_destroy", "(I)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_destroy", "(I)",
 				node_id);
 	return;
 }
@@ -1583,7 +1583,7 @@ static void cb_c_receive_node_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_create", "(IIHH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_create", "(IIHH)",
 				node_id, parent_id, user_id, custom_type);
 	return;
 }
@@ -1661,7 +1661,7 @@ static void cb_c_receive_connect_accept(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_connect_accept", "(HI)", user_id, avatar_id);
+		PyObject_CallMethod((PyObject*)session, "_receive_connect_accept", "(HI)", user_id, avatar_id);
 	return;
 }
 
@@ -1680,7 +1680,7 @@ static void cb_c_receive_connect_terminate(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_connect_terminate", "(B)", error_num);
+		PyObject_CallMethod((PyObject*)session, "_receive_connect_terminate", "(B)", error_num);
 	return;
 }
 
@@ -1736,9 +1736,9 @@ static void cb_c_receive_user_authenticate(const uint8_t session_id,
 
 	if(session != NULL) {
 		if(username==NULL) {
-			PyObject_CallMethod((PyObject*)session, "receive_user_authenticate", "(sO)", "", tuple_methods);
+			PyObject_CallMethod((PyObject*)session, "_receive_user_authenticate", "(sO)", "", tuple_methods);
 		} else {
-			PyObject_CallMethod((PyObject*)session, "receive_user_authenticate", "(sO)", username, tuple_methods);
+			PyObject_CallMethod((PyObject*)session, "_receive_user_authenticate", "(sO)", username, tuple_methods);
 		}
 	}
 
@@ -1940,18 +1940,18 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 
 static PyMethodDef Session_methods[] = {
 		/* Session commands */
-		{"receive_connect_accept",
+		{"_receive_connect_accept",
 				(PyCFunction)Session_receive_connect_accept,
 				METH_VARARGS,
-				"receive_connect_accept(self, user_id, avatar_id) -> None\n\n"
+				"_receive_connect_accept(self, user_id, avatar_id) -> None\n\n"
 				"Callback function that is called, when connection with server is established\n"
 				"user_id:	int ID of user node that represent connected user\n"
 				"avatar_id:	int ID of avatar node that represent connected client"
 		},
-		{"receive_connect_terminate",
+		{"_receive_connect_terminate",
 				(PyCFunction)Session_receive_connect_terminate,
 				METH_VARARGS,
-				"receive_connect_terminate(self, error) -> None\n\n"
+				"_receive_connect_terminate(self, error) -> None\n\n"
 				"Callback function that is called, when connection with server is terminated\n"
 				"error:	int code of reason for termination of connection by server"
 		},
@@ -1962,10 +1962,10 @@ static PyMethodDef Session_methods[] = {
 				"Send connect terminate command to the server\n"
 				"error:	int code of reason for termination of connection by client"
 		},
-		{"receive_user_authenticate",
+		{"_receive_user_authenticate",
 				(PyCFunction)Session_receive_user_authenticate,
 				METH_VARARGS,
-				"receive_user_authenticate(self, username, methods) -> None\n\n"
+				"_receive_user_authenticate(self, username, methods) -> None\n\n"
 				"Callback function that is called, when server requests user authentication\n"
 				"username:	string of client's username\n"
 				"methods:	tuple of supported authentication methods"
@@ -1998,7 +1998,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node create command to the server"
 		},
-		{"receive_node_create",
+		{"_receive_node_create",
 				(PyCFunction)Session_receive_node_create,
 				METH_VARARGS,
 				"Callback function for node create command received from the server"
@@ -2008,7 +2008,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node destroy command to the server"
 		},
-		{"receive_node_destroy",
+		{"_receive_node_destroy",
 				(PyCFunction)Session_receive_node_destroy,
 				METH_VARARGS,
 				"Callback function for node destroy command received from the server"
@@ -2018,7 +2018,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node subscribe command to the server"
 		},
-		{"receive_node_subscribe",
+		{"_receive_node_subscribe",
 				(PyCFunction)Session_receive_node_subscribe,
 				METH_VARARGS,
 				"Callback function for node subscribe command received from the server"
@@ -2028,7 +2028,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node unsubscribe command to the server"
 		},
-		{"receive_node_unsubscribe",
+		{"_receive_node_unsubscribe",
 				(PyCFunction)Session_receive_node_unsubscribe,
 				METH_VARARGS,
 				"Callback function for node unsubscribe command received from server"
@@ -2043,7 +2043,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node link command to the server"
 		},
-		{"receive_node_link",
+		{"_receive_node_link",
 				(PyCFunction)Session_receive_node_link,
 				METH_VARARGS | METH_KEYWORDS,
 				"Callback function for node link command received from server"
@@ -2053,7 +2053,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node perm command to the server"
 		},
-		{"receive_node_perm",
+		{"_receive_node_perm",
 				(PyCFunction)Session_receive_node_perm,
 				METH_VARARGS,
 				"Callback function for node perm command received from server"
@@ -2063,7 +2063,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node owner command to the server"
 		},
-		{"receive_node_owner",
+		{"_receive_node_owner",
 				(PyCFunction)Session_receive_node_owner,
 				METH_VARARGS,
 				"Callback function for node owner command received from server"
@@ -2073,7 +2073,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node lock command to the server"
 		},
-		{"receive_node_lock",
+		{"_receive_node_lock",
 				(PyCFunction)Session_receive_node_lock,
 				METH_VARARGS,
 				"Callback function for node lock command received from server"
@@ -2083,7 +2083,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node unlock command to the server"
 		},
-		{"receive_node_unlock",
+		{"_receive_node_unlock",
 				(PyCFunction)Session_receive_node_unlock,
 				METH_VARARGS,
 				"Callback function for node unlock command received from server"
@@ -2094,7 +2094,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup create command to the server"
 		},
-		{"receive_taggroup_create",
+		{"_receive_taggroup_create",
 				(PyCFunction)Session_receive_taggroup_create,
 				METH_VARARGS,
 				"Callback function for taggroup create command received from server"
@@ -2104,7 +2104,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup destroy command to the server"
 		},
-		{"receive_taggroup_destroy",
+		{"_receive_taggroup_destroy",
 				(PyCFunction)Session_receive_taggroup_destroy,
 				METH_VARARGS,
 				"Callback function for taggroup destroy command received from server"
@@ -2114,7 +2114,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup subscribe command to the server"
 		},
-		{"receive_taggroup_subscribe",
+		{"_receive_taggroup_subscribe",
 				(PyCFunction)Session_receive_taggroup_subscribe,
 				METH_VARARGS,
 				"Callback function for taggroup subscribe command received from server"
@@ -2124,7 +2124,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup unsubscribe command to the server"
 		},
-		{"receive_taggroup_unsubscribe",
+		{"_receive_taggroup_unsubscribe",
 				(PyCFunction)Session_receive_taggroup_unsubscribe,
 				METH_VARARGS,
 				"Callback function for taggroup subscribe command received from server"
@@ -2135,7 +2135,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send tag create command to the server"
 		},
-		{"receive_tag_create",
+		{"_receive_tag_create",
 				(PyCFunction)Session_receive_tag_create,
 				METH_VARARGS,
 				"Callback function for tag create command received from server"
@@ -2145,7 +2145,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send tag destroy command to the server"
 		},
-		{"receive_tag_destroy",
+		{"_receive_tag_destroy",
 				(PyCFunction)Session_receive_tag_destroy,
 				METH_VARARGS,
 				"Callback function for tag destroy command received from server"
@@ -2155,7 +2155,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send tag set value command to the server"
 		},
-		{"receive_tag_set_value",
+		{"_receive_tag_set_value",
 				(PyCFunction)Session_receive_tag_set_value,
 				METH_VARARGS,
 				"Callback function for tag set value command received from server"
@@ -2166,7 +2166,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer create command to the server"
 		},
-		{"receive_layer_create",
+		{"_receive_layer_create",
 				(PyCFunction)Session_receive_layer_create,
 				METH_VARARGS,
 				"Callback function for layer create command received from server"
@@ -2176,7 +2176,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer destroy command to the server"
 		},
-		{"receive_layer_destroy",
+		{"_receive_layer_destroy",
 				(PyCFunction)Session_receive_layer_destroy,
 				METH_VARARGS,
 				"Callback function for layer destroy command received from server"
@@ -2186,7 +2186,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer subscribe command to the server"
 		},
-		{"receive_layer_subscribe",
+		{"_receive_layer_subscribe",
 				(PyCFunction)Session_receive_layer_subscribe,
 				METH_VARARGS,
 				"Callback function for layer subscribe command received from server"
@@ -2196,7 +2196,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer unsubscribe command to the server"
 		},
-		{"receive_layer_unsubscribe",
+		{"_receive_layer_unsubscribe",
 				(PyCFunction)Session_receive_layer_unsubscribe,
 				METH_VARARGS,
 				"Callback function for layer unsubscribe command received from server"
@@ -2206,7 +2206,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer set value command to the server"
 		},
-		{"receive_layer_set_value",
+		{"_receive_layer_set_value",
 				(PyCFunction)Session_receive_layer_set_value,
 				METH_VARARGS,
 				"Callback function for layer set value command received from server"
@@ -2216,7 +2216,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer unset value command to the server"
 		},
-		{"receive_layer_unset_value",
+		{"_receive_layer_unset_value",
 				(PyCFunction)Session_receive_layer_unset_value,
 				METH_VARARGS,
 				"Callback function for layer unset value command received from server"
