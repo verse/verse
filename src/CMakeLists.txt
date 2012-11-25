@@ -129,9 +129,7 @@ target_link_libraries (verse_server
 		verse_shared_lib
 		${CMAKE_THREAD_LIBS_INIT}
 		${OPENSSL_LIBRARIES}
-		${INIPARSER_LIBRARIES}
-		${LDAP_LIBRARIES}
-		${KERBEROS_LIBRARY})
+		${INIPARSER_LIBRARIES})
 		
 if (LDAP_FOUND)
 	target_link_libraries (verse_server
