@@ -49,8 +49,6 @@ set (CMAKE_THREAD_PREFER_PTHREAD)
 find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
 find_package (Iniparser REQUIRED)
-#find_package (LDAP REQUIRED)
-#find_package (Kerberos REQUIRED)
 
 # Set output directory for libraries
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
@@ -58,14 +56,10 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 # Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
 
-# Set up required subdirectories
-add_subdirectory (src)
-add_subdirectory (example)
-
 # OpenLDAP library
 if (VERSE_LDAP)
 
-	# Try to find optional package Check (unittests)
+	# Try to find optional package OpenLDAP library
 	find_package (LDAP)
 
 endif (VERSE_LDAP)
@@ -73,10 +67,14 @@ endif (VERSE_LDAP)
 # Kerberos V5 library
 if (VERSE_KERBEROS)
 
-	# Try to find optional package Check (unittests)
+	# Try to find optional package Kerberos V5
 	find_package (Kerberos)
 
 endif (VERSE_KERBEROS)
+
+# Set up required subdirectories
+add_subdirectory (src)
+add_subdirectory (example)
 
 # Check unit test
 if (VERSE_CHECK)
