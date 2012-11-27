@@ -168,19 +168,27 @@ static void set_host_rwin(struct vContext *C)
 /**
  * \brief This function packs and compress command to the packet from one
  * priority queue.
+ *
+ * \param[in]	*C	The verse context
+ * \param[in]	*sent_packet	The pointer at structure with send packet
+ * \param[in]	buffer_pos		The curent size of buffer of sent packet
+ * \param[in]	prio			The priority of sub queue
+ * \param[in]	prio_win		The window size of current prio queue
+ * \param[out]	tot_cmd_size	The total size of commands that were poped from prio queue
  */
 static int pack_prio_queue(struct vContext *C,
 		struct VSent_Packet *sent_packet,
 		int buffer_pos,
 		uint8 prio,
-		uint16 prio_win)
+		uint16 prio_win,
+		uint16 *tot_cmd_size)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *vconn = CTX_current_dgram_conn(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct Generic_Cmd *cmd;
 	int ret, last_cmd_count = 0;
-	uint16 cmd_count, cmd_len, sum_len=0;
+	uint16 cmd_count, cmd_len, cmd_size, sum_len=0;
 	int8 cmd_share;
 	uint8  last_cmd_id = CMD_RESERVED_ID;
 
@@ -223,17 +231,24 @@ static int pack_prio_queue(struct vContext *C,
 			}
 			v_cmd_destroy(&cmd);
 		} else {
-			if(!(buffer_pos < (vconn->io_ctx.mtu - v_cmd_size(cmd)))) {
+
+			/* What was size of command in queue */
+			cmd_size = v_cmd_size(cmd);
+
+			if(!(buffer_pos < (vconn->io_ctx.mtu - cmd_size))) {
 				/* When there is not enough space for other command,
 				 * then push command back to the beginning of queue. */
 				v_out_queue_push_head(vsession->out_queue, prio, cmd);
 				break;
 			} else {
 
+				/* Update total size of commands that were poped from queue */
+				*tot_cmd_size += cmd_size;
+
 				/* When compression is not allowed, then add this command as is */
 				if( vconn->host_cmd_cmpr == CMPR_NONE) {
 					cmd_count = 0;
-					cmd_len = v_cmd_size(cmd);
+					cmd_len = cmd_size;
 					/* Debug print */
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Cmd: %d, count: %d, length: %d\n",
 							cmd->id, cmd_count, cmd_len);
@@ -244,7 +259,7 @@ static int pack_prio_queue(struct vContext *C,
 					if( (cmd->id != last_cmd_id) || (last_cmd_count <= 0) )	{
 						/* When this command is alone, then use default command size */
 						if(cmd_count == 0) {
-							cmd_len = v_cmd_size(cmd);
+							cmd_len = cmd_size;
 						} else {
 							/* FIXME: do not recompute command length here, but do it right,
 							 * when command is added to the queue */
@@ -298,7 +313,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	struct timeval tv;
 	int ret, keep_alive_packet = -1, full_packet = 0;
 	int error_num;
-	uint16 swin, prio_win;
+	uint16 swin, prio_win, sent_size;
 	uint32 rwin;
 	int cmd_rank = 0;
 
@@ -397,8 +412,6 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	buffer_pos += v_pack_packet_header(s_packet, &io_ctx->buf[buffer_pos]);
 	buffer_pos += v_pack_dgram_system_commands(s_packet, &io_ctx->buf[buffer_pos]);
 
-	/* TODO: compute sent_size */
-
 	/* When this is not pure keep alive packet */
 	if(s_packet->header.flags & PAY_FLAG) {
 
@@ -410,6 +423,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 			real32 prio_sum_high, prio_sum_low, r_prio;
 			uint32 prio_count;
 			int16 prio, max_prio, min_prio;
+			uint16 tot_cmd_size;
 
 			/* Print outgoing command with green color */
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
@@ -449,10 +463,11 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
 							prio, prio_count, r_prio, prio_win);
 
-					/* TODO: return total size of commands that were stored in queue (sent_size) */
-
+					/* Get total size of commands that were stored in queue (sent_size) */
+					tot_cmd_size = 0;
 					/* Pack commands from queues with high priority to the buffer */
-					buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);
+					buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win, &tot_cmd_size);
+					sent_size += tot_cmd_size;
 				}
 			}
 
@@ -468,6 +483,9 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 			}
 		}
 	}
+
+	/* Update sent_size */
+	vconn->sent_size += sent_size;
 
 	io_ctx->buf_size = buffer_pos;
 
@@ -761,6 +779,7 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 	} else {
 		first_sys_index = 0;
 	}
+
 	for(i=first_sys_index;
 			i<MAX_SYSTEM_COMMAND_COUNT && r_packet->sys_cmd[i].cmd.id != CMD_RESERVED_ID;
 			i++)

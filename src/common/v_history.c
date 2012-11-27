@@ -323,6 +323,9 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 				/* Bucket has to include some data */
 				assert(sent_cmd->vbucket->data!=NULL);
 
+				/* Decrease total size of commands that were sent and wasn't acknowladged yet*/
+				dgram_conn->sent_size -= v_cmd_size(cmd);
+
 				/* Put fake command for create/destroy commands at verse server */
 				if(vs_ctx != NULL) {
 					struct VSession *vsession = CTX_current_session(C);
