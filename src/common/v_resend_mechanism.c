@@ -424,9 +424,14 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Packing prio queues, cmd count: %d\n", v_out_queue_get_count(vsession->out_queue));
 
-			/* Go through high priorities and pick commands from priority queues */
-			for(prio = max_prio; prio >= VRS_DEFAULT_PRIORITY; prio--)
+			/* Go through all priorities and pick commands from priority queues */
+			for(prio = max_prio; prio >= min_prio; prio--)
 			{
+				/* TODO: Add better check here */
+				if(prio <= VRS_DEFAULT_PRIORITY && buffer_pos >= vconn->io_ctx.mtu) {
+					break;
+				}
+
 				prio_count = v_out_queue_get_count_prio(vsession->out_queue, prio);
 
 				if(prio_count > 0) {
@@ -434,7 +439,11 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 					/* Compute size of buffer that could be occupied by
 					 * commands from this queue */
-					prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_high;
+					if(prio >= VRS_DEFAULT_PRIORITY) {
+						prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_high;
+					} else {
+						prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_low;
+					}
 
 					/* Debug print */
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
@@ -444,33 +453,6 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 					/* Pack commands from queues with high priority to the buffer */
 					buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);
-				}
-			}
-
-			/* If packet is not full yet, then it's possible to add commands from
-			 * queues with low priorities */
-			if(buffer_pos < vconn->io_ctx.mtu) {
-				/* Go through low priorities and pick commands from priority queues */
-				for(prio = VRS_DEFAULT_PRIORITY - 1; prio >= min_prio; prio--)
-				{
-					prio_count = v_out_queue_get_count_prio(vsession->out_queue,prio);
-
-					if(prio_count > 0) {
-						r_prio = v_out_queue_get_prio(vsession->out_queue, prio);
-
-						/* Compute size of buffer that could be occupied by
-						 * commands from this queue */
-						prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_low;
-
-						/* Debug print */
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
-								prio, prio_count, r_prio, prio_win);
-
-						/* TODO: return total size of commands that were stored in queue (sent_size) */
-
-						/* Pack commands from queues with low priority to the buffer */
-						buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);
-					}
 				}
 			}
 
