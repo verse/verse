@@ -109,6 +109,8 @@ typedef struct VS_CTX {
 	/* Data for connections */
 	unsigned short 		connected_clients;			/* Number of connected clients */
 	struct VSession		**vsessions;				/* List of sessions and session with connection attempts */
+	unsigned int		in_queue_max_size;			/* Default value of max size of incoming queue */
+	unsigned int		out_queue_max_size;			/* Default value of max size of outgoing queue */
 	/* Ports for connections */
 	unsigned short		port_low;					/* The lowest port number in port range */
 	unsigned short		port_high;					/* The highest port number in port range */

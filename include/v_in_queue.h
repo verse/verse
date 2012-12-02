@@ -44,6 +44,8 @@
 #include "v_commands.h"
 #include "v_list.h"
 
+#define IN_QUEUE_DEFAULT_MAX_SIZE 1048576
+
 /**
  * Structure storing information about incoming command waiting in the incoming
  * queue
@@ -70,7 +72,7 @@ uint32 v_in_queue_size(struct VInQueue *in_queue);
 uint32 v_in_queue_cmd_count(struct VInQueue *in_queue);
 struct Generic_Cmd *v_in_queue_pop(struct VInQueue *in_queue);
 int v_in_queue_push(struct VInQueue *in_queue, struct Generic_Cmd *cmd);
-int v_in_queue_init(struct VInQueue *in_queue);
+int v_in_queue_init(struct VInQueue *in_queue, int max_size);
 struct VInQueue *v_in_queue_create(void);
 void v_in_queue_destroy(struct VInQueue **in_queue);
 

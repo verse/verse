@@ -58,6 +58,8 @@
 #define OUT_QUEUE_ADD_TAIL	1
 #define OUT_QUEUE_ADD_HEAD	2
 
+#define OUT_QUEUE_DEFAULT_MAX_SIZE 1048576
+
 /**
  * Structure storing information about outgoing command waiting in the outgoing
  * queue
@@ -100,7 +102,7 @@ typedef struct VOutQueue {
 	real32					r_prio_sum_low;	/**< Summary of all real priorities <DEFAULT_PRIO-1, MIN_PRIO> */
 } VOutQueue;
 
-int	v_out_queue_init(struct VOutQueue *out_queue);
+int	v_out_queue_init(struct VOutQueue *out_queue, int max_size);
 struct VOutQueue *v_out_queue_create(void);
 void v_out_queue_destroy(struct VOutQueue **out_queue);
 

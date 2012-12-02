@@ -1301,9 +1301,9 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		}
 		/* Set up input and output queues */
 		vs_ctx->vsessions[i]->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
-		v_in_queue_init(vs_ctx->vsessions[i]->in_queue);
+		v_in_queue_init(vs_ctx->vsessions[i]->in_queue, vs_ctx->in_queue_max_size);
 		vs_ctx->vsessions[i]->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
-		v_out_queue_init(vs_ctx->vsessions[i]->out_queue);
+		v_out_queue_init(vs_ctx->vsessions[i]->out_queue, vs_ctx->out_queue_max_size);
 		/* Allocate memory for TCP connection */
 		vs_ctx->vsessions[i]->stream_conn = (struct VStreamConn*)calloc(1, sizeof(struct VStreamConn));
 		/* Allocate memory for peer hostname */

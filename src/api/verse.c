@@ -1236,9 +1236,9 @@ int vrs_send_connect_request(const char *hostname,
 			/* Copy flags */
 			vsession->flags = _flags;
 			vsession->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
-			v_in_queue_init(vsession->in_queue);
+			v_in_queue_init(vsession->in_queue, IN_QUEUE_DEFAULT_MAX_SIZE);
 			vsession->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
-			v_out_queue_init(vsession->out_queue);
+			v_out_queue_init(vsession->out_queue, OUT_QUEUE_DEFAULT_MAX_SIZE);
 
 			vc_ctx->vsessions[i] = vsession;
 			break;
