@@ -139,7 +139,13 @@ static void set_host_cwin(struct vContext *C)
 }
 
 /**
- * \brief This function set size of receive window (flow control)
+ * \brief This function set size of receive window (flow control), which is sent
+ * to the peer.
+ *
+ * This function sets C->dgram_conn->rwin_host
+ *
+ * \param[in]	*C	Verse context
+ *
  */
 static void set_host_rwin(struct vContext *C)
 {
@@ -154,7 +160,7 @@ static void set_host_rwin(struct vContext *C)
 	case FC_TCP_LIKE:
 		/* Compute free space in incomming queue */
 		free_space = (long int)vsession->in_queue->max_size - (long int)vsession->in_queue->size;
-		dgram_conn->rwin_host = (uint32)(free_space >0) ? free_space : 0;
+		dgram_conn->rwin_host = (uint32)(free_space > 0) ? free_space : 0;
 		/*printf(">>> max_size: %d, size: %d -> free_size: %ld -> window %d<<<\n",
 				vsession->in_queue->max_size, vsession->in_queue->size, free_space, dgram_conn->rwin_host);*/
 		break;
