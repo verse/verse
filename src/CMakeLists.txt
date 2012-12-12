@@ -79,7 +79,8 @@ set (server_src
 		server/vs_layer.c
 		server/vs_data.c
 		server/vs_config.c
-		server/vs_auth_csv.c)
+		server/vs_auth_csv.c
+		server/vs_auth_ldap.c)
 		
 
 include_directories (../include)
