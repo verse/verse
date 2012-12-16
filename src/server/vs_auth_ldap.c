@@ -34,11 +34,40 @@
  * \brief Load user accounts from LDAP server
  */
 int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx,
-		char *ldap_server_hostname, char *verse_ldap_passwd,
-		char *verse_ldap_dn, char *ldap_search_base)
+		char *ldap_server_attrs, int len)
 {
 	LDAP *ldap;
 	int ret = 0;
+	char *ldap_server_hostname = NULL;
+	char *verse_ldap_dn = NULL;
+	char *verse_ldap_passwd = NULL;
+	char *ldap_search_base = NULL;
+	int col, prev_colon, next_colon;
+
+	/* Parse LDAP server properties */
+	prev_colon = next_colon = 0;
+	for (col = 0; col < len && ldap_server_attrs[col] != ':'; col++)
+		;
+	next_colon = col;
+	ldap_server_hostname = strndup(&ldap_server_attrs[prev_colon], next_colon - prev_colon);
+	prev_colon = next_colon + 1;
+
+	for (col = prev_colon; col < len && ldap_server_attrs[col] != ':'; col++)
+		;
+	next_colon = col;
+	verse_ldap_dn = strndup(&ldap_server_attrs[prev_colon], next_colon - prev_colon);
+	prev_colon = next_colon + 1;
+
+	for (col = prev_colon; col < len && ldap_server_attrs[col] != ':'; col++)
+		;
+	next_colon = col;
+	verse_ldap_passwd = strndup(&ldap_server_attrs[prev_colon], next_colon - prev_colon);
+	prev_colon = next_colon + 1;
+
+	for (col = prev_colon; col < len && ldap_server_attrs[col] != ':'; col++)
+		;
+	next_colon = col;
+	ldap_search_base = strndup(&ldap_server_attrs[prev_colon], next_colon - prev_colon);
 
 	/* Initialization of LDAP structure */
 	if ((ldap = (LDAP *) ldap_init(ldap_server_hostname, LDAP_PORT)) != NULL ) {
@@ -69,6 +98,8 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx,
 						ldap_err2string(ret));
 			} else {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP search successful\n");
+				vs_ctx->users.first = NULL;
+				vs_ctx->users.last = NULL;
 				/* Fetching user info from LDAP message */
 				for (ldap_entry = ldap_first_entry(ldap, ldap_message);
 						ldap_entry != NULL ;

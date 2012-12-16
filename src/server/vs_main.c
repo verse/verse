@@ -34,6 +34,7 @@
 #include "vs_tcp_connect.h"
 #include "vs_udp_connect.h"
 #include "vs_auth_csv.h"
+#include "vs_auth_ldap.h"
 #include "vs_data.h"
 #include "vs_node.h"
 #include "vs_config.h"
@@ -337,6 +338,8 @@ static void vs_print_help(char *prog_name)
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
 	printf("   -c config_file   read configuration from config file\n");
+	printf("   -l hostname:user:passwd:base\n");
+	printf("                    use accounts from specified ldap server\n");
 	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
 }
 
@@ -351,8 +354,9 @@ static void vs_print_help(char *prog_name)
 int main(int argc, char *argv[])
 {
 	VS_CTX vs_ctx;
-	int opt;
+	int opt,len;
 	char *config_file=NULL;
+	char *ldap_server=NULL;
 	int debug_level_set = 0;
 
 	/* Set up initial state */
@@ -360,16 +364,21 @@ int main(int argc, char *argv[])
 
 	/* Default debug prints of verse server */
 	v_init_print_log(VRS_PRINT_WARNING, stdout);
+	v_print_log(VRS_PRINT_DEBUG_MSG, "auth method: %d\n",vs_ctx.auth_type);
 
 	/* When server received some arguments */
 	if(argc>1) {
-		while( (opt = getopt(argc, argv, "c:hd:")) != -1) {
+		while( (opt = getopt(argc, argv, "c:hd:l:")) != -1) {
 			switch(opt) {
 			case 'c':
 				config_file = strdup(optarg);
 				break;
 			case 'd':
 				debug_level_set = vs_set_debug_level(optarg);
+				break;
+			case 'l' :
+				ldap_server = strdup(optarg);
+				len = strlen(optarg);
 				break;
 			case 'h':
 				vs_print_help(argv[0]);
@@ -384,6 +393,14 @@ int main(int argc, char *argv[])
 
 	/* Load Verse server configuration file */
 	vs_load_config_file(&vs_ctx, config_file);
+
+	/* Set up LDAP auth method */
+	if(ldap_server != NULL) {
+			vs_ctx.auth_type = AUTH_METHOD_LDAP;
+	}
+	/*ldap_base = strdup("dc=zdenda,dc=cz");
+	ldap_user = strdup("cn=root,dc=zdenda,dc=cz");
+	ldap_pass = strdup("spartajede");*/
 
 	/* When debug level wasn't specified as option at command line, then use
 	 * configuration from file */
@@ -405,8 +422,9 @@ int main(int argc, char *argv[])
 			/* TODO: read list of supported usernames and their uids somehow */
 			exit(EXIT_FAILURE);
 		case AUTH_METHOD_LDAP:
-			/* TODO: not implemented yet */
-			exit(EXIT_FAILURE);
+		if (vs_load_user_accounts_ldap_server(&vs_ctx, ldap_server, len) != 1)
+				exit(EXIT_FAILURE);
+			break;
 		default:
 			/* Not supported method */
 			exit(EXIT_FAILURE);

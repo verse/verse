@@ -27,7 +27,6 @@
 #define VS_AUTH_LDAP_H_
 
 int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx,
-		char *ldap_server_hostname, char *verse_ldap_passwd,
-		char *verse_ldap_dn, char *ldap_search_base);
+		char *ldap_server_attrs, int len);
 
 #endif /* VS_AUTH_LDAP_H_ */
