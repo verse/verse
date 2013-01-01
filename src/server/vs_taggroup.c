@@ -147,14 +147,12 @@ int vs_taggroup_send_destroy(struct VSNode *node,
  */
 void vs_taggroup_init(struct VSTagGroup *tg)
 {
-	struct VSTag tag;
-
 	tg->id = 0;
 	tg->type = 0;
 
 	v_hash_array_init(&tg->tags,
 				HASH_MOD_256,
-				(char*)&(tag.id) - (char*)&(tag),
+				offsetof(VSTag, id),
 				sizeof(uint16));
 	tg->last_tag_id = 0;
 

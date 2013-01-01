@@ -49,7 +49,6 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 		uint16 type)
 {
 	struct VSLayer *layer = calloc(1, sizeof(struct VSLayer));
-	struct VSLayerValue value;
 
 	if(layer == NULL) {
 		return NULL;
@@ -66,7 +65,7 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 
 	v_hash_array_init(&layer->values,
 				HASH_MOD_65536,
-				(char*)&(value.id) - (char*)&(value),
+				offsetof(VSLayerValue, id),
 				sizeof(uint32));
 
 	/* When parent layer is not NULL, then add this layer to the linked list
