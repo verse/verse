@@ -950,7 +950,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 
 				/* Try to accept client connection (do TCP handshake) */
 				if(io_ctx->host_addr.ip_ver==IPV4) {
-					/* Prepare IP6 variables for TCP handshake */
+					/* Prepare IPv4 variables for TCP handshake */
 					struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
 					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
 					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv4);
@@ -961,10 +961,10 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 						continue;
 					}
 
-					/* Save the IP of the client as string in verse session */
+					/* Save the IPv4 of the client as string in verse session */
 					inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
 				} else if(io_ctx->host_addr.ip_ver==IPV6) {
-					/* Prepare IP6 variables for TCP handshake */
+					/* Prepare IPv6 variables for TCP handshake */
 					struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
 					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
 					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv6);
@@ -975,7 +975,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 						continue;
 					}
 
-					/* Save the IP of the client as string in verse session */
+					/* Save the IPv6 of the client as string in verse session */
 					inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
 				}
 
