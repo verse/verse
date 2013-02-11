@@ -116,7 +116,7 @@ typedef struct VS_CTX {
 	unsigned short		port_high;					/* The highest port number in port range */
 	struct VS_Port		*port_list;					/* List of free ports used for communication with clients */
 	/* Data for packet receiving */
-	struct IO_CTX 		io_ctx;						/* Verse context for sending and receiving (connection attempts) */
+	struct IO_CTX 		tcp_io_ctx;					/* Verse context for sending and receiving (connection attempts) */
 	/* SSL context */
 	SSL_CTX				*tls_ctx;					/* SSL context for main secured TCP TLS socket */
 	SSL_CTX				*dtls_ctx;					/* SSL context for secured UDP DTLS connections (shared with all connections) */

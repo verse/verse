@@ -1365,7 +1365,7 @@ void *vs_main_dgram_loop(void *arg)
 	CTX_current_dgram_conn_set(C, dgram_conn);
 
 	/* Copy version of IP from Verse server context */
-	dgram_conn->io_ctx.host_addr.ip_ver = vs_ctx->io_ctx.host_addr.ip_ver;
+	dgram_conn->io_ctx.host_addr.ip_ver = vs_ctx->tcp_io_ctx.host_addr.ip_ver;
 	if (vs_init_dgram_ctx(C) != 1) {
 		goto end;
 	}
@@ -1387,7 +1387,7 @@ void *vs_main_dgram_loop(void *arg)
 	}
 #else
 	dgram_conn->flags &= ~SOCKET_SECURED;
-	dgram_conn->io_ctx.flags &= ~SOCKET_SECURED;
+	dgram_conn->tcp_io_ctx.flags &= ~SOCKET_SECURED;
 #endif
 
 	/* Packet structure for receiving */

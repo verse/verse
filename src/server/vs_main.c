@@ -111,7 +111,7 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 		vs_ctx->port_list[j].flag = 0;
 	}
 
-	vs_ctx->io_ctx.host_addr.ip_ver = IPV6;
+	vs_ctx->tcp_io_ctx.host_addr.ip_ver = IPV6;
 
 	vs_ctx->print_log_level = VRS_PRINT_DEBUG_MSG;
 	vs_ctx->log_file = stdout;
@@ -257,7 +257,7 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 
 	free(vs_ctx->port_list); vs_ctx->port_list = NULL;
 
-	free(vs_ctx->io_ctx.buf); vs_ctx->io_ctx.buf = NULL;
+	free(vs_ctx->tcp_io_ctx.buf); vs_ctx->tcp_io_ctx.buf = NULL;
 
 	free(vs_ctx->private_cert_file); vs_ctx->private_cert_file = NULL;
 	if(vs_ctx->ca_cert_file != NULL) {
