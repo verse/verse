@@ -382,12 +382,12 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 		if(url.ip_ver==IPV6) {
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_DGRAM_SEC_NONE &&
-					(vs_ctx->security_protocol & VRS_DGRAM_SEC_DTLS)) {
+			if(url.security_protocol==VRS_SEC_DATA_NONE &&
+					(vs_ctx->security_protocol & VRS_SEC_DATA_TLS)) {
 				sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
 						url.node,
 						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_DGRAM_SEC_DTLS) {
+			} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
 				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
 						url.node,
 						vsession->dgram_conn->io_ctx.host_addr.port);
@@ -404,12 +404,12 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 #endif
 		} else {
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_DGRAM_SEC_NONE &&
-					(vs_ctx->security_protocol & VRS_DGRAM_SEC_DTLS)) {
+			if(url.security_protocol==VRS_SEC_DATA_NONE &&
+					(vs_ctx->security_protocol & VRS_SEC_DATA_TLS)) {
 				sprintf(vsession->host_url, "verse-udp-none://%s:%d",
 						url.node,
 						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_DGRAM_SEC_DTLS) {
+			} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
 				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
 						url.node,
 						vsession->dgram_conn->io_ctx.host_addr.port);

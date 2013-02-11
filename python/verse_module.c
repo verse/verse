@@ -2370,8 +2370,8 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "PRINT_WARNING", VRS_PRINT_WARNING);
 	PyModule_AddIntConstant(module, "PRINT_DEBUG_MSG", VRS_PRINT_DEBUG_MSG);
 
-	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_DGRAM_SEC_NONE);
-	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_DGRAM_SEC_DTLS);
+	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_SEC_DATA_NONE);
+	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_SEC_DATA_TLS);
 
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_UNKNOWN", VRS_CONN_TERM_HOST_UNKNOWN);
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_DOWN", VRS_CONN_TERM_HOST_DOWN);

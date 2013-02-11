@@ -1374,7 +1374,7 @@ void *vs_main_dgram_loop(void *arg)
 	CTX_io_ctx_set(C, &dgram_conn->io_ctx);
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-	if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+	if(vsession->flags & VRS_SEC_DATA_TLS) {
 		if( vs_init_dtls_connection(C) == 0) {
 			goto end;
 		}
@@ -1403,7 +1403,7 @@ void *vs_main_dgram_loop(void *arg)
 hello:
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 	/* Wait for DTLS Hello Command from client */
-	if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+	if(vsession->flags & VRS_SEC_DATA_TLS) {
 
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Wait for DTLS Client Hello message\n");
 		/* "Never ending" listen loop (wait for first packet to do DTLS handshake) */
@@ -1603,7 +1603,7 @@ again:
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 		/* Did client close DTLS connection? */
-		if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+		if(vsession->flags & VRS_SEC_DATA_TLS) {
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				vs_destroy_dtls_connection(C);
 				break;

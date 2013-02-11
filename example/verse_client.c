@@ -831,7 +831,9 @@ static void print_help(char *prog_name)
 	printf("  This program is example of Verse client\n\n");
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
-	printf("   -s               secure UDP connection with DTLS protocol (experimental)\n");
+	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
+	printf("   -s security      security of data exchange [none|tls]\n");
+	printf("   -c compresion    compression used for data exchange [none|addrshare]\n");
 	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
 }
 
@@ -852,16 +854,51 @@ static void print_help(char *prog_name)
  */
 int main(int argc, char *argv[])
 {
-	int error_num, opt, ret, flags = VRS_DGRAM_SEC_NONE;
+	int error_num, opt, ret, flags = VRS_SEC_DATA_NONE;
 
 	/* When client was started with some arguments */
 	if(argc>1) {
 		/* Parse all options */
-		while( (opt = getopt(argc, argv, "shd:")) != -1) {
+		while( (opt = getopt(argc, argv, "hs:t:d:")) != -1) {
 			switch(opt) {
 				case 's':
-					flags &= ~VRS_DGRAM_SEC_NONE;
-					flags |= VRS_DGRAM_SEC_DTLS;
+					if(strcmp(optarg, "none") == 0) {
+						flags |= VRS_SEC_DATA_NONE;
+						flags &= ~VRS_SEC_DATA_TLS;
+					}else if(strcmp(optarg, "tls") == 0) {
+						flags &= ~VRS_SEC_DATA_NONE;
+						flags |= VRS_SEC_DATA_TLS;
+					} else {
+						printf("ERROR: unsupported security\n\n");
+						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
+					break;
+				case 't':
+					if(strcmp(optarg, "udp") == 0) {
+						flags |= VRS_TP_UDP;
+						flags &= ~VRS_TP_TCP;
+					} else if(strcmp(optarg, "tcp") == 0) {
+						flags &= ~VRS_TP_UDP;
+						flags |= VRS_TP_TCP;
+					} else {
+						printf("ERROR: unsupported transport protocol\n\n");
+						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
+					break;
+				case 'c':
+					if(strcmp(optarg, "none") == 0) {
+						flags |= VRS_CMD_CMPR_NONE;
+						flags &= ~VRS_CMD_CMPR_ADDR_SHARE;
+					} else if(strcmp(optarg, "addrshare") == 0) {
+						flags &= ~VRS_CMD_CMPR_NONE;
+						flags |= VRS_CMD_CMPR_ADDR_SHARE;
+					} else {
+						printf("ERROR: unsupported command compression\n\n");
+						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
 					break;
 				case 'd':
 					ret = set_debug_level(optarg);

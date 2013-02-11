@@ -1200,16 +1200,16 @@ int vrs_send_connect_request(const char *hostname,
 	}
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 	/* Check consistency of flags */
-	if((_flags & VRS_DGRAM_SEC_NONE) && (_flags & VRS_DGRAM_SEC_DTLS)) {
+	if((_flags & VRS_SEC_DATA_NONE) && (_flags & VRS_SEC_DATA_TLS)) {
 		if(is_log_level(VRS_PRINT_ERROR))
 			v_print_log(VRS_PRINT_ERROR, "VRS_DGRAM_SEC_NONE or VRS_DGRAM_SEC_DTLS could be set, not both.\n");
 		return VRS_FAILURE;
 	}
 #else
-	if (_flags & VRS_DGRAM_SEC_DTLS) {
+	if (_flags & VRS_SEC_DATA_TLS) {
 		v_print_log(VRS_PRINT_WARNING, "flag VRS_DGRAM_SEC_DTLS could be set due to low version of OpenSSL (at least 1.0 is required).\n");
-		_flags &= ~VRS_DGRAM_SEC_DTLS;
-		_flags |= VRS_DGRAM_SEC_NONE;
+		_flags &= ~VRS_SEC_DATA_TLS;
+		_flags |= VRS_SEC_DATA_NONE;
 	}
 #endif
 

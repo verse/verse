@@ -96,9 +96,9 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->stream_protocol = TCP;			/* For new connection attempts is used TCP protocol */
 	vs_ctx->dgram_protocol = VRS_TP_UDP;	/* For data exchange UDP protocol could be used */
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-	vs_ctx->security_protocol = VRS_DGRAM_SEC_NONE | VRS_DGRAM_SEC_DTLS;
+	vs_ctx->security_protocol = VRS_SEC_DATA_NONE | VRS_SEC_DATA_TLS;
 #else
-	vs_ctx->security_protocol = VRS_DGRAM_SEC_NONE;
+	vs_ctx->security_protocol = VRS_SEC_DATA_NONE;
 #endif
 	vs_ctx->port = 12345;				/* Port number for listening */
 

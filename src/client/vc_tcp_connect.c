@@ -183,9 +183,9 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 		vsession->host_url = (char*)malloc((20+INET_ADDRSTRLEN)*sizeof(char));
 
 		/* Choose scheme according client preference */
-		if(vsession->flags & VRS_DGRAM_SEC_NONE) {
+		if(vsession->flags & VRS_SEC_DATA_NONE) {
 			sprintf(vsession->host_url, "verse-udp-none://%s:*", str_addr);
-		} else if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+		} else if(vsession->flags & VRS_SEC_DATA_TLS) {
 			sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
 		} else {
 			/* Default security policy is to use DTLS */
@@ -201,9 +201,9 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 		vsession->host_url = (char*)malloc((22+INET6_ADDRSTRLEN)*sizeof(char));
 
 		/* Choose scheme according client preference */
-		if(vsession->flags & VRS_DGRAM_SEC_NONE) {
+		if(vsession->flags & VRS_SEC_DATA_NONE) {
 			sprintf(vsession->host_url, "verse-udp-none://[%s]:*", str_addr);
-		} else if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+		} else if(vsession->flags & VRS_SEC_DATA_TLS) {
 			sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
 		} else {
 			/* Default security policy is to use DTLS */

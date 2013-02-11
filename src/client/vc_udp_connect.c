@@ -351,7 +351,7 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 			CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vc_ctx->rwin_scale, NULL);
 
 	/* Add command compression proposal */
-	if(vsession->flags & VRS_NO_CMD_CMPR) {
+	if(vsession->flags & VRS_CMD_CMPR_NONE) {
 		/* Client doesn't want to send compressed commands (local proposal) */
 		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, NULL);
@@ -1236,7 +1236,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	freeaddrinfo(result);
 
 	/* When DTLS was negotiated, then set flag */
-	if(url.security_protocol == VRS_DGRAM_SEC_DTLS) {
+	if(url.security_protocol == VRS_SEC_DATA_TLS) {
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 		dgram_conn->io_ctx.flags |= SOCKET_SECURED;
 #else

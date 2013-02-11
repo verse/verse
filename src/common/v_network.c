@@ -113,11 +113,11 @@ int v_parse_url(const char *str, struct VURL *url)
 
 	/* There could be "none" or "dtls" string */
 	if(strncmp(&str[str_pos], "none", strlen("none"))==0) {
-		url->security_protocol = VRS_DGRAM_SEC_NONE;
+		url->security_protocol = VRS_SEC_DATA_NONE;
 		str_pos += strlen("none");
 		/*printf("\t%s\n", &str[str_pos]);*/
 	} else if(strncmp(&str[str_pos], "dtls", strlen("dtls"))==0) {
-		url->security_protocol = VRS_DGRAM_SEC_DTLS;
+		url->security_protocol = VRS_SEC_DATA_TLS;
 		str_pos += strlen("dtls");
 		/*printf("\t%s\n", &str[str_pos]);*/
 	} else {
@@ -175,9 +175,9 @@ void v_print_url(const int level, struct VURL *url)
 	} else {
 		v_print_log_simple(level, "\tdgram_protocol: unknow\n");
 	}
-	if(url->security_protocol==VRS_DGRAM_SEC_NONE) {
+	if(url->security_protocol==VRS_SEC_DATA_NONE) {
 		v_print_log_simple(level, "\tsecurity_protocol: NONE\n");
-	} else if(url->security_protocol==VRS_DGRAM_SEC_DTLS) {
+	} else if(url->security_protocol==VRS_SEC_DATA_TLS) {
 		v_print_log_simple(level, "\tsecurity_protocol: DTLS\n");
 	} else {
 		v_print_log_simple(level, "\tsecurity_protocol: unknown\n");
