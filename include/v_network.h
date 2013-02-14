@@ -267,7 +267,7 @@ typedef struct IO_CTX {
 /* Structure for storing data from parsed URL */
 typedef struct VURL {
 	char		*scheme;				/* Scheme of URL */
-	char		dgram_protocol;			/* Datagrame transport protocol */
+	char		transport_protocol;		/* Transport protocol used for data exchange */
 	char		security_protocol;		/* Security protocol */
 	char		ip_ver;					/* Version of IP */
 	char		*node;					/* Hostname or IP address */

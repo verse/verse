@@ -337,6 +337,8 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			ded_confirmed==1)
 	{
 		struct vContext *new_C;
+		char trans_proto[4];
+		char sec_proto[5];
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
@@ -359,71 +361,70 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 		/* Copy settings about dgram connection to the session */
 		vsession->flags |= url.security_protocol;
-		vsession->flags |= url.dgram_protocol;
+		vsession->flags |= url.transport_protocol;
 
-		/* Create copy of new Verse context for new thread */
-		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-		memcpy(new_C, C, sizeof(struct vContext));
+		if(vsession->flags & VRS_TP_UDP) {
+			strncpy(trans_proto, "udp", 3);
+			trans_proto[4] = '\0';
 
-		/* Try to create new thread */
-		if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-			return 0;
+			/* Create copy of new Verse context for new thread */
+			new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
+			memcpy(new_C, C, sizeof(struct vContext));
+
+			/* Try to create new thread */
+			if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+				return 0;
+			}
+
+			/* Wait for datagram thread to be in LISTEN state */
+			while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
+				usleep(10);
+			}
+		} else if(vsession->flags & VRS_TP_TCP) {
+			strncpy(trans_proto, "tcp", 3);
+			trans_proto[4] = '\0';
 		}
 
-		/* Wait for datagram thread to be in LISTEN state */
-		while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
-			usleep(10);
+#if OPENSSL_VERSION_NUMBER>=0x10000000
+		if(url.security_protocol==VRS_SEC_DATA_NONE ||
+				!(vs_ctx->security_protocol & VRS_SEC_DATA_TLS))
+		{
+			strncpy(sec_proto, "none", 4);
+			sec_proto[4] = '\0';
+		} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
+			if(vsession->flags & VRS_TP_UDP) {
+				strncpy(sec_proto, "dtls", 4);
+				sec_proto[4] = '\0';
+			} else if(vsession->flags & VRS_TP_TCP) {
+				strncpy(sec_proto, "tls", 3);
+				sec_proto[3] = '\0';
+			}
+		} else {
+			strncpy(sec_proto, "none", 4);
+			sec_proto[4] = '\0';
 		}
+#else
+		strncmp(sec_proto, "none", 4);
+		sec_proto[4] = '\0';
+#endif
 
 		s_message->sys_cmd[1].change_l_cmd.id = CMD_CHANGE_L_ID;
 		s_message->sys_cmd[1].change_l_cmd.feature = FTR_HOST_URL;
 		s_message->sys_cmd[1].change_l_cmd.count = 1;
 		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 		if(url.ip_ver==IPV6) {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_SEC_DATA_NONE &&
-					(vs_ctx->security_protocol & VRS_SEC_DATA_TLS)) {
-				sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
-				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else {
-				/* Default security policy */
-				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			}
-#else
-			sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
+			sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
+					trans_proto,
+					sec_proto,
 					url.node,
-					vsession->dgram_conn->tcp_io_ctx.host_addr.port);
-#endif
+					vsession->dgram_conn->io_ctx.host_addr.port);
 		} else {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_SEC_DATA_NONE &&
-					(vs_ctx->security_protocol & VRS_SEC_DATA_TLS)) {
-				sprintf(vsession->host_url, "verse-udp-none://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
-				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else {
-				/* Default security policy */
-				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			}
-#else
-			sprintf(vsession->host_url, "verse-udp-none://%s:%d",
+			sprintf(vsession->host_url, "verse-%s-%s://%s:%d",
+					trans_proto,
+					sec_proto,
 					url.node,
-					vsession->dgram_conn->tcp_io_ctx.host_addr.port);
-#endif
+					vsession->dgram_conn->io_ctx.host_addr.port);
 		}
 		s_message->sys_cmd[1].change_l_cmd.value[0].string8.length = strlen(vsession->host_url);
 		strcpy((char*)s_message->sys_cmd[1].change_l_cmd.value[0].string8.str, vsession->host_url);

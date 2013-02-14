@@ -107,6 +107,21 @@ static int vc_get_username_passwd(struct VSession *vsession,
 	return 0;
 }
 
+/**
+ *
+ */
+static int vc_STREAM_OPEN_loop(struct vContext *C)
+{
+	/* TODO: do something */
+	(void)C;
+	return 0;
+}
+
+/**
+ * \brief This function negotiate new data connection with server
+ *
+ * This new negotiated connection could be on the same server or it could be on different host.
+ */
 int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
@@ -152,6 +167,10 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
 	return 0;
 }
 
+
+/**
+ *
+ */
 static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 {
 	struct VSession *vsession = CTX_current_session(C);
@@ -184,11 +203,26 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 
 		/* Choose scheme according client preference */
 		if(vsession->flags & VRS_SEC_DATA_NONE) {
-			sprintf(vsession->host_url, "verse-udp-none://%s:*", str_addr);
+			if(vsession->flags & VRS_TP_UDP) {
+				sprintf(vsession->host_url, "verse-udp-none://%s:*", str_addr);
+			} else if(vsession->flags & VRS_TP_TCP) {
+				sprintf(vsession->host_url, "verse-tcp-none://%s:*", str_addr);
+			} else {
+				/* Default transport protocol is UDP */
+				sprintf(vsession->host_url, "verse-udp-none://%s:*", str_addr);
+			}
 		} else if(vsession->flags & VRS_SEC_DATA_TLS) {
-			sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
+			if(vsession->flags & VRS_TP_UDP) {
+				sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
+			} else if(vsession->flags & VRS_TP_TCP) {
+				sprintf(vsession->host_url, "verse-tcp-tls://%s:*", str_addr);
+			} else {
+				/* Default transport protocol is UDP */
+				sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
+			}
 		} else {
-			/* Default security policy is to use DTLS */
+			/* Default security policy is to use DTLS and default transport protocol
+			 * is UDP */
 			sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
 		}
 	} else if (io_ctx->peer_addr.ip_ver == IPV6) {
@@ -196,20 +230,35 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 		inet_ntop(AF_INET6, &(io_ctx->peer_addr.addr.ipv6.sin6_addr), str_addr, sizeof(str_addr));
 
 		if(vsession->host_url!=NULL) {
-					free(vsession->host_url);
-				}
+			free(vsession->host_url);
+		}
 		vsession->host_url = (char*)malloc((22+INET6_ADDRSTRLEN)*sizeof(char));
 
 		/* Choose scheme according client preference */
 		if(vsession->flags & VRS_SEC_DATA_NONE) {
-			sprintf(vsession->host_url, "verse-udp-none://[%s]:*", str_addr);
+			if(vsession->flags & VRS_TP_UDP) {
+				sprintf(vsession->host_url, "verse-udp-none://[%s]:*", str_addr);
+			} else if(vsession->flags & VRS_TP_TCP) {
+				sprintf(vsession->host_url, "verse-tcp-none://[%s]:*", str_addr);
+			} else {
+				/* Default transport protocol is UDP */
+				sprintf(vsession->host_url, "verse-udp-none://[%s]:*", str_addr);
+			}
 		} else if(vsession->flags & VRS_SEC_DATA_TLS) {
-			sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
+			if(vsession->flags & VRS_TP_UDP) {
+				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
+			} else if(vsession->flags & VRS_TP_UDP) {
+				sprintf(vsession->host_url, "verse-tcp-tls://[%s]:*", str_addr);
+			} else {
+				/* Default transport protocol is UDP */
+				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
+			}
 		} else {
-			/* Default security policy is to use DTLS */
+			/* Default security policy is to use DTLS and default transport protocol is UDP*/
 			sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
 		}
 	}
+
 	/* Set up negotiate command of host URL. This URL is fake URL and it
 	 * is used for sending IP of server, that client used for connecting
 	 * server and preferred transport protocol (UDP) and encryption protocol
@@ -358,6 +407,9 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 	return 0;
 }
 
+/**
+ *
+ */
 static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd *ua_data)
 {
 	struct VSession *vsession = CTX_current_session(C);
@@ -496,6 +548,9 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 	return 0;
 }
 
+/**
+ *
+ */
 static int vc_USRAUTH_none_loop(struct vContext *C,
 		struct User_Authenticate_Cmd *ua_data)
 {
@@ -1163,14 +1218,59 @@ newhost:
 		printf("%c[%dm", 27, 0);
 	}
 
-	/* Try to create new UDP thread */
-	if((ret = pthread_create(&vsession->udp_thread, NULL, vc_main_dgram_loop, (void*)C)) != 0) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+	if( vsession->flags & VRS_TP_UDP ) {
+		/* Try to create new UDP thread */
+		if((ret = pthread_create(&vsession->udp_thread, NULL, vc_main_dgram_loop, (void*)C)) != 0) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		}
+	} else if (vsession->flags & VRS_TP_TCP ) {
+		/* Negotiate new TCP connection or confirm existing TCP connection */
+		ret = vc_NEGOTIATE_newhost(C, vsession->host_url);
+		switch (ret) {
+		case 0:
+			error = VRS_CONN_TERM_ERROR;
+			stream_conn->host_state = TCP_CLIENT_STATE_CLOSING;
+			goto closing;
+		case 1:
+			goto stream_open;
+			break;
+		default:
+			break;
+		}
+	} else {
+		stream_conn->host_state = TCP_CLIENT_STATE_CLOSING;
 	}
 
+	goto closing;
+
+stream_open:
+	/* Update client state */
+	stream_conn->host_state = TCP_CLIENT_STATE_STREAM_OPEN;
+
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: OPEN\n");
+		printf("%c[%dm", 27, 0);
+	}
+
+	ret = vc_STREAM_OPEN_loop(C);
+	switch (ret) {
+	case 0:
+		error = VRS_CONN_TERM_ERROR;
+		break;
+	case 1:
+		break;
+	default:
+		break;
+	}
+
+	stream_conn->host_state = TCP_CLIENT_STATE_CLOSING;
+
 closing:
+	/* Wait until datagram connection is negotiated and established */
 	while(vsession->stream_conn->host_state == TCP_CLIENT_STATE_NEGOTIATE_NEWHOST) {
-		usleep(10);
+		/* Sleep 1 milisecond */
+		usleep(1000);
 	}
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
@@ -1215,6 +1315,9 @@ closed:
 	conn_term = v_Connect_Terminate_create(error);
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_term);
 
-	/* TODO: wait in loop to free vsession->in_queue */
-	sleep(1);
+	/* Wait in loop to free vsession->in_queue */
+	while( v_in_queue_size(vsession->in_queue) > 0) {
+		/* Sleep 1 milisecond */
+		usleep(1000);
+	}
 }
