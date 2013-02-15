@@ -359,7 +359,12 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			}
 		}
 
-		/* Copy settings about dgram connection to the session */
+		/* Do not allow unsecure TCP data connection */
+		if(url.transport_protocol == VRS_TP_TCP) {
+			url.security_protocol = VRS_SEC_DATA_TLS;
+		}
+
+		/* Copy settings about data connection to the session */
 		vsession->flags |= url.security_protocol;
 		vsession->flags |= url.transport_protocol;
 
@@ -379,7 +384,8 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 			/* Wait for datagram thread to be in LISTEN state */
 			while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
-				usleep(10);
+				/* Sleep 1 milisecond */
+				usleep(1000);
 			}
 		} else if(vsession->flags & VRS_TP_TCP) {
 			strncpy(trans_proto, "tcp", 3);
@@ -865,8 +871,10 @@ end:
 	return NULL;
 }
 
-/* Main Verse server loop. Server waits for connect attempts, responds to attempts
- * and creates per connection threads */
+/**
+ * \brief Main Verse server loop. Server waits for connect attempts, responds to attempts
+ * and creates per connection threads
+ */
 int vs_main_stream_loop(VS_CTX *vs_ctx)
 {
 	struct vContext *C;
@@ -1044,6 +1052,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					/* Close connection (no more free session slots) */
 					close(tmp_sockfd);
 				}
+				/* TODO: Fix this */
 				sleep(1);
 			}
 		}

@@ -732,6 +732,35 @@ static void cb_receive_connect_terminate(const uint8_t session_id,
 {
 	printf("%s() session_id: %d, error_num: %d\n",
 			__FUNCTION__, session_id, error_num);
+	switch(error_num) {
+	case VRS_CONN_TERM_AUTH_FAILED:
+		printf("User authentication failed\n");
+		break;
+	case VRS_CONN_TERM_HOST_DOWN:
+		printf("Host is not accesible\n");
+		break;
+	case VRS_CONN_TERM_HOST_UNKNOWN:
+		printf("Host could not be found\n");
+		break;
+	case VRS_CONN_TERM_SERVER_DOWN:
+		printf("Server is not running\n");
+		break;
+	case VRS_CONN_TERM_TIMEOUT:
+		printf("Connection timout\n");
+		break;
+	case VRS_CONN_TERM_ERROR:
+		printf("Conection with server was broken\n");
+		break;
+	case VRS_CONN_TERM_SERVER:
+		printf("Connection was terminated by server\n");
+		break;
+	case VRS_CONN_TERM_CLIENT:
+		printf("Connection was terminated by client\n");
+		break;
+	default:
+		printf("Unknown error\n");
+		break;
+	}
 	exit(EXIT_SUCCESS);
 }
 

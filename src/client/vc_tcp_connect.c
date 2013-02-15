@@ -114,7 +114,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 {
 	/* TODO: do something */
 	(void)C;
-	return 0;
+	return 1;
 }
 
 /**
