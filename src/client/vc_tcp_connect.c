@@ -114,6 +114,8 @@ static int vc_get_username_passwd(struct VSession *vsession,
 static int vc_STREAM_OPEN_loop(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct Connect_Accept_Cmd *conn_accept;
+	struct VSession *vsession = CTX_current_session(C);
 	int flag;
 
 	/* Set socket non-blocking */
@@ -122,6 +124,10 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		return -1;
 	}
+
+	/* Put connect accept command to queue -> call callback function */
+	conn_accept = v_Connect_Accept_create(vsession->avatar_id, vsession->user_id);
+	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_accept);
 
 	/* Communicate with server */
 	v_STREAM_OPEN_loop(C);

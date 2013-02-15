@@ -102,17 +102,21 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 
 			/* TODO: Unpack all system commands */
 
-
 			v_print_receive_message(C);
 
-			/* Unpack node commands and put them to the queue of incomming commands */
+			/* Unpack all node commands and put them to the queue of incomming commands */
 			v_cmd_unpack((char*)&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), vsession->in_queue);
 		}
 
 		/* Is here something to send? */
 		if(v_out_queue_get_count(vsession->out_queue) > 0) {
 
-			/* TODO: How many data could be added to the TCP stack? */
+			buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+			/* TODO: send system command too */
+			s_message->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
+
+			/* TODO: Compute, how many data could be added to the TCP stack? */
 			swin = 10000;
 
 			max_prio = v_out_queue_get_max_prio(vsession->out_queue);
@@ -147,14 +151,19 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 					/* Get total size of commands that were stored in queue (sent_size) */
 					tot_cmd_size = 0;
 
-					cmd_share = 0;
-					cmd_count = 0;
+					while(prio_count > 0) {
+						cmd_share = 0;
+						cmd_count = 0;
 
-					/* Pack commands from queues with high priority to the buffer */
-					cmd = v_out_queue_pop(vsession->out_queue, prio, &cmd_count, &cmd_share, &cmd_len);
-					buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, 0, 0);
+						/* Pack commands from queues with high priority to the buffer */
+						cmd = v_out_queue_pop(vsession->out_queue, prio, &cmd_count, &cmd_share, &cmd_len);
+						buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
+						v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
 
-					sent_size += tot_cmd_size;
+						sent_size += tot_cmd_size;
+
+						prio_count--;
+					}
 				}
 			}
 
@@ -172,8 +181,6 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 			if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
 				/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
 				return 0;
-			} else {
-				return 1;
 			}
 		}
 	}

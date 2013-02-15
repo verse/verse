@@ -708,7 +708,7 @@ static void cb_receive_connect_accept(const uint8_t session_id,
 	 * to the root node of the node tree. Id of root node is still 0. This
 	 * function is called with level 1. It means, that this client will be
 	 * subscribed to the root node and its child nodes (1, 2, 3) */
-	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 0, 1);
+	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 0, 0);
 
 	/* Check if server allow double subscribe? */
 	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 1, 0);
