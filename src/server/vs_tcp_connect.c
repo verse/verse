@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "verse_types.h"
 
@@ -52,6 +53,8 @@
 #include "v_unpack.h"
 #include "v_connection.h"
 #include "v_session.h"
+#include "v_stream.h"
+#include "v_fake_commands.h"
 
 /**
  * \brief Initialize VConnection at Verse server for potential clients
@@ -188,6 +191,10 @@ static int vs_TLS_teardown(struct vContext *C)
 	return 1;
 }
 
+
+/**
+ *
+ */
 static void vs_CLOSING(struct vContext *C)
 {
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
@@ -196,6 +203,44 @@ static void vs_CLOSING(struct vContext *C)
 
 }
 
+
+/**
+ * \brief This function is never ending loop of server state STREAM_OPEN
+ */
+static int vs_STREAM_OPEN_loop(struct vContext *C)
+{
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct Connect_Accept_Cmd *conn_accept;
+	struct VSession *vsession = CTX_current_session(C);
+	int flag;
+
+	/* Set socket non-blocking */
+	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if( (fcntl(io_ctx->sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return -1;
+	}
+
+	/* Put connect accept command to queue -> call callback function */
+	conn_accept = v_Connect_Accept_create(vsession->avatar_id, vsession->user_id);
+	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_accept);
+
+	/* Communicate with client */
+	v_STREAM_OPEN_loop(C);
+
+	/* Set socket blocking again */
+	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if( (fcntl(io_ctx->sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * \brief This function is called, when server is in NEGOTIATE newhost state
+ */
 static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
@@ -233,6 +278,12 @@ static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 	return 0;
 }
 
+
+/**
+ * \brief This function is called, when server is in NEGOTIATE_cookie_ded state
+ *
+ * This function can create new thread for datagrame connection
+ */
 static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
@@ -474,6 +525,10 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	return 0;
 }
 
+
+/**
+ *
+ */
 static int vs_RESPOND_userauth_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
@@ -671,6 +726,7 @@ static int vs_RESPOND_methods_loop(struct vContext *C)
 	return 0;
 }
 
+
 /**
  * \brief Main function for new thread. This thread is created for new
  * connection with client. This thread will try to authenticate new user
@@ -718,7 +774,8 @@ void *vs_tcp_conn_loop(void *arg)
 		tv.tv_usec = 0;
 
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
@@ -732,7 +789,8 @@ void *vs_tcp_conn_loop(void *arg)
 			 * header. If this condition is not reached, then somebody tries
 			 * to do some very bad things! .. Close this connection. */
 			if(io_ctx->buf_size < VERSE_MESSAGE_HEADER_SIZE) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "received buffer too small %d\n", io_ctx->buf_size);
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "received buffer too small %d\n",
+						io_ctx->buf_size);
 				goto end;
 			}
 
@@ -785,8 +843,18 @@ void *vs_tcp_conn_loop(void *arg)
 				/* Wait VERSE_TIMEOT seconds to confirming proposed URL */
 				ret = vs_NEGOTIATE_newhost_loop(C);
 				if(ret==1) {
-					/* When URL was confirmed, then go to the end state */
-					goto end;
+					if(vsession->flags & VRS_TP_UDP) {
+						/* When URL was confirmed, then go to the end state */
+						goto end;
+					} else if (vsession->flags & VRS_TP_TCP) {
+						stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
+
+						if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+							printf("%c[%d;%dm", 27, 1, 31);
+							v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: STREAM_OPEN\n");
+							printf("%c[%dm", 27, 0);
+						}
+					}
 				} else {
 					/* When thread was not confirmed, then try to cancel
 					 * UDP thread*/
@@ -795,6 +863,10 @@ void *vs_tcp_conn_loop(void *arg)
 					}
 					goto end;
 				}
+				break;
+			case TCP_SERVER_STATE_STREAM_OPEN:
+				vs_STREAM_OPEN_loop(C);
+				goto end;
 				break;
 			}
 		} else {
@@ -858,6 +930,9 @@ end:
 	/* This session could be used again for authentication */
 	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
 
+	/* Clear session flags */
+	vsession->flags = 0;
+
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: LISTEN\n");
@@ -870,6 +945,7 @@ end:
 	pthread_exit(NULL);
 	return NULL;
 }
+
 
 /**
  * \brief Main Verse server loop. Server waits for connect attempts, responds to attempts
@@ -1070,7 +1146,11 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN ) {
 					tmp++;
 				}
-				/* TODO: cancel thread with closed connection to speed up server exit */
+				/* TODO: cancel thread with closed connection to speed up server exit
+					pthread_kill(vs_ctx->vsessions[i]->tcp_thread, SIGALRM);
+					pthread_join(vs_ctx->vsessions[i]->tcp_thread, NULL);
+				*/
+
 			}
 		}
 		if(tmp==0) {
@@ -1085,7 +1165,10 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 	return 1;
 }
 
-/* Initialize verse server context */
+
+/**
+ * \brief Initialize verse server context
+ */
 int vs_init_stream_ctx(VS_CTX *vs_ctx)
 {
 	int i, flag;

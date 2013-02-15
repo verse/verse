@@ -58,6 +58,7 @@ void v_init_session(struct VSession *vsession)
 	vsession->peer_cookie.str = NULL;
 	vsession->host_cookie.str = NULL;
 	vsession->avatar_id = -1;
+	vsession->flags = 0;
 }
 
 void v_destroy_session(struct VSession *vsession)

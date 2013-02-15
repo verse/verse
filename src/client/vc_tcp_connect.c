@@ -60,6 +60,7 @@
 #include "v_unpack.h"
 #include "v_session.h"
 #include "v_connection.h"
+#include "v_stream.h"
 
 #define FPS	60	/* TODO: set it from client application and store it in session */
 
@@ -108,12 +109,30 @@ static int vc_get_username_passwd(struct VSession *vsession,
 }
 
 /**
- *
+ * \brief this function is never ending loop of client state STREAM_OPEN
  */
 static int vc_STREAM_OPEN_loop(struct vContext *C)
 {
-	/* TODO: do something */
-	(void)C;
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	int flag;
+
+	/* Set socket non-blocking */
+	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if( (fcntl(io_ctx->sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return -1;
+	}
+
+	/* Communicate with server */
+	v_STREAM_OPEN_loop(C);
+
+	/* Set socket blocking again */
+	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if( (fcntl(io_ctx->sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return -1;
+	}
+
 	return 1;
 }
 
