@@ -26,7 +26,9 @@
 #ifndef VS_AUTH_LDAP_H_
 #define VS_AUTH_LDAP_H_
 
-int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx,
-		char *ldap_server_attrs, int len);
+int vs_ldap_auth_user(struct vContext *C, const char *username,
+		const char *pass);
+int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx, char *ldap_server_attrs,
+		int len);
 
 #endif /* VS_AUTH_LDAP_H_ */

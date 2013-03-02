@@ -36,6 +36,7 @@ typedef struct VSUser {
 	char			*username;
 	char			*password;
 	char			*realname;
+	char			*ldap_dn;
 	uint8			fake_user;
 } VSUser;
 

@@ -135,6 +135,10 @@ typedef struct VS_CTX {
 	struct VListBase	users;						/* Linked list of users */
 	struct VSUser		*other_users;				/* The pointer at fake user other_users */
 	unsigned char		default_perm;				/* Default permissions for other users */
+	char				*ldap_hostname;				/* LDAP server */
+	char				*ldap_user;					/* LDAP Verse user */
+	char				*ldap_passwd;				/* Password of LDAP Verse user */
+	char				*ldap_search_base;			/* LDAP search base */
 	/* Data shared at verse server */
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */

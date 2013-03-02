@@ -364,7 +364,6 @@ int main(int argc, char *argv[])
 
 	/* Default debug prints of verse server */
 	v_init_print_log(VRS_PRINT_WARNING, stdout);
-	v_print_log(VRS_PRINT_DEBUG_MSG, "auth method: %d\n",vs_ctx.auth_type);
 
 	/* When server received some arguments */
 	if(argc>1) {
@@ -398,9 +397,6 @@ int main(int argc, char *argv[])
 	if(ldap_server != NULL) {
 			vs_ctx.auth_type = AUTH_METHOD_LDAP;
 	}
-	/*ldap_base = strdup("dc=zdenda,dc=cz");
-	ldap_user = strdup("cn=root,dc=zdenda,dc=cz");
-	ldap_pass = strdup("spartajede");*/
 
 	/* When debug level wasn't specified as option at command line, then use
 	 * configuration from file */

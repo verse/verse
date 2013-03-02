@@ -85,8 +85,7 @@ int vs_user_auth(struct vContext *C, const char *username, const char *data)
 #endif
 			break;
 		case AUTH_METHOD_LDAP:
-			/* TODO: it needs real implementation */
-			uid = -1;
+			uid = vs_ldap_auth_user(C, username, data);
 			break;
 	}
 
