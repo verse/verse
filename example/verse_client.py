@@ -143,7 +143,7 @@ class MySession(vrs.Session):
         # Add root node to the dictionary of nodes
         self.nodes[0] = MyNode(0, None, 0, 0)
         # Subscribe to the root of node tree
-        self.send_node_subscribe(prio=vrs.DEFAULT_PRIORITY, node_id=0, version=0)
+        self.send_node_subscribe(prio=vrs.DEFAULT_PRIORITY, node_id=0, version=0, crc32=0)
         # Create my new node
         self.send_node_create(prio=vrs.DEFAULT_PRIORITY, custom_type=10)
 
@@ -170,7 +170,7 @@ class MySession(vrs.Session):
               ", user_id: ", user_id,
               ", custom_type: ", custom_type)
         # Subscribe to node
-        self.send_node_subscribe(vrs.DEFAULT_PRIORITY, node_id, 0)
+        self.send_node_subscribe(vrs.DEFAULT_PRIORITY, node_id, 0, 0)
         # Try to find parent node
         try:
             parent_node = self.nodes[parent_id]

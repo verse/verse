@@ -499,7 +499,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 	} else if(node_id==VRS_USERS_PARENT_NODE_ID) {
 		printf("\tParent of User Nodes\n");
 		/* Example of node subscribe command */
-		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
+		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
 	} else if(node_id==VRS_SCENE_PARENT_NODE_ID) {
 		printf("\tParent of Scene Nodes\n");
 		/* Example of node un-subscribe command */
@@ -519,7 +519,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 		/* Client should subscribe to his avarat node to be able receive information
 		 * about nodes, that was created by this client */
 		printf("\tMy Avatar Node\n");
-		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
+		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
 
 		/* Test of sending wrong node_perm command (client doesn't own this node) */
 		vrs_send_node_perm(session_id, VRS_DEFAULT_PRIORITY, node_id, my_user_id, VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
@@ -550,7 +550,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 		my_test_node_id = node_id;
 
 		/* Test of subscribing to my own node */
-		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
+		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
 
 		/* Test of changing priority of my node */
 		vrs_send_node_prio(session_id, VRS_DEFAULT_PRIORITY, node_id, my_test_node_prio);
@@ -708,10 +708,10 @@ static void cb_receive_connect_accept(const uint8_t session_id,
 	 * to the root node of the node tree. Id of root node is still 0. This
 	 * function is called with level 1. It means, that this client will be
 	 * subscribed to the root node and its child nodes (1, 2, 3) */
-	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 0, 0);
+	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 0, 0, 0);
 
 	/* Check if server allow double subscribe? */
-	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 1, 0);
+	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 1, 0, 0);
 
 	/* Try to create new node */
 	vrs_send_node_create(session_id, VRS_DEFAULT_PRIORITY, MY_TEST_NODE_TYPE);

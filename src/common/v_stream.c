@@ -169,6 +169,7 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 
 			s_message->header.len = io_ctx->buf_size = buffer_pos;
 			s_message->header.version = VRS_VERSION;
+
 			/* Pack header to the beginning of the buffer */
 			v_pack_message_header(s_message, io_ctx->buf);
 

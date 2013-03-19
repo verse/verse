@@ -1504,17 +1504,18 @@ static PyObject *Session_send_node_subscribe(PyObject *self, PyObject *args, PyO
 	uint8_t prio;
 	uint32_t node_id;
 	uint32_t version;
+	uint32_t crc32;
 	int ret;
-	static char *kwlist[] = {"prio", "node_id", "version", NULL};
+	static char *kwlist[] = {"prio", "node_id", "version", "crc32", NULL};
 
 	/* Parse arguments */
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BII", kwlist,
-			&prio, &node_id, &version)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIII", kwlist,
+			&prio, &node_id, &version, &crc32)) {
 		return NULL;
 	}
 
 	/* Call C API function */
-	ret = vrs_send_node_subscribe(session->session_id, prio, node_id, version);
+	ret = vrs_send_node_subscribe(session->session_id, prio, node_id, version, crc32);
 
 	/* Check if calling function was successful */
 	if(ret != VRS_SUCCESS) {

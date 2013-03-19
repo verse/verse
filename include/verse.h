@@ -205,7 +205,8 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 int vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
-		const uint32_t version);
+		const uint32_t version,
+		const uint32_t crc32);
 void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t version,

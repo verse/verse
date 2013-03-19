@@ -237,6 +237,7 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
  * \param[in]	node_id		The ID that client wants to be subscribed for.
  * \param[in]	version		The requested version that client request. The client
  * has to have local copy of this version.
+ * \param[in]	crc32		The crc32 of requested version.
  *
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
@@ -244,9 +245,10 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 int vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
-		const uint32_t version)
+		const uint32_t version,
+		const uint32_t crc32)
 {
-	struct Generic_Cmd *node_subscribe_cmd = v_node_subscribe_create(node_id, version, 0);
+	struct Generic_Cmd *node_subscribe_cmd = v_node_subscribe_create(node_id, version, crc32);
 	return vc_send_command(session_id, prio, node_subscribe_cmd);
 }
 
