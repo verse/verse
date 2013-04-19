@@ -99,7 +99,7 @@ void vs_handle_signal(int sig)
 		}
 	}
 	if(sig == SIGUSR1){
-		vs_reload_user_accounts(&local_vs_ctx);
+		vs_reload_user_accounts(local_vs_ctx);
 	}
 }
 
