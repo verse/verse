@@ -159,3 +159,15 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 
 	return ret;
 }
+
+/**
+ * \brief Load new user accounts from CSV file
+ */
+int vs_load_new_user_accounts_csv_file(VS_CTX *vs_ctx)
+{
+	int ret = 0;
+	/**
+	 * TODO: implementation of this
+	 */
+	return ret;
+}

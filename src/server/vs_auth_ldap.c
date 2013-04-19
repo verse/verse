@@ -100,16 +100,17 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
  * \param	VS_CTX *vs_ctx				The Verse server context.
  * \param	char *ldap_server_attrs 	LDAP attributes
  */
-int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx, char *ldap_server_attrs,
-		int len)
+int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx, char *ldap_server_attrs)
 {
 	LDAP *ldap;
-	int ret = 0;
+	int ret = 0, len;
 	char *ldap_server_hostname = NULL;
 	char *verse_ldap_dn = NULL;
 	char *verse_ldap_passwd = NULL;
 	char *ldap_search_base = NULL;
 	int col, prev_colon, next_colon;
+
+	len = strlen(ldap_server_attrs);
 
 	/* Parse LDAP server properties */
 	prev_colon = next_colon = 0;
@@ -297,5 +298,17 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx, char *ldap_server_attrs,
 		v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_initialize: %d: %s\n", ret,
 				ldap_err2string(ret));
 	}
+	return ret;
+}
+
+/**
+ * \brief Load new user accounts from LDAP server
+ */
+int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
+{
+	int ret = 0;
+	/**
+	 * TODO: implementation of this
+	 */
 	return ret;
 }

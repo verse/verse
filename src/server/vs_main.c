@@ -46,6 +46,27 @@
 struct VS_CTX *local_vs_ctx = NULL;
 
 /**
+ * \brief Load information about user accounts created after server started.
+ */
+static int vs_reload_user_accounts(struct VS_CTX *vs_ctx)
+{
+	int ret = 0;
+
+	switch (vs_ctx->auth_type) {
+	case AUTH_METHOD_CSV_FILE:
+		vs_load_new_user_accounts_csv_file(vs_ctx);
+		break;
+	case AUTH_METHOD_LDAP:
+		vs_load_new_user_accounts_ldap_server(vs_ctx);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+/**
  * \brief Callback function for handling signals.
  * \param	sig	identifier of signal
  */
@@ -76,9 +97,9 @@ void vs_handle_signal(int sig)
 				}
 			}
 		}
-
-		/* Reset signal handling to default behavior */
-		signal(SIGINT, SIG_DFL);
+	}
+	if(sig == SIGUSR1){
+		vs_reload_user_accounts(&local_vs_ctx);
 	}
 }
 
@@ -162,13 +183,16 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 /**
  * \brief Load information about all user accounts
  */
-static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
+static int vs_load_user_accounts(struct VS_CTX *vs_ctx, char *ldap)
 {
 	int ret = 0;
 
 	switch (vs_ctx->auth_type) {
 		case AUTH_METHOD_CSV_FILE:
 			ret = vs_load_user_accounts_csv_file(vs_ctx);
+			break;
+		case AUTH_METHOD_LDAP:
+			ret = vs_load_user_accounts_ldap_server(vs_ctx, ldap);
 			break;
 		default:
 			break;
@@ -288,14 +312,56 @@ static int vs_init_server(struct VS_CTX *vs_ctx)
 #endif
 
 /**
+ * \brief Endless loop, waiting for signals.
+ */
+static void vs_signal_thread(void){
+	while(1){
+
+	}
+}
+
+/**
  * \brief Configure handling of received signals
  * \param	vs_ctx	The Verse server context.
  */
 static int vs_config_signal_handling(void)
 {
+	int s;
+	sigset_t set;
+	pthread_t thread;
+	struct sigaction a_INT;
+	struct sigaction a_USR1;
+
+	/* Handle SIGUSR1 signal. The handle_signal function will try to load
+	 * new user accounts */
+	sigemptyset(&set);
+	a_USR1.sa_handler = &vs_handle_signal;
+	a_USR1.sa_mask = set;
+	a_USR1.sa_flags = 0;
+	a_USR1.sa_restorer = NULL;
+	sigaction(SIGUSR1, &a_USR1, NULL);
+
 	/* Handle SIGINT signal. The handle_signal function will try to terminate
 	 * all connections. */
-	signal(SIGINT, vs_handle_signal);
+	sigaddset(&set, SIGUSR1);
+	a_INT.sa_handler = &vs_handle_signal;
+	a_INT.sa_mask = set;
+	a_INT.sa_flags = SA_RESETHAND;
+	a_INT.sa_restorer = NULL;
+	sigaction(SIGINT, &a_INT, NULL );
+
+	/* Try to create thread which handles the signals */
+	if((s = pthread_create(&thread, NULL, vs_signal_thread, (void *) NULL)) != 0){
+		v_print_log(VRS_PRINT_WARNING, "pthread_create: %d", s);
+		return -1;
+	}
+
+	sigaddset(&set, SIGINT);
+
+	/* Try to block the signals for this tread and any other new threads */
+	if ((s = pthread_sigmask(SIG_BLOCK, &set, NULL )) != 0) {
+		v_print_log(VRS_PRINT_WARNING, "pthread_sigmask: %d", s);
+	}
 
 	return 1;
 }
@@ -354,7 +420,7 @@ static void vs_print_help(char *prog_name)
 int main(int argc, char *argv[])
 {
 	VS_CTX vs_ctx;
-	int opt,len;
+	int opt;
 	char *config_file=NULL;
 	char *ldap_server=NULL;
 	int debug_level_set = 0;
@@ -377,7 +443,6 @@ int main(int argc, char *argv[])
 				break;
 			case 'l' :
 				ldap_server = strdup(optarg);
-				len = strlen(optarg);
 				break;
 			case 'h':
 				vs_print_help(argv[0]);
@@ -411,14 +476,14 @@ int main(int argc, char *argv[])
 	 * context */
 	switch (vs_ctx.auth_type) {
 		case AUTH_METHOD_CSV_FILE:
-			if(vs_load_user_accounts(&vs_ctx) != 1)
+			if(vs_load_user_accounts(&vs_ctx, NULL) != 1)
 				exit(EXIT_FAILURE);
 			break;
 		case AUTH_METHOD_PAM:
 			/* TODO: read list of supported usernames and their uids somehow */
 			exit(EXIT_FAILURE);
 		case AUTH_METHOD_LDAP:
-		if (vs_load_user_accounts_ldap_server(&vs_ctx, ldap_server, len) != 1)
+		if (vs_load_user_accounts(&vs_ctx, ldap_server) != 1)
 				exit(EXIT_FAILURE);
 			break;
 		default:
