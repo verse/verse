@@ -111,11 +111,10 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 		int version;
 
 		v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP initialized\n");
-		version = LDAP_VERSION3;
+		version = vs_ctx->ldap_version;
 		/* Setting version to LDAP v3. */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP version %d\n", version);
 			/* Bind to LDAP server */
 			if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
 					vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
@@ -274,11 +273,10 @@ int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
 			int version;
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP initialized\n");
-			version = LDAP_VERSION3;
+			version = vs_ctx->ldap_version;
 			/* Setting version to LDAP v3. */
 			if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 					== LDAP_SUCCESS) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP version %d\n", version);
 				/* Bind to LDAP server */
 				if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
 						vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
