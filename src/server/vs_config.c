@@ -75,6 +75,53 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 			}
 		}
 
+		/* Try to load section [Users] for LDAP */
+		if (user_auth_method != NULL && strcmp(user_auth_method, "ldap") == 0) {
+			int ldap_version = 0;
+
+			printf("user_auth_method: %s\n", user_auth_method);
+
+			ldap_version = iniparser_getint(ini_dict, "Users:Version", NULL );
+
+			if (ldap_version != NULL && ldap_version > 0 && ldap_version <= 3) {
+				char *ldap_hostname, *ldap_DN, *ldap_pass, *ldap_base,
+						*ldap_LOS;
+
+				printf("LDAP version %d\n", ldap_version);
+				vs_ctx->ldap_version = ldap_version;
+
+				ldap_hostname = iniparser_getstring(ini_dict, "Users:Hostname",
+						NULL );
+				ldap_DN = iniparser_getstring(ini_dict, "Users:UserDN",
+										NULL );
+				ldap_pass = iniparser_getstring(ini_dict, "Users:Pass",
+										NULL );
+				ldap_base = iniparser_getstring(ini_dict, "Users:Base",
+										NULL );
+				ldap_LOS = iniparser_getstring(ini_dict, "Users:LoadOnStart",
+						NULL );
+
+				if (ldap_hostname != NULL && ldap_DN != NULL
+						&& ldap_pass != NULL && ldap_base != NULL ) {
+					if (strcmp(ldap_LOS, "yes") == 0) {
+						vs_ctx->auth_type = AUTH_METHOD_LDAP;
+						printf("Users will be loaded on startup.\n");
+					} else {
+						vs_ctx->auth_type = AUTH_METHOD_LDAP_LOAD_AT_LOGIN;
+						printf("Users will be loaded at login.\n");
+					}
+
+					vs_ctx->ldap_hostname = strdup(ldap_hostname);
+					vs_ctx->ldap_user = strdup(ldap_DN);
+					vs_ctx->ldap_passwd = strdup(ldap_pass);
+					vs_ctx->ldap_search_base = strdup(ldap_base);
+					printf("LDAP server hostname: %s\n", ldap_hostname);
+					printf("LDAP user DN: %s\n", ldap_DN);
+					printf("LDAP search base: %s\n", ldap_base);
+				}
+			}
+		}
+
 		/* Try to load section [Security] */
 		certificate_file_name = iniparser_getstring(ini_dict, "Security:Certificate", NULL);
 		if(certificate_file_name != NULL) {

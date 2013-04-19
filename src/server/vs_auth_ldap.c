@@ -100,52 +100,12 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
  * \param	VS_CTX *vs_ctx				The Verse server context.
  * \param	char *ldap_server_attrs 	LDAP attributes
  */
-int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx, char *ldap_server_attrs)
+int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 {
 	LDAP *ldap;
-	int ret = 0, len;
-	char *ldap_server_hostname = NULL;
-	char *verse_ldap_dn = NULL;
-	char *verse_ldap_passwd = NULL;
-	char *ldap_search_base = NULL;
-	int col, prev_colon, next_colon;
+	int ret = 0;
 
-	len = strlen(ldap_server_attrs);
-
-	/* Parse LDAP server properties */
-	prev_colon = next_colon = 0;
-	for (col = 0; col < len && ldap_server_attrs[col] != '%'; col++)
-		;
-	next_colon = col;
-	ldap_server_hostname = strndup(&ldap_server_attrs[prev_colon],
-			next_colon - prev_colon);
-	vs_ctx->ldap_hostname = ldap_server_hostname;
-	prev_colon = next_colon + 1;
-
-	for (col = prev_colon; col < len && ldap_server_attrs[col] != '%'; col++)
-		;
-	next_colon = col;
-	verse_ldap_dn = strndup(&ldap_server_attrs[prev_colon],
-			next_colon - prev_colon);
-	vs_ctx->ldap_user = verse_ldap_dn;
-	prev_colon = next_colon + 1;
-
-	for (col = prev_colon; col < len && ldap_server_attrs[col] != '%'; col++)
-		;
-	next_colon = col;
-	verse_ldap_passwd = strndup(&ldap_server_attrs[prev_colon],
-			next_colon - prev_colon);
-	vs_ctx->ldap_passwd = verse_ldap_passwd;
-	prev_colon = next_colon + 1;
-
-	for (col = prev_colon; col < len && ldap_server_attrs[col] != '%'; col++)
-		;
-	next_colon = col;
-	ldap_search_base = strndup(&ldap_server_attrs[prev_colon],
-			next_colon - prev_colon);
-	vs_ctx->ldap_search_base = ldap_search_base;
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Initialiying LDAP\n");
-
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Initializing LDAP\n");
 	/* Initialization of LDAP structure */
 	if ((ret = ldap_initialize(&ldap, vs_ctx->ldap_hostname)) == LDAP_SUCCESS) {
 		int version;
@@ -183,7 +143,7 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx, char *ldap_server_attrs)
 							"ldap_search_ext_s: %d: %s\n", ret,
 							ldap_err2string(ret));
 				} else {
-					/* Successsful search */
+					/* Successful search */
 					v_print_log(VRS_PRINT_DEBUG_MSG,
 							"LDAP search successful\n");
 					vs_ctx->users.first = NULL;
@@ -346,7 +306,7 @@ int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
 								"ldap_search_ext_s: %d: %s\n", ret,
 								ldap_err2string(ret));
 					} else {
-						/* Successsful search */
+						/* Successful search */
 						v_print_log(VRS_PRINT_DEBUG_MSG,
 								"LDAP search successful\n");
 						/* Fetching user info from LDAP message */

@@ -45,6 +45,7 @@
 #include "vs_udp_connect.h"
 #include "vs_auth_pam.h"
 #include "vs_auth_csv.h"
+#include "vs_auth_ldap.h"
 #include "vs_node.h"
 
 #include "v_common.h"

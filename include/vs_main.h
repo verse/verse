@@ -58,6 +58,7 @@
 #define AUTH_METHOD_CSV_FILE				1
 #define AUTH_METHOD_PAM						2
 #define AUTH_METHOD_LDAP					3
+#define AUTH_METHOD_LDAP_LOAD_AT_LOGIN		4
 
 /**
  * States of Verse server
@@ -139,6 +140,7 @@ typedef struct VS_CTX {
 	char				*ldap_user;					/* LDAP Verse user */
 	char				*ldap_passwd;				/* Password of LDAP Verse user */
 	char				*ldap_search_base;			/* LDAP search base */
+	int					ldap_version;				/* Version of LDAP */
 	/* Data shared at verse server */
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */

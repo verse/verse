@@ -183,7 +183,7 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 /**
  * \brief Load information about all user accounts
  */
-static int vs_load_user_accounts(struct VS_CTX *vs_ctx, char *ldap)
+static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
 {
 	int ret = 0;
 
@@ -192,7 +192,7 @@ static int vs_load_user_accounts(struct VS_CTX *vs_ctx, char *ldap)
 			ret = vs_load_user_accounts_csv_file(vs_ctx);
 			break;
 		case AUTH_METHOD_LDAP:
-			ret = vs_load_user_accounts_ldap_server(vs_ctx, ldap);
+			ret = vs_load_user_accounts_ldap_server(vs_ctx);
 			break;
 		default:
 			break;
@@ -409,8 +409,6 @@ static void vs_print_help(char *prog_name)
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
 	printf("   -c config_file   read configuration from config file\n");
-	printf("   -l hostname:user:passwd:base\n");
-	printf("                    use accounts from specified ldap server\n");
 	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
 }
 
@@ -427,7 +425,6 @@ int main(int argc, char *argv[])
 	VS_CTX vs_ctx;
 	int opt;
 	char *config_file=NULL;
-	char *ldap_server=NULL;
 	int debug_level_set = 0;
 
 	/* Set up initial state */
@@ -446,9 +443,6 @@ int main(int argc, char *argv[])
 			case 'd':
 				debug_level_set = vs_set_debug_level(optarg);
 				break;
-			case 'l' :
-				ldap_server = strdup(optarg);
-				break;
 			case 'h':
 				vs_print_help(argv[0]);
 				exit(EXIT_SUCCESS);
@@ -463,11 +457,6 @@ int main(int argc, char *argv[])
 	/* Load Verse server configuration file */
 	vs_load_config_file(&vs_ctx, config_file);
 
-	/* Set up LDAP auth method */
-	if(ldap_server != NULL) {
-			vs_ctx.auth_type = AUTH_METHOD_LDAP;
-	}
-
 	/* When debug level wasn't specified as option at command line, then use
 	 * configuration from file */
 	if(debug_level_set == 1) {
@@ -481,14 +470,14 @@ int main(int argc, char *argv[])
 	 * context */
 	switch (vs_ctx.auth_type) {
 		case AUTH_METHOD_CSV_FILE:
-			if(vs_load_user_accounts(&vs_ctx, NULL) != 1)
+			if(vs_load_user_accounts(&vs_ctx) != 1)
 				exit(EXIT_FAILURE);
 			break;
 		case AUTH_METHOD_PAM:
 			/* TODO: read list of supported usernames and their uids somehow */
 			exit(EXIT_FAILURE);
 		case AUTH_METHOD_LDAP:
-		if (vs_load_user_accounts(&vs_ctx, ldap_server) != 1)
+		if (vs_load_user_accounts(&vs_ctx) != 1)
 				exit(EXIT_FAILURE);
 			break;
 		default:
