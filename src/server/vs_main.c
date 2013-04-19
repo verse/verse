@@ -314,9 +314,14 @@ static int vs_init_server(struct VS_CTX *vs_ctx)
 /**
  * \brief Endless loop, waiting for signals.
  */
-static void vs_signal_thread(void){
-	while(1){
+static void vs_signal_thread(void *signal_set){
+	int s, sig;
+	sigset_t *set = (sigset_t *)signal_set;
 
+	while(1){
+		if((s = sigwait(set, &sig)) != 0){
+			v_print_log(VRS_PRINT_WARNING, "sigwait: %d", s);
+		}
 	}
 }
 
@@ -351,7 +356,7 @@ static int vs_config_signal_handling(void)
 	sigaction(SIGINT, &a_INT, NULL );
 
 	/* Try to create thread which handles the signals */
-	if((s = pthread_create(&thread, NULL, vs_signal_thread, (void *) NULL)) != 0){
+	if((s = pthread_create(&thread, NULL, vs_signal_thread, (void *) &set)) != 0){
 		v_print_log(VRS_PRINT_WARNING, "pthread_create: %d", s);
 		return -1;
 	}
