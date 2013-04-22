@@ -194,6 +194,11 @@ static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
 		case AUTH_METHOD_LDAP:
 			ret = vs_load_user_accounts_ldap_server(vs_ctx);
 			break;
+		case AUTH_METHOD_LDAP_LOAD_AT_LOGIN:
+			vs_ctx->users.first = NULL;
+			vs_ctx->users.last = NULL;
+			ret = 1;
+			break;
 		default:
 			break;
 	}
@@ -477,7 +482,11 @@ int main(int argc, char *argv[])
 			/* TODO: read list of supported usernames and their uids somehow */
 			exit(EXIT_FAILURE);
 		case AUTH_METHOD_LDAP:
-		if (vs_load_user_accounts(&vs_ctx) != 1)
+			if (vs_load_user_accounts(&vs_ctx) != 1)
+				exit(EXIT_FAILURE);
+			break;
+		case AUTH_METHOD_LDAP_LOAD_AT_LOGIN:
+			if (vs_load_user_accounts(&vs_ctx) != 1)
 				exit(EXIT_FAILURE);
 			break;
 		default:
