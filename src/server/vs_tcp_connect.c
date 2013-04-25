@@ -415,7 +415,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 		if(vsession->flags & VRS_TP_UDP) {
 			strncpy(trans_proto, "udp", 3);
-			trans_proto[4] = '\0';
+			trans_proto[3] = '\0';
 
 			/* Create copy of new Verse context for new thread */
 			new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
