@@ -141,6 +141,7 @@ typedef struct VS_CTX {
 	char				*ldap_passwd;				/* Password of LDAP Verse user */
 	char				*ldap_search_base;			/* LDAP search base */
 	int					ldap_version;				/* Version of LDAP */
+	char				*created_user_file;			/* CSV file containing list of created users */
 	/* Data shared at verse server */
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */

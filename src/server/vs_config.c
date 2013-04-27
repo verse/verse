@@ -107,8 +107,15 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 						vs_ctx->auth_type = AUTH_METHOD_LDAP;
 						printf("Users will be loaded on startup.\n");
 					} else {
+						char *cache_file;
+
+						cache_file = iniparser_getstring(ini_dict, "Users:File",
+								NULL );
 						vs_ctx->auth_type = AUTH_METHOD_LDAP_LOAD_AT_LOGIN;
+						vs_ctx->created_user_file = strdup(cache_file);
 						printf("Users will be loaded at login.\n");
+						printf("File for saving user accounts: %s\n",
+								cache_file);
 					}
 
 					vs_ctx->ldap_hostname = strdup(ldap_hostname);

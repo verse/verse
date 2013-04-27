@@ -94,10 +94,50 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 	return uid;
 }
 
-/*
+int vs_save_ldap_user_to_file(VS_CTX *vs_ctx, VSUser *user)
+{
+	int ret = 0;
+
+	if (vs_ctx->created_user_file != NULL ) {
+		FILE *file;
+		char line[LINE_LEN], record[LINE_LEN];
+
+		file = fopen(vs_ctx->created_user_file, "a+");
+		if (fgets(line, LINE_LEN - 2, file) == NULL ) {
+			fprintf(file, "username,UID\n");
+			fprintf(file, "%s,%d\n", user->username, user->user_id);
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Added to cache: %s,%d\n",
+					user->username, user->user_id);
+			ret = 1;
+		} else {
+			sprintf(record, "%s,%d\n", user->username, user->user_id);
+			rewind(file);
+			while ((fgets(line, LINE_LEN - 2, file) != NULL )&& (ret != 1)){
+			if(strncmp(&line[0], &record[0], strlen(&record[0])) == 0) {
+				ret = 1;
+				break;
+			}
+		}
+			if (ret == 0) {
+				fprintf(file, "%s,%d\n", user->username, user->user_id);
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Added to cache: %s,%d\n",
+						user->username, user->user_id);
+				ret = 1;
+			}
+		}
+		ret = 1;
+
+		fclose(file);
+	}
+
+	return ret;
+}
+
+/**
  * \brief Parse user data from ldap message.
  */
-int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap, LDAPMessage *ldap_message)
+int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
+		LDAPMessage *ldap_message)
 {
 	int count = 0;
 	char **user_cn = NULL;
@@ -158,6 +198,12 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap, LDAPMessag
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Added: username: %s, ID: %d, realname: %s\n",
 					new_user->username, new_user->user_id, new_user->realname);
+			if (vs_ctx->auth_type == AUTH_METHOD_LDAP_LOAD_AT_LOGIN) {
+				if (vs_save_ldap_user_to_file(vs_ctx, new_user) != 1) {
+					v_print_log(VRS_PRINT_WARNING,
+							"Unsuccessful adding to cache file\n");
+				}
+			}
 			count++;
 		} else {
 			free(new_user);
@@ -193,7 +239,8 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap, LDAPMessag
  * \param	vContext 				*C	Verse context
  * \param	const char *username	User name (cn)
  */
-int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_cn)
+int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
+		const char *search_by)
 {
 	int ret = 0;
 	LDAP *ldap;
@@ -210,11 +257,17 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_cn)
 			if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
 					vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
 				char *search_filter;
-				search_filter = malloc(100 * sizeof(char));
+				int length;
 				LDAPMessage *ldap_message = NULL;
+
+				length = strlen(user_name);
+				length += strlen(search_by);
+				length += 1;
+				search_filter = malloc(length * sizeof(char));
+
 				/* bind OK */
-				search_filter = strcpy(search_filter, "cn=");
-				search_filter = strcat(search_filter, user_cn);
+				search_filter = strcpy(search_filter, search_by);
+				search_filter = strcat(search_filter, user_name);
 				/* Sear for users in LDAP */
 				ret = ldap_search_ext_s(ldap, vs_ctx->ldap_search_base,
 						LDAP_SCOPE_SUBTREE, search_filter, NULL, 0, NULL, NULL,
@@ -230,7 +283,8 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_cn)
 							"LDAP search successful\n");
 
 					/* Fetching user info from LDAP message */
-					if(vs_add_users_from_ldap_message(vs_ctx, ldap, ldap_message) > 0){
+					if (vs_add_users_from_ldap_message(vs_ctx, ldap,
+							ldap_message) > 0) {
 						ret = 1;
 					}
 
@@ -279,7 +333,8 @@ int vs_ldap_auth_and_add_user(struct vContext *C, const char *username,
 	/* Try to do traditional authentication */
 	if ((uid = vs_ldap_auth_user(C, username, pass)) == -1) {
 		/* User does not exist in Verse, LDAP or bad password */
-		if (vs_ldap_add_concrete_user(CTX_server_ctx(C), username) == 1) {
+		if (vs_ldap_add_concrete_user(CTX_server_ctx(C), username, "cn=")
+				== 1) {
 			uid = vs_ldap_auth_user(C, username, pass);
 		}
 	}
@@ -432,3 +487,18 @@ int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
 	return ret;
 }
 
+int vs_load_saved_ldap_users(VS_CTX *vs_ctx)
+{
+	int ret = 0;
+
+	vs_ctx->users.first = NULL;
+	vs_ctx->users.last = NULL;
+
+	/**
+	 * TODO: loading users cached in CSV file
+	 */
+
+	ret = 1;
+
+	return ret;
+}

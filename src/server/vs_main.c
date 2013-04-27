@@ -195,9 +195,7 @@ static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
 			ret = vs_load_user_accounts_ldap_server(vs_ctx);
 			break;
 		case AUTH_METHOD_LDAP_LOAD_AT_LOGIN:
-			vs_ctx->users.first = NULL;
-			vs_ctx->users.last = NULL;
-			ret = 1;
+			ret = vs_load_saved_ldap_users(vs_ctx);
 			break;
 		default:
 			break;
