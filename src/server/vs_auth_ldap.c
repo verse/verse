@@ -60,7 +60,7 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 						== LDAP_SUCCESS) {
 					/* Initialization OK */
 					int version = vs_ctx->ldap_version;
-					/* Setting version to LDAP v3. */
+					/* Setting LDAP version */
 					if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION,
 							&version)) == LDAP_SUCCESS) {
 						/* Bind to LDAP server */
@@ -93,7 +93,11 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 	}
 	return uid;
 }
-
+/**
+ * \brief Save given user's username and UID to csv file
+ * \param VS_CTX *vs_ctx	The Verse server context
+ * \param VSUser *user		VSUser *user
+ */
 int vs_save_ldap_user_to_file(VS_CTX *vs_ctx, VSUser *user)
 {
 	int ret = 0;
@@ -102,8 +106,10 @@ int vs_save_ldap_user_to_file(VS_CTX *vs_ctx, VSUser *user)
 		FILE *file;
 		char line[LINE_LEN], record[LINE_LEN];
 
+		/* Try to open file */
 		file = fopen(vs_ctx->created_user_file, "a+");
 		if (fgets(line, LINE_LEN - 2, file) == NULL ) {
+			/* If file was created now add header */
 			fprintf(file, "username,UID\n");
 			fprintf(file, "%s,%d\n", user->username, user->user_id);
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Added to cache: %s,%d\n",
@@ -112,6 +118,7 @@ int vs_save_ldap_user_to_file(VS_CTX *vs_ctx, VSUser *user)
 		} else {
 			sprintf(record, "%s,%d\n", user->username, user->user_id);
 			rewind(file);
+			/* Check if user is not already in file */
 			while ((fgets(line, LINE_LEN - 2, file) != NULL )&& (ret != 1)){
 			if(strncmp(&line[0], &record[0], strlen(&record[0])) == 0) {
 				ret = 1;
@@ -119,6 +126,7 @@ int vs_save_ldap_user_to_file(VS_CTX *vs_ctx, VSUser *user)
 			}
 		}
 			if (ret == 0) {
+				/* Add user to file */
 				fprintf(file, "%s,%d\n", user->username, user->user_id);
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Added to cache: %s,%d\n",
 						user->username, user->user_id);
@@ -135,6 +143,9 @@ int vs_save_ldap_user_to_file(VS_CTX *vs_ctx, VSUser *user)
 
 /**
  * \brief Parse user data from ldap message.
+ * \param VS_CTX *vs_ctx			The Verse server context
+ * \param LDAP *ldap				LDAP context
+ * \param LDAPMessage *ldap_message	Message with search results
  */
 int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 		LDAPMessage *ldap_message)
@@ -236,8 +247,9 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 
 /**
  * \brief This function tries to add concrete (by cn) LDAP user to verse.
- * \param	vContext 				*C	Verse context
- * \param	const char *username	User name (cn)
+ * \param VS_CTX *vs_ctx			The Verse server context
+ * \param const char *username	User name (cn)
+ * \param const char *search_by	Attribute used for search ("cn=")
  */
 int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 		const char *search_by)
@@ -245,17 +257,18 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 	int ret = 0;
 	LDAP *ldap;
 
-	/* When record with username, then try LDAP bind with password */
+	/* Initialize LDAP */
 	if ((ret = ldap_initialize(&ldap, vs_ctx->ldap_hostname)) == LDAP_SUCCESS) {
 		/* Initialization OK */
 		int version = vs_ctx->ldap_version;
-		/* Setting version to LDAP v3. */
+		/* Setting LDAP version. */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP version %d\n", version);
 			/* Bind to LDAP server */
 			if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
 					vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
+				/* bind OK */
 				char *search_filter;
 				int length;
 				LDAPMessage *ldap_message = NULL;
@@ -264,8 +277,6 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 				length += strlen(search_by);
 				length += 1;
 				search_filter = malloc(length * sizeof(char));
-
-				/* bind OK */
 				search_filter = strcpy(search_filter, search_by);
 				search_filter = strcat(search_filter, user_name);
 				/* Sear for users in LDAP */
@@ -343,9 +354,8 @@ int vs_ldap_auth_and_add_user(struct vContext *C, const char *username,
 }
 
 /**
- * \brief Load user accounts from LdAP server
- * \param	VS_CTX *vs_ctx				The Verse server context.
- * \param	char *ldap_server_attrs 	LDAP attributes
+ * \brief Load user accounts from LDAP server
+ * \param	VS_CTX *vs_ctx	The Verse server context.
  */
 int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 {
@@ -359,7 +369,7 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 
 		v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP initialized\n");
 		version = vs_ctx->ldap_version;
-		/* Setting version to LDAP v3. */
+		/* Setting LDAP version. */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
 			/* Bind to LDAP server */
@@ -419,6 +429,7 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 
 /**
  * \brief Load new user accounts from LDAP server
+ * \param VS_CTX *vs_ctx	The Verse server context.
  */
 int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
 {
@@ -431,7 +442,7 @@ int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
 
 		v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP initialized\n");
 		version = vs_ctx->ldap_version;
-		/* Setting version to LDAP v3. */
+		/* Setting LDAP version */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
 			/* Bind to LDAP server */
@@ -486,19 +497,44 @@ int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
 	}
 	return ret;
 }
-
+/**
+ * \brief Load LDAP user accounts saved in csv file
+ * \param VS_CTX *vs_ctx	The Verse server context.
+ */
 int vs_load_saved_ldap_users(VS_CTX *vs_ctx)
 {
-	int ret = 0;
+	int ret = 1;
 
 	vs_ctx->users.first = NULL;
 	vs_ctx->users.last = NULL;
 
-	/**
-	 * TODO: loading users cached in CSV file
-	 */
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Loading cached user accounts.\n");
 
-	ret = 1;
+	if (vs_ctx->created_user_file != NULL ) {
+		FILE *file;
+
+		/* Try to open cache file */
+		file = fopen(vs_ctx->created_user_file, "rt");
+		if(file != NULL){
+			char line[LINE_LEN], *name;
+			int col;
+
+			/* Go trough file */
+			while (fgets(line, LINE_LEN - 2, file) != NULL ) {
+				if (!((strncmp(&line[0], "username", 8) == 0)
+						&& (strncmp(&line[9], "UID", 3) == 0))) {
+					/* username */
+					for (col = 0; col < LINE_LEN && line[col] != ','; col++) {
+					}
+					name = strndup(&line[0], col);
+					/* Search for user with given username */
+					ret = vs_ldap_add_concrete_user(vs_ctx, name, "cn=");
+				}
+
+			}
+			fclose(file);
+		}
+	}
 
 	return ret;
 }
