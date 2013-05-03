@@ -291,7 +291,8 @@ void *vs_data_loop(void *arg)
 		ret = sem_wait(&vs_ctx->data.sem);
 		if(ret == 0) {
 			for(i=0; i<vs_ctx->max_sessions; i++) {
-				if(vs_ctx->vsessions[i]->dgram_conn->host_state == UDP_SERVER_STATE_OPEN) {
+				if(vs_ctx->vsessions[i]->dgram_conn->host_state == UDP_SERVER_STATE_OPEN ||
+						vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
 					/* Pop all data of incoming messages from queue */
 
 					while(v_in_queue_cmd_count(vs_ctx->vsessions[i]->in_queue) > 0) {

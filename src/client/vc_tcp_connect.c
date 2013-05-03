@@ -1274,7 +1274,7 @@ stream_open:
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: OPEN\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: STREAM_OPEN\n");
 		printf("%c[%dm", 27, 0);
 	}
 

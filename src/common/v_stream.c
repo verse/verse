@@ -44,12 +44,15 @@
 #include "v_commands.h"
 #include "v_session.h"
 
+#include "vs_main.h"
+
 /**
  * \brief
  */
 int v_STREAM_OPEN_loop(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct VSession *vsession = CTX_current_session(C);
@@ -96,6 +99,7 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 
 			/* Reset content of received message */
 			memset(r_message, 0, sizeof(struct VMessage));
+			buffer_pos = 0;
 
 			/* Unpack Verse message header */
 			buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
@@ -105,7 +109,12 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 			v_print_receive_message(C);
 
 			/* Unpack all node commands and put them to the queue of incomming commands */
-			v_cmd_unpack((char*)&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), vsession->in_queue);
+			ret = v_cmd_unpack((char*)&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), vsession->in_queue);
+
+			/* When some payload data were received, then poke data thread */
+			if( (vs_ctx != NULL) && ret > 0) {
+				sem_post(&vs_ctx->data.sem);
+			}
 		}
 
 		/* Is here something to send? */
@@ -134,6 +143,7 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 				prio_count = v_out_queue_get_count_prio(vsession->out_queue, prio);
 
 				if(prio_count > 0) {
+
 					r_prio = v_out_queue_get_prio(vsession->out_queue, prio);
 
 					/* Compute size of buffer that could be occupied by
@@ -149,20 +159,24 @@ int v_STREAM_OPEN_loop(struct vContext *C)
 							prio, prio_count, r_prio, prio_win);
 
 					/* Get total size of commands that were stored in queue (sent_size) */
+					sent_size = 0;
 					tot_cmd_size = 0;
 
 					while(prio_count > 0) {
 						cmd_share = 0;
 						cmd_count = 0;
+						cmd_len = prio_win - sent_size;
 
 						/* Pack commands from queues with high priority to the buffer */
 						cmd = v_out_queue_pop(vsession->out_queue, prio, &cmd_count, &cmd_share, &cmd_len);
-						buffer_pos += v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
-						v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
-
-						sent_size += tot_cmd_size;
-
-						prio_count--;
+						if(cmd != NULL) {
+							buffer_pos += tot_cmd_size = v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
+							v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+							sent_size += tot_cmd_size;
+							prio_count--;
+						} else {
+							break;
+						}
 					}
 				}
 			}

@@ -848,6 +848,9 @@ void *vs_tcp_conn_loop(void *arg)
 							v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: STREAM_OPEN\n");
 							printf("%c[%dm", 27, 0);
 						}
+
+						vs_STREAM_OPEN_loop(C);
+						goto end;
 					}
 				} else {
 					/* When thread was not confirmed, then try to cancel
@@ -858,10 +861,7 @@ void *vs_tcp_conn_loop(void *arg)
 					goto end;
 				}
 				break;
-			case TCP_SERVER_STATE_STREAM_OPEN:
-				vs_STREAM_OPEN_loop(C);
-				goto end;
-				break;
+
 			}
 		} else {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "No response in %d seconds\n", VRS_TIMEOUT);
