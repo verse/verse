@@ -78,13 +78,13 @@ static struct PyMemberDef Session_members[] = {
 
 /**
  * \brief Generic default callback function that print function name,
- * session ID, keywords and arguments
+ * session ID and arguments
  */
 static PyObject *_print_callback_arguments(const char *func_name, PyObject *self, PyObject *args)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
 	printf("default %s(session_id: %d, ", &func_name[7], session->session_id);
-	printf("arg: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf(")\n");
+	printf("args: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf(")\n");
 	Py_RETURN_NONE;
 }
 
