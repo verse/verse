@@ -209,8 +209,11 @@ static void vs_CLOSING(struct vContext *C)
  */
 static int vs_STREAM_OPEN_loop(struct vContext *C)
 {
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	int flag;
+	struct timeval tv;
+	fd_set set;
+	int flag, ret;
 
 	/* Set socket non-blocking */
 	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
@@ -219,8 +222,37 @@ static int vs_STREAM_OPEN_loop(struct vContext *C)
 		return -1;
 	}
 
-	/* Communicate with client */
-	v_STREAM_OPEN_loop(C);
+	/* "Never ending" loop */
+	while(1)
+	{
+		FD_ZERO(&set);
+		FD_SET(io_ctx->sockfd, &set);
+
+		/* TODO: negotiate FPS */
+		tv.tv_sec = 0;
+		tv.tv_usec = 1000000/60;
+
+		/* Wait for recieved data */
+		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			goto end;
+			/* Was event on the listen socket */
+		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
+
+			if(v_STREAM_handle_messages(C) == 0) {
+				goto end;
+			}
+
+			/* When some payload data were received, then poke data thread */
+			sem_post(&vs_ctx->data.sem);
+		}
+
+		if(v_STREAM_send_message(C) == 0 ) {
+			goto end;
+		}
+	}
+end:
 
 	/* Set socket blocking again */
 	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);

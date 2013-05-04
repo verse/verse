@@ -116,7 +116,9 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct Connect_Accept_Cmd *conn_accept;
 	struct VSession *vsession = CTX_current_session(C);
-	int flag;
+	struct timeval tv;
+	fd_set set;
+	int flag, ret;
 
 	/* Set socket non-blocking */
 	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
@@ -129,8 +131,34 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 	conn_accept = v_Connect_Accept_create(vsession->avatar_id, vsession->user_id);
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_accept);
 
-	/* Communicate with server */
-	v_STREAM_OPEN_loop(C);
+	/* "Never ending" loop */
+	while(1)
+	{
+		FD_ZERO(&set);
+		FD_SET(io_ctx->sockfd, &set);
+
+		/* TODO: negotiate FPS */
+		tv.tv_sec = 0;
+		tv.tv_usec = 1000000/60;
+
+		/* Wait for recieved data */
+		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			goto end;
+			/* Was event on the listen socket */
+		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
+
+			if(v_STREAM_handle_messages(C) == 0) {
+				goto end;
+			}
+		}
+
+		if(v_STREAM_send_message(C) == 0) {
+			goto end;
+		}
+	}
+end:
 
 	/* Set socket blocking again */
 	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
