@@ -401,11 +401,11 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	/* When negotiated and used FPS is different, then pack negotiate command
 	 * for FPS */
 	if(vsession->fps_host != vsession->fps_peer) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_FPS, &vsession->fps_host, NULL);
 	} else {
 		if(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CONFIRM_L_ID, FTR_FPS, &vsession->fps_peer, NULL);
 			/* Send confirmation only once for received system command */
 			vsession->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;

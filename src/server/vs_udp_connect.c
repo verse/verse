@@ -420,22 +420,22 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 
 	/* Send confirmation about cookie */
 	if(vsession->peer_cookie.str!=NULL) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 	}
 
 	/* Send own cookie */
 	if(vsession->host_cookie.str!=NULL) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 	}
 
 	/* Send confirmation about Congestion Control method if client proposed
 	 * supported Congestion Control method */
 	if(dgram_conn->cc_meth != CC_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_CC_ID, &dgram_conn->cc_meth, NULL);
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_R_ID, FTR_CC_ID, &dgram_conn->cc_meth, NULL);
 	} else {
 		/* TODO: when client didn't send some proposal, then send server preference
@@ -445,28 +445,28 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 	/* Send proposal of Flow Control (server send this proposal first) */
 	if(vs_ctx->fc_meth != FC_RESERVED) {
 		/* Flow control used at link between server and client */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_FC_ID, &vs_ctx->fc_meth, NULL);
 		/* Flow control used at link between client and server */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_R_ID, FTR_FC_ID, &vs_ctx->fc_meth, NULL);
 	}
 
 	/* Send proposal of host (local) Flow Control Window scaling */
 	if(vs_ctx->rwin_scale != 0) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vs_ctx->rwin_scale, NULL);
 	}
 
 	/* Send confirmation of peer Flow Control Window scaling */
 	if(dgram_conn->rwin_peer_scale != 0) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_RWIN_SCALE, &dgram_conn->rwin_peer_scale, NULL);
 	}
 
 	/* Send confirmation of peer command compression */
 	if(dgram_conn->host_cmd_cmpr != CMPR_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_R_ID, FTR_CMD_COMPRESS, &dgram_conn->host_cmd_cmpr, NULL);
 	} else {
 		/* When client didn't propose any command compression, then propose compression
@@ -474,17 +474,17 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 		uint8 cmpr_addr_share = CMPR_ADDR_SHARE;
 		uint8 cmpr_none = CMPR_NONE;
 		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, &cmpr_none, NULL);
 		} else {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, &cmpr_addr_share, NULL);
 		}
 	}
 
 	/* Send confirmation of peer command compression */
 	if(dgram_conn->peer_cmd_cmpr != CMPR_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_CMD_COMPRESS, &dgram_conn->peer_cmd_cmpr, NULL);
 	} else {
 		/* When client didn't propose any command compression, then propose compression
@@ -492,10 +492,10 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 		uint8 cmpr_addr_share = CMPR_ADDR_SHARE;
 		uint8 cmpr_none = CMPR_NONE;
 		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, &cmpr_none, NULL);
 		} else {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_none, &cmpr_addr_share, NULL);
 		}
 	}

@@ -42,6 +42,7 @@
 #include "v_common.h"
 #include "v_network.h"
 #include "v_commands.h"
+#include "v_fake_commands.h"
 #include "v_session.h"
 
 
@@ -83,9 +84,12 @@ int v_STREAM_handle_messages(struct vContext *C)
 	/* Unpack Verse message header */
 	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
 
-	/* TODO: Unpack all system commands */
+	/* Unpack all system commands */
+	buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
 
 	v_print_receive_message(C);
+
+	/* Handle system commands */
 
 	/* Unpack all node commands and put them to the queue of incomming commands */
 	ret = v_cmd_unpack((char*)&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), vsession->in_queue);
@@ -108,7 +112,7 @@ int v_STREAM_send_message(struct vContext *C)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct Generic_Cmd *cmd;
-	int ret = 1, error, buffer_pos = 0, prio_count, cmd_rank;
+	int ret = 1, error, buffer_pos = 0, prio_count, cmd_rank=0;
 	int8 cmd_share;
 	int16 prio, max_prio, min_prio;
 	uint16 cmd_count, cmd_len, prio_win, swin, sent_size, tot_cmd_size;
@@ -119,24 +123,22 @@ int v_STREAM_send_message(struct vContext *C)
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
-#if 0
+		s_message->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
+
 		/* When negotiated and used FPS is different, then pack negotiate command
 		 * for FPS */
 		if(vsession->fps_host != vsession->fps_peer) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank,
 					CMD_CHANGE_L_ID, FTR_FPS, &vsession->fps_host, NULL);
 		} else {
 			if(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
-				cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+				cmd_rank += v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank,
 						CMD_CONFIRM_L_ID, FTR_FPS, &vsession->fps_peer, NULL);
 				/* Send confirmation only once for received system command */
 				vsession->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
 			}
 		}
-#endif
 
-		/* TODO: send system command too */
-		s_message->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
 		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
 		/* TODO: Compute, how many data could be added to the TCP stack? */
@@ -184,9 +186,23 @@ int v_STREAM_send_message(struct vContext *C)
 					/* Pack commands from queues with high priority to the buffer */
 					cmd = v_out_queue_pop(vsession->out_queue, prio, &cmd_count, &cmd_share, &cmd_len);
 					if(cmd != NULL) {
-						buffer_pos += tot_cmd_size = v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
-						v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
-						sent_size += tot_cmd_size;
+
+						/* Is this command fake command? */
+						if(cmd->id < MIN_CMD_ID) {
+							if(cmd->id == FAKE_CMD_CONNECT_TERMINATE) {
+								/* TODO */
+							} else if(cmd->id == FAKE_CMD_FPS) {
+								struct Fps_Cmd *fps_cmd = (struct Fps_Cmd*)cmd;
+								/* Change value of FPS. It will be sent in negotiate command
+								 * until it is confirmed be the peer (server) */
+								vsession->fps_host = fps_cmd->fps;
+							}
+							v_cmd_destroy(&cmd);
+						} else {
+							buffer_pos += tot_cmd_size = v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
+							v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+							sent_size += tot_cmd_size;
+						}
 						prio_count--;
 					} else {
 						break;

@@ -150,17 +150,6 @@ typedef struct VPacketHeader {
 	unsigned int	ank_id;
 } VPacketHeader;
 
-/* Union of system commands */
-typedef union VSystemCommands {
-	struct Generic_Cmd					cmd;
-	struct Ack_Nak_Cmd					ack_cmd;
-	struct Ack_Nak_Cmd					nak_cmd;
-	struct User_Authentication_Request	ua_req;
-	struct User_Authentication_Failure	ua_fail;
-	struct User_Authentication_Success	ua_succ;
-	struct Negotiate_Cmd				negotiate_cmd;
-} VSystemCommands;
-
 /* Verse packet */
 typedef struct VPacket {
 	/* Length of packet (from UDP header) */

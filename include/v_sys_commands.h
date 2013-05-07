@@ -41,6 +41,7 @@
 #include <limits.h>
 
 #include "verse_types.h"
+#include "v_commands.h"
 
 /* System Commands (IDs are in range 0-31). These commands can not be added to the
  * packet directly by client application*/
@@ -131,10 +132,21 @@ typedef struct Ack_Nak_Cmd {
 	uint32			pay_id;			/* ID of payload packet */
 } Ack_Nak_Cmd;
 
+/* Union of system commands */
+typedef union VSystemCommands {
+	struct Generic_Cmd					cmd;
+	struct Ack_Nak_Cmd					ack_cmd;
+	struct Ack_Nak_Cmd					nak_cmd;
+	struct User_Authentication_Request	ua_req;
+	struct User_Authentication_Failure	ua_fail;
+	struct User_Authentication_Success	ua_succ;
+	struct Negotiate_Cmd				negotiate_cmd;
+} VSystemCommands;
+
 struct VPacket;
 struct VMessage;
 
-int v_add_negotiate_cmd(struct VPacket *packet,
+int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 		uint8 cmd_rank,
 		uint8 cmd_op_code,
 		uint8 ftr_op_code,
