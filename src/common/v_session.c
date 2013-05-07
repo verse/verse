@@ -59,6 +59,9 @@ void v_init_session(struct VSession *vsession)
 	vsession->host_cookie.str = NULL;
 	vsession->avatar_id = -1;
 	vsession->flags = 0;
+	vsession->fps_host = DEFAULT_FPS;	/* Default value */
+	vsession->fps_peer = DEFAULT_FPS;	/* Default value */
+	vsession->tmp_flags = 0;
 }
 
 void v_destroy_session(struct VSession *vsession)

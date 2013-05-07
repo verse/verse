@@ -1520,8 +1520,8 @@ again:
 		FD_SET(dgram_conn->io_ctx.sockfd, &set);
 
 		/* Compute timeout for select from negotiated FPS */
-		tv.tv_sec = 1/dgram_conn->fps_host;			/* Seconds */
-		tv.tv_usec = 1000000/dgram_conn->fps_host;	/* Microseconds */
+		tv.tv_sec = 1/vsession->fps_host;			/* Seconds */
+		tv.tv_usec = 1000000/vsession->fps_host;	/* Microseconds */
 
 		/* Wait for event on socket sockfd */
 		if( (ret = select(dgram_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {

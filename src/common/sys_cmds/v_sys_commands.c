@@ -67,20 +67,11 @@ void v_print_message_sys_cmds(const unsigned char level, const struct VMessage *
 					(struct User_Authentication_Success*)&vmessage->sys_cmd[i].ua_succ);
 			break;
 		case CMD_CHANGE_L_ID:
-			v_print_negotiate_cmd(level,
-					(struct Negotiate_Cmd*)&vmessage->sys_cmd[i].change_l_cmd);
-			break;
 		case CMD_CONFIRM_L_ID:
-			v_print_negotiate_cmd(level,
-					(struct Negotiate_Cmd*)&vmessage->sys_cmd[i].confirm_l_cmd);
-			break;
 		case CMD_CHANGE_R_ID:
-			v_print_negotiate_cmd(level,
-					(struct Negotiate_Cmd*)&vmessage->sys_cmd[i].change_r_cmd);
-			break;
 		case CMD_CONFIRM_R_ID:
 			v_print_negotiate_cmd(level,
-					(struct Negotiate_Cmd*)&vmessage->sys_cmd[i].confirm_r_cmd);
+					(struct Negotiate_Cmd*)&vmessage->sys_cmd[i].negotiate_cmd);
 			break;
 		}
 		v_print_log_simple(level, "\n");
@@ -233,24 +224,12 @@ int v_unpack_message_system_commands(const char *buffer,
 						&vmessage->sys_cmd[i].ua_succ);
 				break;
 			case CMD_CHANGE_L_ID:
-				buffer_pos += v_raw_unpack_negotiate_cmd(&buffer[buffer_pos],
-						buffer_len - buffer_pos,
-						&vmessage->sys_cmd[i].change_l_cmd);
-				break;
 			case CMD_CONFIRM_L_ID:
-				buffer_pos += v_raw_unpack_negotiate_cmd(&buffer[buffer_pos],
-						buffer_len - buffer_pos,
-						&vmessage->sys_cmd[i].confirm_l_cmd);
-				break;
 			case CMD_CHANGE_R_ID:
-				buffer_pos += v_raw_unpack_negotiate_cmd(&buffer[buffer_pos],
-						buffer_len - buffer_pos,
-						&vmessage->sys_cmd[i].change_r_cmd);
-				break;
 			case CMD_CONFIRM_R_ID:
 				buffer_pos += v_raw_unpack_negotiate_cmd(&buffer[buffer_pos],
 						buffer_len - buffer_pos,
-						&vmessage->sys_cmd[i].confirm_r_cmd);
+						&vmessage->sys_cmd[i].negotiate_cmd);
 				break;
 			default:	/* Unknown system command. */
 				/* Unpack length of the command */
@@ -329,20 +308,11 @@ int v_pack_stream_system_commands(const struct VMessage *vmessage, char *buffer)
 					&vmessage->sys_cmd[i].ua_succ);
 			break;
 		case CMD_CHANGE_L_ID:
-			buffer_pos += v_raw_pack_negotiate_cmd(&buffer[buffer_pos],
-					&vmessage->sys_cmd[i].change_l_cmd);
-			break;
 		case CMD_CONFIRM_L_ID:
-			buffer_pos += v_raw_pack_negotiate_cmd(&buffer[buffer_pos],
-					&vmessage->sys_cmd[i].confirm_l_cmd);
-			break;
 		case CMD_CHANGE_R_ID:
-			buffer_pos += v_raw_pack_negotiate_cmd(&buffer[buffer_pos],
-					&vmessage->sys_cmd[i].change_r_cmd);
-			break;
 		case CMD_CONFIRM_R_ID:
 			buffer_pos += v_raw_pack_negotiate_cmd(&buffer[buffer_pos],
-					&vmessage->sys_cmd[i].confirm_r_cmd);
+					&vmessage->sys_cmd[i].negotiate_cmd);
 			break;
 		}
 		i++;

@@ -108,7 +108,7 @@ int v_STREAM_send_message(struct vContext *C)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct Generic_Cmd *cmd;
-	int ret = 1, error, buffer_pos = 0, prio_count;
+	int ret = 1, error, buffer_pos = 0, prio_count, cmd_rank;
 	int8 cmd_share;
 	int16 prio, max_prio, min_prio;
 	uint16 cmd_count, cmd_len, prio_win, swin, sent_size, tot_cmd_size;
@@ -119,8 +119,25 @@ int v_STREAM_send_message(struct vContext *C)
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
+#if 0
+		/* When negotiated and used FPS is different, then pack negotiate command
+		 * for FPS */
+		if(vsession->fps_host != vsession->fps_peer) {
+			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+					CMD_CHANGE_L_ID, FTR_FPS, &vsession->fps_host, NULL);
+		} else {
+			if(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
+				cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+						CMD_CONFIRM_L_ID, FTR_FPS, &vsession->fps_peer, NULL);
+				/* Send confirmation only once for received system command */
+				vsession->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
+			}
+		}
+#endif
+
 		/* TODO: send system command too */
 		s_message->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
+		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
 		/* TODO: Compute, how many data could be added to the TCP stack? */
 		swin = 10000;

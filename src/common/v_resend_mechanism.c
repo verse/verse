@@ -233,7 +233,7 @@ static int pack_prio_queue(struct vContext *C,
 				struct Fps_Cmd *fps_cmd = (struct Fps_Cmd*)cmd;
 				/* Change value of FPS. It will be sent in negotiate command
 				 * until it is confirmed be the peer (server) */
-				vconn->fps_host = fps_cmd->fps;
+				vsession->fps_host = fps_cmd->fps;
 			}
 			v_cmd_destroy(&cmd);
 		} else {
@@ -400,15 +400,15 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 	/* When negotiated and used FPS is different, then pack negotiate command
 	 * for FPS */
-	if(vconn->fps_host != vconn->fps_peer) {
+	if(vsession->fps_host != vsession->fps_peer) {
 		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
-				CMD_CHANGE_L_ID, FTR_FPS, &vconn->fps_host, NULL);
+				CMD_CHANGE_L_ID, FTR_FPS, &vsession->fps_host, NULL);
 	} else {
-		if(vconn->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
+		if(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
 			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
-					CMD_CONFIRM_L_ID, FTR_FPS, &vconn->fps_peer, NULL);
+					CMD_CONFIRM_L_ID, FTR_FPS, &vsession->fps_peer, NULL);
 			/* Send confirmation only once for received system command */
-			vconn->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
+			vsession->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
 		}
 	}
 
@@ -760,6 +760,7 @@ static int handle_node_commands(struct vContext *C)
 int handle_packet_in_OPEN_state(struct vContext *C)
 {
 	struct VDgramConn *vconn = CTX_current_dgram_conn(C);
+	struct VSession *vsession = CTX_current_session(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
 	int ret, first_sys_index, i;
 
@@ -794,15 +795,15 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 				r_packet->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
 				r_packet->sys_cmd[i].negotiate_cmd.count > 0)
 		{
-			vconn->fps_host = vconn->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
-			vconn->tmp_flags |= SYS_CMD_NEGOTIATE_FPS;
+			vsession->fps_host = vsession->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
+			vsession->tmp_flags |= SYS_CMD_NEGOTIATE_FPS;
 		}
 
 		if(r_packet->sys_cmd[i].cmd.id == CMD_CONFIRM_L_ID &&
 				r_packet->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
 				r_packet->sys_cmd[i].negotiate_cmd.count > 0)
 		{
-			vconn->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
+			vsession->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
 		}
 	}
 

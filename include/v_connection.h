@@ -86,10 +86,6 @@
 /* Maximal number of client or server state.  */
 #define STATE_COUNT				(((UDP_CLIENT_STATE_CLOSED > UDP_SERVER_STATE_CLOSED) ? UDP_CLIENT_STATE_CLOSED : UDP_SERVER_STATE_CLOSED)+1)
 
-/* When negotiation is not used, then client and server consider
- * FPS to be 60 */
-#define DEFAULT_FPS				60.0
-
 /* Temporary flags that keeps information about receiving system commands
  * in OPEN and CLOSEREQ states */
 #define SYS_CMD_NEGOTIATE_FPS					1
@@ -143,9 +139,6 @@ typedef struct VDgramConn {
 	unsigned int			sent_size;			/* Size of data that were sent and were not acknowledged */
 	unsigned char			rwin_host_scale;	/* Scaling of host Flow Control Window (my) */
 	unsigned char			rwin_peer_scale;	/* Scaling of perr Flow Control Window */
-	float					fps_host;			/* FPS used by this host */
-	float					fps_peer;			/* Negotiated FPS used by peer */
-	unsigned char			tmp_flags;			/* Temporary flags (notification of received system commands) */
 	unsigned char			host_cmd_cmpr;		/* Command compression used by host for sedning commands */
 	unsigned char			peer_cmd_cmpr;		/* Command compression used by peer for sending commands */
 	/* States */

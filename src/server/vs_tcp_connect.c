@@ -289,10 +289,10 @@ static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CONFIRM_L_ID:
-			if(r_message->sys_cmd[i].confirm_l_cmd.feature==FTR_HOST_URL) {
-				if(r_message->sys_cmd[i].confirm_l_cmd.count == 1) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature==FTR_HOST_URL) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count == 1) {
 					if(vsession->host_url!=NULL &&
-							strcmp(vsession->host_url, (char*)r_message->sys_cmd[i].confirm_l_cmd.value[0].string8.str) == 0) {
+							strcmp(vsession->host_url, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0) {
 						return 1;
 					}
 				}
@@ -339,13 +339,13 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CHANGE_R_ID:
 			/* Client has to propose url in this state */
-			if(r_message->sys_cmd[i].change_r_cmd.feature == FTR_HOST_URL) {
-				if(r_message->sys_cmd[i].change_r_cmd.count > 0) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_HOST_URL) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
 					if(vsession->host_url!=NULL) {
 						free(vsession->host_url);
 					}
 					/* Only first proposed URL will be used */
-					vsession->host_url = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
+					vsession->host_url = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					/* Check if proposed URL is correct */
 					ret = v_parse_url(vsession->host_url, &url);
 					if(ret == 1)
@@ -354,25 +354,25 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 						host_url_proposed = 0;
 				}
 			/* Client has to propose host cookie in this state */
-			} else if(r_message->sys_cmd[i].change_r_cmd.feature == FTR_COOKIE) {
-				if(r_message->sys_cmd[i].change_r_cmd.count > 0) {
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
 					if(vsession->host_cookie.str!=NULL) {
 						free(vsession->host_cookie.str);
 					}
-					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
+					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					host_cookie_proposed = 1;
 				}
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
-						r_message->sys_cmd[i].change_r_cmd.feature);
+						r_message->sys_cmd[i].negotiate_cmd.feature);
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
 			/* Client has to confirm peer cookie in this state */
-			if(r_message->sys_cmd[i].confirm_r_cmd.feature == FTR_COOKIE) {
-				if (r_message->sys_cmd[i].confirm_r_cmd.count == 1) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
+				if (r_message->sys_cmd[i].negotiate_cmd.count == 1) {
 					if(vsession->peer_cookie.str!=NULL &&
-						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str) == 0)
+						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						gettimeofday(&tv, NULL);
 						vsession->peer_cookie.tv.tv_sec = tv.tv_sec;
@@ -382,19 +382,19 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 				}
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
-						r_message->sys_cmd[i].change_r_cmd.feature);
+						r_message->sys_cmd[i].negotiate_cmd.feature);
 			}
 			break;
 		case CMD_CONFIRM_L_ID:
 			/* Client has to confirm DED in this state */
-			if(r_message->sys_cmd[i].confirm_l_cmd.feature == FTR_DED) {
-				if(r_message->sys_cmd[i].confirm_l_cmd.count == 1) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_DED) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count == 1) {
 					if(vsession->ded.str != NULL &&
-							strcmp(vsession->ded.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str) == 0)
+							strcmp(vsession->ded.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						ded_confirmed = 1;
 					} else {
-						printf("%s != %s\n", vsession->ded.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str);
+						printf("%s != %s\n", vsession->ded.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					}
 				}
 			}
@@ -423,9 +423,9 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		memcpy(&vsession->peer_address, &io_ctx->peer_addr, sizeof(struct VNetworkAddress));
 
 		/* Do not confirm proposed URL */
-		s_message->sys_cmd[0].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_message->sys_cmd[0].confirm_r_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[0].confirm_r_cmd.count = 0;
+		s_message->sys_cmd[0].negotiate_cmd.id = CMD_CONFIRM_R_ID;
+		s_message->sys_cmd[0].negotiate_cmd.feature = FTR_HOST_URL;
+		s_message->sys_cmd[0].negotiate_cmd.count = 0;
 
 		/* Find first unused port from port range */
 		for(i=vs_ctx->port_low, j=0; i<vs_ctx->port_high; i++, j++) {
@@ -492,9 +492,9 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		sec_proto[4] = '\0';
 #endif
 
-		s_message->sys_cmd[1].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_message->sys_cmd[1].change_l_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[1].change_l_cmd.count = 1;
+		s_message->sys_cmd[1].negotiate_cmd.id = CMD_CHANGE_L_ID;
+		s_message->sys_cmd[1].negotiate_cmd.feature = FTR_HOST_URL;
+		s_message->sys_cmd[1].negotiate_cmd.count = 1;
 		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 		if(url.ip_ver==IPV6) {
 			sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
@@ -509,8 +509,8 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 					url.node,
 					vsession->dgram_conn->io_ctx.host_addr.port);
 		}
-		s_message->sys_cmd[1].change_l_cmd.value[0].string8.length = strlen(vsession->host_url);
-		strcpy((char*)s_message->sys_cmd[1].change_l_cmd.value[0].string8.str, vsession->host_url);
+		s_message->sys_cmd[1].negotiate_cmd.value[0].string8.length = strlen(vsession->host_url);
+		strcpy((char*)s_message->sys_cmd[1].negotiate_cmd.value[0].string8.str, vsession->host_url);
 
 		/* Set time for the host cookie */
 		gettimeofday(&tv, NULL);
@@ -518,11 +518,11 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		vsession->host_cookie.tv.tv_usec = tv.tv_usec;
 
 		/* Send confirmation about host cookie */
-		s_message->sys_cmd[2].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_message->sys_cmd[2].confirm_r_cmd.feature = FTR_COOKIE;
-		s_message->sys_cmd[2].confirm_r_cmd.count = 1;
-		s_message->sys_cmd[2].confirm_r_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-		strcpy((char*)s_message->sys_cmd[2].confirm_r_cmd.value[0].string8.str, vsession->host_cookie.str);
+		s_message->sys_cmd[2].negotiate_cmd.id = CMD_CONFIRM_R_ID;
+		s_message->sys_cmd[2].negotiate_cmd.feature = FTR_COOKIE;
+		s_message->sys_cmd[2].negotiate_cmd.count = 1;
+		s_message->sys_cmd[2].negotiate_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
+		strcpy((char*)s_message->sys_cmd[2].negotiate_cmd.value[0].string8.str, vsession->host_cookie.str);
 
 		s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
 
@@ -608,9 +608,9 @@ static int vs_RESPOND_userauth_loop(struct vContext *C)
 					s_message->sys_cmd[0].ua_succ.avatar_id = avatar_id;
 
 					/* Set up negotiate command of the host cookie */
-					s_message->sys_cmd[1].change_r_cmd.id = CMD_CHANGE_R_ID;
-					s_message->sys_cmd[1].change_r_cmd.feature = FTR_COOKIE;
-					s_message->sys_cmd[1].change_r_cmd.count = 1;
+					s_message->sys_cmd[1].negotiate_cmd.id = CMD_CHANGE_R_ID;
+					s_message->sys_cmd[1].negotiate_cmd.feature = FTR_COOKIE;
+					s_message->sys_cmd[1].negotiate_cmd.count = 1;
 					/* Generate random string */
 					vsession->peer_cookie.str = (char*)calloc((COOKIE_SIZE+1), sizeof(char));
 					for(i=0; i<COOKIE_SIZE; i++) {
@@ -618,16 +618,16 @@ static int vs_RESPOND_userauth_loop(struct vContext *C)
 						vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
 					}
 					vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-					s_message->sys_cmd[1].change_r_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-					strcpy((char*)s_message->sys_cmd[1].change_r_cmd.value[0].string8.str, vsession->peer_cookie.str);
+					s_message->sys_cmd[1].negotiate_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
+					strcpy((char*)s_message->sys_cmd[1].negotiate_cmd.value[0].string8.str, vsession->peer_cookie.str);
 
-					s_message->sys_cmd[2].change_l_cmd.id = CMD_CHANGE_L_ID;
-					s_message->sys_cmd[2].change_l_cmd.feature = FTR_DED;
-					s_message->sys_cmd[2].change_l_cmd.count = 1;
+					s_message->sys_cmd[2].negotiate_cmd.id = CMD_CHANGE_L_ID;
+					s_message->sys_cmd[2].negotiate_cmd.feature = FTR_DED;
+					s_message->sys_cmd[2].negotiate_cmd.count = 1;
 					/* Load DED from configuration and save it to the session */
 					vsession->ded.str = strdup(vs_ctx->ded);
-					s_message->sys_cmd[2].change_l_cmd.value[0].string8.length = strlen(vsession->ded.str);
-					strcpy((char*)s_message->sys_cmd[2].change_l_cmd.value[0].string8.str, vsession->ded.str);
+					s_message->sys_cmd[2].negotiate_cmd.value[0].string8.length = strlen(vsession->ded.str);
+					strcpy((char*)s_message->sys_cmd[2].negotiate_cmd.value[0].string8.str, vsession->ded.str);
 
 					/* Terminating command */
 					s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
@@ -1418,6 +1418,8 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
 			return -1;
 		}
+		/* Set up verse session */
+		v_init_session(vs_ctx->vsessions[i]);
 		/* Set up input and output queues */
 		vs_ctx->vsessions[i]->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
 		v_in_queue_init(vs_ctx->vsessions[i]->in_queue, vs_ctx->in_queue_max_size);
