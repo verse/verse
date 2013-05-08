@@ -57,7 +57,7 @@
 int v_STREAM_handle_messages(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	int error, ret = 1, buffer_pos;
+	int error, ret = 1, buffer_pos = 0, i;
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VSession *vsession = CTX_current_session(C);
 
@@ -79,7 +79,6 @@ int v_STREAM_handle_messages(struct vContext *C)
 
 	/* Reset content of received message */
 	memset(r_message, 0, sizeof(struct VMessage));
-	buffer_pos = 0;
 
 	/* Unpack Verse message header */
 	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
@@ -90,9 +89,28 @@ int v_STREAM_handle_messages(struct vContext *C)
 	v_print_receive_message(C);
 
 	/* Handle system commands */
+	for(i=0;
+			i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id != CMD_RESERVED_ID;
+			i++)
+	{
+		if(r_message->sys_cmd[i].cmd.id == CMD_CHANGE_L_ID &&
+				r_message->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
+				r_message->sys_cmd[i].negotiate_cmd.count > 0)
+		{
+			vsession->fps_host = vsession->fps_peer = r_message->sys_cmd[i].negotiate_cmd.value->real32;
+			vsession->tmp_flags |= SYS_CMD_NEGOTIATE_FPS;
+		}
+
+		if(r_message->sys_cmd[i].cmd.id == CMD_CONFIRM_L_ID &&
+				r_message->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
+				r_message->sys_cmd[i].negotiate_cmd.count > 0)
+		{
+			vsession->fps_peer = r_message->sys_cmd[i].negotiate_cmd.value->real32;
+		}
+	}
 
 	/* Unpack all node commands and put them to the queue of incomming commands */
-	ret = v_cmd_unpack((char*)&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), vsession->in_queue);
+	buffer_pos += v_cmd_unpack((char*)&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), vsession->in_queue);
 
 end:
 	return ret;
@@ -119,7 +137,8 @@ int v_STREAM_send_message(struct vContext *C)
 	real32 prio_sum_high, prio_sum_low, r_prio;
 
 	/* Is here something to send? */
-	if(v_out_queue_get_count(vsession->out_queue) > 0) {
+	if((v_out_queue_get_count(vsession->out_queue) > 0) ||
+			(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS)) {
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 

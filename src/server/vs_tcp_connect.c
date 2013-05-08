@@ -210,6 +210,7 @@ static void vs_CLOSING(struct vContext *C)
 static int vs_STREAM_OPEN_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct VSession *vsession = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct timeval tv;
 	fd_set set;
@@ -228,9 +229,9 @@ static int vs_STREAM_OPEN_loop(struct vContext *C)
 		FD_ZERO(&set);
 		FD_SET(io_ctx->sockfd, &set);
 
-		/* TODO: negotiate FPS */
+		/* Use negotiated FPS */
 		tv.tv_sec = 0;
-		tv.tv_usec = 1000000/60;
+		tv.tv_usec = 1000000/vsession->fps_host;
 
 		/* Wait for recieved data */
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
