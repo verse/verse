@@ -163,8 +163,8 @@ typedef struct VPacket {
 	/* Number of system commands in packet */
 	unsigned short				sys_cmd_count;
 	/* Pointer to the received buffer, where are stored node commands */
-	uint8								*data;
-	uint16								data_size;
+	uint8						*data;
+	uint16						data_size;
 
 } VPacket;
 
