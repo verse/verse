@@ -179,24 +179,15 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int ret, error, buffer_pos=0;
+	int ret, error, buffer_pos=0, cmd_rank=0;
 
 	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
 	if(host_url!=NULL) {
-		s_message->sys_cmd[0].negotiate_cmd.id = CMD_CONFIRM_L_ID;
-		s_message->sys_cmd[0].negotiate_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[0].negotiate_cmd.count = 1;
-		s_message->sys_cmd[0].negotiate_cmd.value[0].string8.length = strlen(host_url);
-		strcpy((char*)s_message->sys_cmd[0].negotiate_cmd.value[0].string8.str, host_url);
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_HOST_URL, host_url, NULL);
 	} else {
-		s_message->sys_cmd[0].negotiate_cmd.id = CMD_CONFIRM_L_ID;
-		s_message->sys_cmd[0].negotiate_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[0].negotiate_cmd.count = 0;
-		s_message->sys_cmd[0].negotiate_cmd.value[0].string8.length = 0;
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_HOST_URL, NULL);
 	}
-
-	s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
 
 	/* Pack all system commands to the buffer */
 	buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
@@ -232,7 +223,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 	struct VMessage *s_message = CTX_s_message(C);
 	struct timeval tv;
 	fd_set set;
-	int i, ret, error, buffer_pos=0;
+	int i, ret, error, buffer_pos=0, cmd_rank = 0;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -316,11 +307,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 	 * is used for sending IP of server, that client used for connecting
 	 * server and preferred transport protocol (UDP) and encryption protocol
 	 * (DTLS) */
-	s_message->sys_cmd[0].negotiate_cmd.id = CMD_CHANGE_R_ID;
-	s_message->sys_cmd[0].negotiate_cmd.feature = FTR_HOST_URL;
-	s_message->sys_cmd[0].negotiate_cmd.count = 1;
-	s_message->sys_cmd[0].negotiate_cmd.value[0].string8.length = strlen(vsession->host_url);
-	strcpy((char*)s_message->sys_cmd[0].negotiate_cmd.value[0].string8.str, vsession->host_url);
+	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_HOST_URL, vsession->host_url, NULL);
 
 	/* Set time for cookie */
 	gettimeofday(&tv, NULL);
@@ -328,16 +315,8 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 	vsession->host_cookie.tv.tv_usec = tv.tv_usec;
 
 	/* Set up negotiate command of host Cookie */
-	s_message->sys_cmd[1].negotiate_cmd.id = CMD_CONFIRM_R_ID;
-	s_message->sys_cmd[1].negotiate_cmd.feature = FTR_COOKIE;
-	s_message->sys_cmd[1].negotiate_cmd.count = 1;
-	s_message->sys_cmd[1].negotiate_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-	strcpy((char*)s_message->sys_cmd[1].negotiate_cmd.value[0].string8.str, vsession->host_cookie.str);
+	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 
-	/* Set up negotiate command of peer Cookie */
-	s_message->sys_cmd[2].negotiate_cmd.id = CMD_CHANGE_R_ID;
-	s_message->sys_cmd[2].negotiate_cmd.feature = FTR_COOKIE;
-	s_message->sys_cmd[2].negotiate_cmd.count = 1;
 	/* Generate random string */
 	vsession->peer_cookie.str = (char*)malloc((COOKIE_SIZE+1)*sizeof(char));
 	for(i=0; i<COOKIE_SIZE; i++) {
@@ -345,17 +324,11 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 		vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
 	}
 	vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-	s_message->sys_cmd[2].negotiate_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-	strcpy((char*)s_message->sys_cmd[2].negotiate_cmd.value[0].string8.str, vsession->peer_cookie.str);
+	/* Set up negotiate command of peer Cookie */
+	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 
 	/* Send confirmation of proposed DED */
-	s_message->sys_cmd[3].negotiate_cmd.id = CMD_CONFIRM_L_ID;
-	s_message->sys_cmd[3].negotiate_cmd.feature = FTR_DED;
-	s_message->sys_cmd[3].negotiate_cmd.count = 1;
-	s_message->sys_cmd[3].negotiate_cmd.value[0].string8.length = strlen(vsession->ded.str);
-	strcpy((char*)s_message->sys_cmd[3].negotiate_cmd.value[0].string8.str, vsession->ded.str);
-
-	s_message->sys_cmd[4].cmd.id = CMD_RESERVED_ID;
+	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_DED, vsession->ded.str, NULL);
 
 	/* Pack all system commands to the buffer */
 	buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
