@@ -993,6 +993,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	struct VStreamConn *stream_conn = NULL;
 	struct addrinfo hints, *result, *rp;
 	int sockfd, ret, flag;
+	unsigned int int_size;
 #ifndef __APPLE__
 	struct timeval tv;
 #endif
@@ -1089,6 +1090,11 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	stream_conn->io_ctx.sockfd = sockfd;
 
 	freeaddrinfo(result);
+
+	/* Try to get size of TCP buffer */
+	int_size = sizeof(int_size);
+	getsockopt(stream_conn->io_ctx.sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size);
 
 	/* Make sure socket is blocking */
 	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);

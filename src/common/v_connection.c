@@ -292,6 +292,9 @@ void v_conn_stream_init(struct VStreamConn *stream_conn)
 	memset(&(stream_conn->peer_address), 0, sizeof(VNetworkAddress));
 	/* Initialize connection mutex */
 	pthread_mutex_init(&stream_conn->mutex, NULL);
+	/* Initialize offsets */
+	stream_conn->sent_data_offset = 0;
+	stream_conn->pushed_data_offset = 0;
 }
 
 void v_conn_stream_destroy(struct VStreamConn *stream_conn)

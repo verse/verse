@@ -36,6 +36,8 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <linux/sockios.h>
 
 #include "verse.h"
 #include "v_stream.h"
@@ -127,10 +129,11 @@ end:
 int v_STREAM_send_message(struct vContext *C)
 {
 	struct VSession *vsession = CTX_current_session(C);
+	struct VStreamConn *conn = CTX_current_stream_conn(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct Generic_Cmd *cmd;
-	int ret = 1, error, buffer_pos = 0, prio_count, cmd_rank=0;
+	int ret = 1, error, queue_size, buffer_pos = 0, prio_cmd_count, cmd_rank=0;
 	int8 cmd_share;
 	int16 prio, max_prio, min_prio;
 	uint16 cmd_count, cmd_len, prio_win, swin, sent_size, tot_cmd_size;
@@ -138,7 +141,17 @@ int v_STREAM_send_message(struct vContext *C)
 
 	/* Is here something to send? */
 	if((v_out_queue_get_count(vsession->out_queue) > 0) ||
-			(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS)) {
+			(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS))
+	{
+
+		/* Get current size of data in TCP outgoing buffer */
+		if( (error = ioctl(io_ctx->sockfd, SIOCOUTQ, &queue_size)) == -1 ) {
+			perror("ioctl()");
+			return 0;
+		}
+
+		/* Compute, how many data could be added to the TCP stack? */
+		swin = conn->socket_buffer_size - queue_size;
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
@@ -160,9 +173,6 @@ int v_STREAM_send_message(struct vContext *C)
 
 		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
-		/* TODO: Compute, how many data could be added to the TCP stack? */
-		swin = 10000;
-
 		max_prio = v_out_queue_get_max_prio(vsession->out_queue);
 		min_prio = v_out_queue_get_min_prio(vsession->out_queue);
 
@@ -175,9 +185,9 @@ int v_STREAM_send_message(struct vContext *C)
 		/* Go through all priorities and pick commands from priority queues */
 		for(prio = max_prio; prio >= min_prio; prio--)
 		{
-			prio_count = v_out_queue_get_count_prio(vsession->out_queue, prio);
+			prio_cmd_count = v_out_queue_get_count_prio(vsession->out_queue, prio);
 
-			if(prio_count > 0) {
+			if(prio_cmd_count > 0) {
 
 				r_prio = v_out_queue_get_prio(vsession->out_queue, prio);
 
@@ -191,13 +201,13 @@ int v_STREAM_send_message(struct vContext *C)
 
 				/* Debug print */
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
-						prio, prio_count, r_prio, prio_win);
+						prio, prio_cmd_count, r_prio, prio_win);
 
 				/* Get total size of commands that were stored in queue (sent_size) */
 				sent_size = 0;
 				tot_cmd_size = 0;
 
-				while(prio_count > 0) {
+				while(prio_cmd_count > 0) {
 					cmd_share = 0;
 					cmd_count = 0;
 					cmd_len = prio_win - sent_size;
@@ -216,13 +226,16 @@ int v_STREAM_send_message(struct vContext *C)
 								 * until it is confirmed be the peer (server) */
 								vsession->fps_host = fps_cmd->fps;
 							}
-							v_cmd_destroy(&cmd);
 						} else {
 							buffer_pos += tot_cmd_size = v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
 							v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
 							sent_size += tot_cmd_size;
 						}
-						prio_count--;
+
+						/* It is not neccessary to put cmd to history of sent commands,
+						 * when TCP is used. */
+						v_cmd_destroy(&cmd);
+						prio_cmd_count--;
 					} else {
 						break;
 					}

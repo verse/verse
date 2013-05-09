@@ -753,6 +753,12 @@ void *vs_tcp_conn_loop(void *arg)
 	fd_set set;
 	int error, ret, user_auth_attempts=0;
 	void *udp_thread_result;
+	unsigned int int_size;
+
+	/* Try to get size of TCP buffer */
+	int_size = sizeof(int_size);
+	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size);
 
 	/* Try to do TLS handshake with client */
 	if(vs_TLS_handshake(C)!=1) {

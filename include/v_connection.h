@@ -150,7 +150,7 @@ typedef struct VDgramConn {
 	pthread_mutex_t			mutex;				/* Mutex used, when state of connection is changing */
 } VDgramConn;
 
-/* VDgramConn is structure storing information about stream (TCP) connection. */
+/* VStreamConn is structure storing information about stream (TCP) connection. */
 typedef struct VStreamConn {
 	/* IO */
 	struct IO_CTX			io_ctx;				/* Context for sending and receiving data */
@@ -159,8 +159,10 @@ typedef struct VStreamConn {
 	/* Addresses */
 	struct VNetworkAddress	peer_address;		/* Address of peer and port number */
 	struct VNetworkAddress	host_address;		/* Address of host and port number */
-	/* Security */
-	/*SSL						*ssl;*/
+	/* Flow control */
+	int						socket_buffer_size;	/* Size of socket buffer */
+	int						sent_data_offset;	/* Offset of data poped from TCP stack */
+	int						pushed_data_offset;	/* Offset of data pushed to TCP stack*/
 	/* Multi-threading */
 	pthread_mutex_t			mutex;				/* Mutex used, when state of connection is changing */
 } VStreamConn;
