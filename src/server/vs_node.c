@@ -390,11 +390,13 @@ static int vs_node_destroy(struct VS_CTX *vs_ctx, struct VSNode *node)
 			if(node->tag_groups.lb.first != NULL) {
 				vs_node_taggroups_destroy(node);
 			}
+			v_hash_array_destroy(&node->tag_groups);
 
 			/* Remove all layers */
 			if(node->layers.lb.first != NULL) {
 				vs_node_layers_destroy(node);
 			}
+			v_hash_array_destroy(&node->layers);
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Node: %d destroyed\n", node->id);
 

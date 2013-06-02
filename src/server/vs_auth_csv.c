@@ -112,6 +112,7 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					next_comma = col;
 					tmp = strndup(&line[prev_comma], next_comma-prev_comma);
 					sscanf(tmp, "%d", (int*)&new_user->user_id);
+					free(tmp);
 					prev_comma = next_comma+1;
 
 					/* real name */

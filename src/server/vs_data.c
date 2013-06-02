@@ -27,6 +27,7 @@
 #include <semaphore.h>
 #include <time.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "verse_types.h"
 
@@ -283,12 +284,18 @@ void *vs_data_loop(void *arg)
 {
 	struct VS_CTX *vs_ctx = (struct VS_CTX*)arg;
 	struct Generic_Cmd *cmd;
+	struct timespec ts;
+	struct timeval tv;
 	int i, ret = 0;
 
-	while(1) {
+	gettimeofday(&tv, NULL);
+	ts.tv_sec = tv.tv_sec + 1;
+	ts.tv_nsec = 0;
+
+	while(vs_ctx->state != SERVER_STATE_CLOSED) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Wait for data ...\n");
 
-		ret = sem_wait(&vs_ctx->data.sem);
+		ret = sem_timedwait(&vs_ctx->data.sem, &ts);
 		if(ret == 0) {
 			for(i=0; i<vs_ctx->max_sessions; i++) {
 				if(vs_ctx->vsessions[i]->dgram_conn->host_state == UDP_SERVER_STATE_OPEN ||
@@ -304,10 +311,15 @@ void *vs_data_loop(void *arg)
 					}
 				}
 			}
+		} else {
+			if(errno == ETIMEDOUT) {
+				ts.tv_sec++;
+			}
 		}
 	}
 
-	pthread_exit(NULL);
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting data thread\n");
 
+	pthread_exit(NULL);
 	return NULL;
 }

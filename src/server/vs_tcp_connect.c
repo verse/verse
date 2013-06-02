@@ -1183,7 +1183,17 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 
 
 /**
- * \brief Initialize verse server context
+ * \brief Destroy stream part of verse context
+ */
+void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
+{
+	if(vs_ctx->tls_ctx != NULL) SSL_CTX_free(vs_ctx->tls_ctx);
+	if(vs_ctx->dtls_ctx != NULL) SSL_CTX_free(vs_ctx->dtls_ctx);
+}
+
+
+/**
+ * \brief Initialize verse server context for connection at TCP
  */
 int vs_init_stream_ctx(VS_CTX *vs_ctx)
 {
@@ -1368,6 +1378,8 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_family = AF_INET6;
 		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_addr = in6addr_any;
 		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_port = htons(vs_ctx->port);
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_flowinfo = 0; /* Obsolete value */
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_scope_id = 0;
 		vs_ctx->tcp_io_ctx.host_addr.port = vs_ctx->port;
 
 		/* Bind address and socket */
@@ -1381,17 +1393,6 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		if( listen(vs_ctx->tcp_io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
 			return -1;
-		}
-	}
-
-	/* Set up free ports for communication with clients */
-	if( (vs_ctx->port_list = (struct VS_Port*)calloc((vs_ctx->port_high - vs_ctx->port_low), sizeof(struct VS_Port))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
-		return -1;
-	} else {
-		for(i=0; i<(vs_ctx->port_high-vs_ctx->port_low); i++) {
-			vs_ctx->port_list[i].port_number = i+vs_ctx->port_low;
-			vs_ctx->port_list[i].flag = 0;
 		}
 	}
 

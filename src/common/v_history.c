@@ -108,6 +108,8 @@ void v_packet_history_destroy(struct VPacket_History *history)
 	for(cmd_id=0; cmd_id<=MAX_CMD_ID; cmd_id++) {
 		if(history->cmd_hist[cmd_id] != NULL) {
 			v_cmd_queue_destroy(history->cmd_hist[cmd_id]);
+			free(history->cmd_hist[cmd_id]);
+			history->cmd_hist[cmd_id] = NULL;
 		}
 	}
 }
