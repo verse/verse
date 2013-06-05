@@ -499,7 +499,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 	} else if(node_id==VRS_USERS_PARENT_NODE_ID) {
 		printf("\tParent of User Nodes\n");
 		/* Example of node subscribe command */
-		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
+		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
 	} else if(node_id==VRS_SCENE_PARENT_NODE_ID) {
 		printf("\tParent of Scene Nodes\n");
 		/* Example of node un-subscribe command */
@@ -519,7 +519,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 		/* Client should subscribe to his avarat node to be able receive information
 		 * about nodes, that was created by this client */
 		printf("\tMy Avatar Node\n");
-		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
+		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
 
 		/* Test of sending wrong node_perm command (client doesn't own this node) */
 		vrs_send_node_perm(session_id, VRS_DEFAULT_PRIORITY, node_id, my_user_id, VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
@@ -550,7 +550,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 		my_test_node_id = node_id;
 
 		/* Test of subscribing to my own node */
-		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
+		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
 
 		/* Test of changing priority of my node */
 		vrs_send_node_prio(session_id, VRS_DEFAULT_PRIORITY, node_id, my_test_node_prio);
@@ -708,10 +708,10 @@ static void cb_receive_connect_accept(const uint8_t session_id,
 	 * to the root node of the node tree. Id of root node is still 0. This
 	 * function is called with level 1. It means, that this client will be
 	 * subscribed to the root node and its child nodes (1, 2, 3) */
-	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 0, 1);
+	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 0, 0, 0);
 
 	/* Check if server allow double subscribe? */
-	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 1, 0);
+	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 1, 0, 0);
 
 	/* Try to create new node */
 	vrs_send_node_create(session_id, VRS_DEFAULT_PRIORITY, MY_TEST_NODE_TYPE);
@@ -732,6 +732,35 @@ static void cb_receive_connect_terminate(const uint8_t session_id,
 {
 	printf("%s() session_id: %d, error_num: %d\n",
 			__FUNCTION__, session_id, error_num);
+	switch(error_num) {
+	case VRS_CONN_TERM_AUTH_FAILED:
+		printf("User authentication failed\n");
+		break;
+	case VRS_CONN_TERM_HOST_DOWN:
+		printf("Host is not accesible\n");
+		break;
+	case VRS_CONN_TERM_HOST_UNKNOWN:
+		printf("Host could not be found\n");
+		break;
+	case VRS_CONN_TERM_SERVER_DOWN:
+		printf("Server is not running\n");
+		break;
+	case VRS_CONN_TERM_TIMEOUT:
+		printf("Connection timout\n");
+		break;
+	case VRS_CONN_TERM_ERROR:
+		printf("Conection with server was broken\n");
+		break;
+	case VRS_CONN_TERM_SERVER:
+		printf("Connection was terminated by server\n");
+		break;
+	case VRS_CONN_TERM_CLIENT:
+		printf("Connection was terminated by client\n");
+		break;
+	default:
+		printf("Unknown error\n");
+		break;
+	}
 	exit(EXIT_SUCCESS);
 }
 
@@ -831,7 +860,9 @@ static void print_help(char *prog_name)
 	printf("  This program is example of Verse client\n\n");
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
-	printf("   -s               secure UDP connection with DTLS protocol (experimental)\n");
+	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
+	printf("   -s security      security of data exchange [none|tls]\n");
+	printf("   -c compresion    compression used for data exchange [none|addrshare]\n");
 	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
 }
 
@@ -852,16 +883,51 @@ static void print_help(char *prog_name)
  */
 int main(int argc, char *argv[])
 {
-	int error_num, opt, ret, flags = VRS_DGRAM_SEC_NONE;
+	int error_num, opt, ret, flags = VRS_SEC_DATA_NONE;
 
 	/* When client was started with some arguments */
 	if(argc>1) {
 		/* Parse all options */
-		while( (opt = getopt(argc, argv, "shd:")) != -1) {
+		while( (opt = getopt(argc, argv, "hs:t:d:")) != -1) {
 			switch(opt) {
 				case 's':
-					flags &= ~VRS_DGRAM_SEC_NONE;
-					flags |= VRS_DGRAM_SEC_DTLS;
+					if(strcmp(optarg, "none") == 0) {
+						flags |= VRS_SEC_DATA_NONE;
+						flags &= ~VRS_SEC_DATA_TLS;
+					}else if(strcmp(optarg, "tls") == 0) {
+						flags &= ~VRS_SEC_DATA_NONE;
+						flags |= VRS_SEC_DATA_TLS;
+					} else {
+						printf("ERROR: unsupported security\n\n");
+						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
+					break;
+				case 't':
+					if(strcmp(optarg, "udp") == 0) {
+						flags |= VRS_TP_UDP;
+						flags &= ~VRS_TP_TCP;
+					} else if(strcmp(optarg, "tcp") == 0) {
+						flags &= ~VRS_TP_UDP;
+						flags |= VRS_TP_TCP;
+					} else {
+						printf("ERROR: unsupported transport protocol\n\n");
+						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
+					break;
+				case 'c':
+					if(strcmp(optarg, "none") == 0) {
+						flags |= VRS_CMD_CMPR_NONE;
+						flags &= ~VRS_CMD_CMPR_ADDR_SHARE;
+					} else if(strcmp(optarg, "addrshare") == 0) {
+						flags &= ~VRS_CMD_CMPR_NONE;
+						flags |= VRS_CMD_CMPR_ADDR_SHARE;
+					} else {
+						printf("ERROR: unsupported command compression\n\n");
+						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
 					break;
 				case 'd':
 					ret = set_debug_level(optarg);

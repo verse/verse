@@ -420,22 +420,22 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 
 	/* Send confirmation about cookie */
 	if(vsession->peer_cookie.str!=NULL) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 	}
 
 	/* Send own cookie */
 	if(vsession->host_cookie.str!=NULL) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 	}
 
 	/* Send confirmation about Congestion Control method if client proposed
 	 * supported Congestion Control method */
 	if(dgram_conn->cc_meth != CC_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_CC_ID, &dgram_conn->cc_meth, NULL);
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_R_ID, FTR_CC_ID, &dgram_conn->cc_meth, NULL);
 	} else {
 		/* TODO: when client didn't send some proposal, then send server preference
@@ -445,28 +445,28 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 	/* Send proposal of Flow Control (server send this proposal first) */
 	if(vs_ctx->fc_meth != FC_RESERVED) {
 		/* Flow control used at link between server and client */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_FC_ID, &vs_ctx->fc_meth, NULL);
 		/* Flow control used at link between client and server */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_R_ID, FTR_FC_ID, &vs_ctx->fc_meth, NULL);
 	}
 
 	/* Send proposal of host (local) Flow Control Window scaling */
 	if(vs_ctx->rwin_scale != 0) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vs_ctx->rwin_scale, NULL);
 	}
 
 	/* Send confirmation of peer Flow Control Window scaling */
 	if(dgram_conn->rwin_peer_scale != 0) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_RWIN_SCALE, &dgram_conn->rwin_peer_scale, NULL);
 	}
 
 	/* Send confirmation of peer command compression */
 	if(dgram_conn->host_cmd_cmpr != CMPR_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_R_ID, FTR_CMD_COMPRESS, &dgram_conn->host_cmd_cmpr, NULL);
 	} else {
 		/* When client didn't propose any command compression, then propose compression
@@ -474,17 +474,17 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 		uint8 cmpr_addr_share = CMPR_ADDR_SHARE;
 		uint8 cmpr_none = CMPR_NONE;
 		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, &cmpr_none, NULL);
 		} else {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, &cmpr_addr_share, NULL);
 		}
 	}
 
 	/* Send confirmation of peer command compression */
 	if(dgram_conn->peer_cmd_cmpr != CMPR_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_CMD_COMPRESS, &dgram_conn->peer_cmd_cmpr, NULL);
 	} else {
 		/* When client didn't propose any command compression, then propose compression
@@ -492,10 +492,10 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 		uint8 cmpr_addr_share = CMPR_ADDR_SHARE;
 		uint8 cmpr_none = CMPR_NONE;
 		if(vs_ctx->cmd_cmpr == CMPR_ADDR_SHARE) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, &cmpr_none, NULL);
 		} else {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 					CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_none, &cmpr_addr_share, NULL);
 		}
 	}
@@ -1365,7 +1365,7 @@ void *vs_main_dgram_loop(void *arg)
 	CTX_current_dgram_conn_set(C, dgram_conn);
 
 	/* Copy version of IP from Verse server context */
-	dgram_conn->io_ctx.host_addr.ip_ver = vs_ctx->io_ctx.host_addr.ip_ver;
+	dgram_conn->io_ctx.host_addr.ip_ver = vs_ctx->tcp_io_ctx.host_addr.ip_ver;
 	if (vs_init_dgram_ctx(C) != 1) {
 		goto end;
 	}
@@ -1374,7 +1374,7 @@ void *vs_main_dgram_loop(void *arg)
 	CTX_io_ctx_set(C, &dgram_conn->io_ctx);
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-	if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+	if(vsession->flags & VRS_SEC_DATA_TLS) {
 		if( vs_init_dtls_connection(C) == 0) {
 			goto end;
 		}
@@ -1387,7 +1387,7 @@ void *vs_main_dgram_loop(void *arg)
 	}
 #else
 	dgram_conn->flags &= ~SOCKET_SECURED;
-	dgram_conn->io_ctx.flags &= ~SOCKET_SECURED;
+	dgram_conn->tcp_io_ctx.flags &= ~SOCKET_SECURED;
 #endif
 
 	/* Packet structure for receiving */
@@ -1403,7 +1403,7 @@ void *vs_main_dgram_loop(void *arg)
 hello:
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 	/* Wait for DTLS Hello Command from client */
-	if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+	if(vsession->flags & VRS_SEC_DATA_TLS) {
 
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Wait for DTLS Client Hello message\n");
 		/* "Never ending" listen loop (wait for first packet to do DTLS handshake) */
@@ -1520,8 +1520,8 @@ again:
 		FD_SET(dgram_conn->io_ctx.sockfd, &set);
 
 		/* Compute timeout for select from negotiated FPS */
-		tv.tv_sec = 1/dgram_conn->fps_host;			/* Seconds */
-		tv.tv_usec = 1000000/dgram_conn->fps_host;	/* Microseconds */
+		tv.tv_sec = 1/vsession->fps_host;			/* Seconds */
+		tv.tv_usec = 1000000/vsession->fps_host;	/* Microseconds */
 
 		/* Wait for event on socket sockfd */
 		if( (ret = select(dgram_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
@@ -1603,7 +1603,7 @@ again:
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 		/* Did client close DTLS connection? */
-		if(vsession->flags & VRS_DGRAM_SEC_DTLS) {
+		if(vsession->flags & VRS_SEC_DATA_TLS) {
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				vs_destroy_dtls_connection(C);
 				break;

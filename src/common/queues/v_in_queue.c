@@ -135,7 +135,7 @@ int v_in_queue_push(struct VInQueue *in_queue, struct Generic_Cmd *cmd)
 /**
  * \brief This function initialize queue for incoming commands
  */
-int v_in_queue_init(struct VInQueue *in_queue)
+int v_in_queue_init(struct VInQueue *in_queue, int max_size)
 {
 	int id, res;
 
@@ -149,7 +149,7 @@ int v_in_queue_init(struct VInQueue *in_queue)
 	in_queue->count = 0;
 	in_queue->size = 0;
 
-	in_queue->max_size = 1 << 20;	/* 1MB */
+	in_queue->max_size = max_size;
 
 	in_queue->queue.first = NULL;
 	in_queue->queue.last = NULL;
@@ -169,7 +169,7 @@ struct VInQueue *v_in_queue_create(void)
 	struct VInQueue *in_queue = (struct VInQueue *)malloc(sizeof(struct VInQueue));
 
 	if(in_queue!=NULL) {
-		if( v_in_queue_init(in_queue) != 1) {
+		if( v_in_queue_init(in_queue, IN_QUEUE_DEFAULT_MAX_SIZE) != 1) {
 			free(in_queue);
 			in_queue = NULL;
 		}

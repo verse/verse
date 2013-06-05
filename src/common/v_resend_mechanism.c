@@ -119,8 +119,10 @@ static int check_ack_nak_flag(struct vContext *C)
 /**
  * \brief This function set size of congestion window (congestion control)
  */
-static void set_host_cwin(struct VDgramConn *dgram_conn)
+static void set_host_cwin(struct vContext *C)
 {
+	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
+
 	switch(dgram_conn->cc_meth) {
 	case CC_NONE:
 		dgram_conn->cwin = 0xFFFF;
@@ -137,17 +139,30 @@ static void set_host_cwin(struct VDgramConn *dgram_conn)
 }
 
 /**
- * \brief This function set size of receive window (flow control)
+ * \brief This function set size of receive window (flow control), which is sent
+ * to the peer.
+ *
+ * This function sets C->dgram_conn->rwin_host
+ *
+ * \param[in]	*C	Verse context
+ *
  */
-static void set_host_rwin(struct VDgramConn *dgram_conn)
+static void set_host_rwin(struct vContext *C)
 {
+	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
+	struct VSession *vsession = CTX_current_session(C);
+	long int free_space;
+
 	switch(dgram_conn->fc_meth) {
 	case FC_NONE:
 		dgram_conn->rwin_host = 0xFFFFFFFF;
 		break;
 	case FC_TCP_LIKE:
-		/* TODO: implement real TCP like flow control */
-		dgram_conn->rwin_host = 0xFFFFFFFF;
+		/* Compute free space in incomming queue */
+		free_space = (long int)vsession->in_queue->max_size - (long int)vsession->in_queue->size;
+		dgram_conn->rwin_host = (uint32)(free_space > 0) ? free_space : 0;
+		/*printf(">>> max_size: %d, size: %d -> free_size: %ld -> window %d<<<\n",
+				vsession->in_queue->max_size, vsession->in_queue->size, free_space, dgram_conn->rwin_host);*/
 		break;
 	case FC_RESERVED:
 		v_print_log(VRS_PRINT_WARNING, "FC_RESERVED should never be used\n");
@@ -159,19 +174,27 @@ static void set_host_rwin(struct VDgramConn *dgram_conn)
 /**
  * \brief This function packs and compress command to the packet from one
  * priority queue.
+ *
+ * \param[in]	*C	The verse context
+ * \param[in]	*sent_packet	The pointer at structure with send packet
+ * \param[in]	buffer_pos		The curent size of buffer of sent packet
+ * \param[in]	prio			The priority of sub queue
+ * \param[in]	prio_win		The window size of current prio queue
+ * \param[out]	tot_cmd_size	The total size of commands that were poped from prio queue
  */
 static int pack_prio_queue(struct vContext *C,
 		struct VSent_Packet *sent_packet,
 		int buffer_pos,
 		uint8 prio,
-		uint16 prio_win)
+		uint16 prio_win,
+		uint16 *tot_cmd_size)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *vconn = CTX_current_dgram_conn(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct Generic_Cmd *cmd;
 	int ret, last_cmd_count = 0;
-	uint16 cmd_count, cmd_len, sum_len=0;
+	uint16 cmd_count, cmd_len, cmd_size, sum_len=0;
 	int8 cmd_share;
 	uint8  last_cmd_id = CMD_RESERVED_ID;
 
@@ -210,21 +233,28 @@ static int pack_prio_queue(struct vContext *C,
 				struct Fps_Cmd *fps_cmd = (struct Fps_Cmd*)cmd;
 				/* Change value of FPS. It will be sent in negotiate command
 				 * until it is confirmed be the peer (server) */
-				vconn->fps_host = fps_cmd->fps;
+				vsession->fps_host = fps_cmd->fps;
 			}
 			v_cmd_destroy(&cmd);
 		} else {
-			if(!(buffer_pos < (vconn->io_ctx.mtu - v_cmd_size(cmd)))) {
+
+			/* What was size of command in queue */
+			cmd_size = v_cmd_size(cmd);
+
+			if(!(buffer_pos < (vconn->io_ctx.mtu - cmd_size))) {
 				/* When there is not enough space for other command,
 				 * then push command back to the beginning of queue. */
 				v_out_queue_push_head(vsession->out_queue, prio, cmd);
 				break;
 			} else {
 
+				/* Update total size of commands that were poped from queue */
+				*tot_cmd_size += cmd_size;
+
 				/* When compression is not allowed, then add this command as is */
 				if( vconn->host_cmd_cmpr == CMPR_NONE) {
 					cmd_count = 0;
-					cmd_len = v_cmd_size(cmd);
+					cmd_len = cmd_size;
 					/* Debug print */
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Cmd: %d, count: %d, length: %d\n",
 							cmd->id, cmd_count, cmd_len);
@@ -235,7 +265,7 @@ static int pack_prio_queue(struct vContext *C,
 					if( (cmd->id != last_cmd_id) || (last_cmd_count <= 0) )	{
 						/* When this command is alone, then use default command size */
 						if(cmd_count == 0) {
-							cmd_len = v_cmd_size(cmd);
+							cmd_len = cmd_size;
 						} else {
 							/* FIXME: do not recompute command length here, but do it right,
 							 * when command is added to the queue */
@@ -289,7 +319,8 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	struct timeval tv;
 	int ret, keep_alive_packet = -1, full_packet = 0;
 	int error_num;
-	uint16 swin, prio_win;
+	uint16 swin, prio_win, sent_size;
+	uint32 rwin;
 	int cmd_rank = 0;
 
 	/* Verse packet header */
@@ -340,12 +371,20 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	s_packet->header.flags |= ANK_FLAG;
 	s_packet->header.ank_id = vconn->ank_id;
 
-	set_host_rwin(vconn);
-	set_host_cwin(vconn);
+	/* Compute current windows for flow control and congestion control */
+	set_host_rwin(C);
+	set_host_cwin(C);
 
-	s_packet->header.window = (unsigned short)(vconn->rwin_host >> vconn->rwin_host_scale);
+	/* Set window of flow control that will sent to receiver */
+	rwin = vconn->rwin_host >> vconn->rwin_host_scale;
+	s_packet->header.window = (unsigned short)(rwin > 0xFFFF) ? 0xFFFF : rwin;
+	/*printf("\t---real window: %d---\n", s_packet->header.window);*/
 
-	swin = (vconn->cwin < vconn->rwin_peer) ? vconn->cwin : vconn->rwin_peer;
+	/* Compute how many data could be sent to not congest receiver */
+	rwin = vconn->rwin_peer - vconn->sent_size;
+
+	/* Select smallest window for sending (congestion control window or flow control window)*/
+	swin = (vconn->cwin < rwin) ? vconn->cwin : rwin;
 
 	/* Set up Payload ID, when there is need to send payload packet */
 	if(s_packet->header.flags & PAY_FLAG)
@@ -361,15 +400,15 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 	/* When negotiated and used FPS is different, then pack negotiate command
 	 * for FPS */
-	if(vconn->fps_host != vconn->fps_peer) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
-				CMD_CHANGE_L_ID, FTR_FPS, &vconn->fps_host, NULL);
+	if(vsession->fps_host != vsession->fps_peer) {
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_FPS, &vsession->fps_host, NULL);
 	} else {
-		if(vconn->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
-			cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
-					CMD_CONFIRM_L_ID, FTR_FPS, &vconn->fps_peer, NULL);
+		if(vsession->tmp_flags & SYS_CMD_NEGOTIATE_FPS) {
+			cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+					CMD_CONFIRM_L_ID, FTR_FPS, &vsession->fps_peer, NULL);
 			/* Send confirmation only once for received system command */
-			vconn->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
+			vsession->tmp_flags &= ~SYS_CMD_NEGOTIATE_FPS;
 		}
 	}
 
@@ -390,6 +429,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 			real32 prio_sum_high, prio_sum_low, r_prio;
 			uint32 prio_count;
 			int16 prio, max_prio, min_prio;
+			uint16 tot_cmd_size;
 
 			/* Print outgoing command with green color */
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
@@ -404,9 +444,14 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Packing prio queues, cmd count: %d\n", v_out_queue_get_count(vsession->out_queue));
 
-			/* Go through high priorities and pick commands from priority queues */
-			for(prio = max_prio; prio >= VRS_DEFAULT_PRIORITY; prio--)
+			/* Go through all priorities and pick commands from priority queues */
+			for(prio = max_prio; prio >= min_prio; prio--)
 			{
+				/* TODO: Add better check here */
+				if(prio <= VRS_DEFAULT_PRIORITY && buffer_pos >= vconn->io_ctx.mtu) {
+					break;
+				}
+
 				prio_count = v_out_queue_get_count_prio(vsession->out_queue, prio);
 
 				if(prio_count > 0) {
@@ -414,39 +459,21 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 					/* Compute size of buffer that could be occupied by
 					 * commands from this queue */
-					prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_high;
+					if(prio >= VRS_DEFAULT_PRIORITY) {
+						prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_high;
+					} else {
+						prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_low;
+					}
 
 					/* Debug print */
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
 							prio, prio_count, r_prio, prio_win);
 
+					/* Get total size of commands that were stored in queue (sent_size) */
+					tot_cmd_size = 0;
 					/* Pack commands from queues with high priority to the buffer */
-					buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);
-				}
-			}
-
-			/* If packet is not full yet, then it's possible to add commands from
-			 * queues with low priorities */
-			if(buffer_pos < vconn->io_ctx.mtu) {
-				/* Go through low priorities and pick commands from priority queues */
-				for(prio = VRS_DEFAULT_PRIORITY - 1; prio >= min_prio; prio--)
-				{
-					prio_count = v_out_queue_get_count_prio(vsession->out_queue,prio);
-
-					if(prio_count > 0) {
-						r_prio = v_out_queue_get_prio(vsession->out_queue, prio);
-
-						/* Compute size of buffer that could be occupied by
-						 * commands from this queue */
-						prio_win = ((swin - buffer_pos)*r_prio)/prio_sum_low;
-
-						/* Debug print */
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Queue: %d, count: %d, r_prio: %6.3f, prio_win: %d\n",
-								prio, prio_count, r_prio, prio_win);
-
-						/* Pack commands from queues with low priority to the buffer */
-						buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win);
-					}
+					buffer_pos = pack_prio_queue(C, sent_packet, buffer_pos, prio, prio_win, &tot_cmd_size);
+					sent_size += tot_cmd_size;
 				}
 			}
 
@@ -462,6 +489,9 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 			}
 		}
 	}
+
+	/* Update sent_size */
+	vconn->sent_size += sent_size;
 
 	io_ctx->buf_size = buffer_pos;
 
@@ -730,6 +760,7 @@ static int handle_node_commands(struct vContext *C)
 int handle_packet_in_OPEN_state(struct vContext *C)
 {
 	struct VDgramConn *vconn = CTX_current_dgram_conn(C);
+	struct VSession *vsession = CTX_current_session(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
 	int ret, first_sys_index, i;
 
@@ -741,7 +772,7 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 		r_packet->acked=0;
 	}
 
-	/* Compute RWIN */
+	/* Compute real RWIN of Flow Control */
 	vconn->rwin_peer = r_packet->header.window << vconn->rwin_peer_scale;
 
 	/* Was packet received with any ACK or NAK command? */
@@ -755,6 +786,7 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 	} else {
 		first_sys_index = 0;
 	}
+
 	for(i=first_sys_index;
 			i<MAX_SYSTEM_COMMAND_COUNT && r_packet->sys_cmd[i].cmd.id != CMD_RESERVED_ID;
 			i++)
@@ -763,15 +795,15 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 				r_packet->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
 				r_packet->sys_cmd[i].negotiate_cmd.count > 0)
 		{
-			vconn->fps_host = vconn->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
-			vconn->tmp_flags |= SYS_CMD_NEGOTIATE_FPS;
+			vsession->fps_host = vsession->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
+			vsession->tmp_flags |= SYS_CMD_NEGOTIATE_FPS;
 		}
 
 		if(r_packet->sys_cmd[i].cmd.id == CMD_CONFIRM_L_ID &&
 				r_packet->sys_cmd[i].negotiate_cmd.feature == FTR_FPS &&
 				r_packet->sys_cmd[i].negotiate_cmd.count > 0)
 		{
-			vconn->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
+			vsession->fps_peer = r_packet->sys_cmd[i].negotiate_cmd.value->real32;
 		}
 	}
 

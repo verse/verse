@@ -108,6 +108,8 @@ void v_packet_history_destroy(struct VPacket_History *history)
 	for(cmd_id=0; cmd_id<=MAX_CMD_ID; cmd_id++) {
 		if(history->cmd_hist[cmd_id] != NULL) {
 			v_cmd_queue_destroy(history->cmd_hist[cmd_id]);
+			free(history->cmd_hist[cmd_id]);
+			history->cmd_hist[cmd_id] = NULL;
 		}
 	}
 }
@@ -322,6 +324,9 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 
 				/* Bucket has to include some data */
 				assert(sent_cmd->vbucket->data!=NULL);
+
+				/* Decrease total size of commands that were sent and wasn't acknowladged yet*/
+				dgram_conn->sent_size -= v_cmd_size(cmd);
 
 				/* Put fake command for create/destroy commands at verse server */
 				if(vs_ctx != NULL) {

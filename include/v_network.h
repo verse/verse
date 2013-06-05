@@ -158,39 +158,13 @@ typedef struct VPacket {
 	struct VPacketHeader		header;
 	/* Flag controlling if this packed has been already acked? */
 	char						acked;
-
-	/* Union of supported system commands: ACK/NAK commands
-	 * and Negotiate Commands */
-	union {
-		struct Generic_Cmd		cmd;
-		struct Ack_Nak_Cmd		ack_cmd;
-		struct Ack_Nak_Cmd		nak_cmd;
-		struct Negotiate_Cmd	negotiate_cmd;
-	} sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
-
+	/* Array of unions of system commands */
+	VSystemCommands sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
 	/* Number of system commands in packet */
 	unsigned short				sys_cmd_count;
-
-#if 0
-	/* Union of supported node commands stored in fixed length array */
-	union {
-		struct Generic_Cmd				cmd;
-		/* Node Commands */
-		struct Node_Create_Cmd			node_create;
-		struct Node_Destroy_Cmd			node_destroy;
-		struct Node_Subscribe_Cmd		node_subscribe;
-		struct Node_Unsubscribe_Cmd		node_unsubscribe;
-		/* TagGroup Commands */
-		struct TagGroup_Create_Cmd		taggroup_create;
-	} node_cmd[MAX_NODE_COMMAND_COUNT];
-
-	/* Number of node commands in packet */
-	unsigned short						node_cmd_count;
-#endif
-
 	/* Pointer to the received buffer, where are stored node commands */
-	uint8								*data;
-	uint16								data_size;
+	uint8						*data;
+	uint16						data_size;
 
 } VPacket;
 
@@ -226,17 +200,8 @@ typedef struct VMessageHeader {
 typedef struct VMessage {
 	/* Verse message header */
 	struct VMessageHeader		header;
-	/* List of System Commands: Negotiate Commands */
-	union {
-		struct Generic_Cmd					cmd;
-		struct User_Authentication_Request	ua_req;
-		struct User_Authentication_Failure	ua_fail;
-		struct User_Authentication_Success	ua_succ;
-		struct Negotiate_Cmd				change_l_cmd;
-		struct Negotiate_Cmd				change_r_cmd;
-		struct Negotiate_Cmd				confirm_l_cmd;
-		struct Negotiate_Cmd				confirm_r_cmd;
-	} sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
+	/* Array of unions of system commands */
+	VSystemCommands sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
 } VMessage;
 
 /* Network address of the peer */
@@ -267,7 +232,7 @@ typedef struct IO_CTX {
 /* Structure for storing data from parsed URL */
 typedef struct VURL {
 	char		*scheme;				/* Scheme of URL */
-	char		dgram_protocol;			/* Datagrame transport protocol */
+	char		transport_protocol;		/* Transport protocol used for data exchange */
 	char		security_protocol;		/* Security protocol */
 	char		ip_ver;					/* Version of IP */
 	char		*node;					/* Hostname or IP address */

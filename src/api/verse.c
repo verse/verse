@@ -237,6 +237,7 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
  * \param[in]	node_id		The ID that client wants to be subscribed for.
  * \param[in]	version		The requested version that client request. The client
  * has to have local copy of this version.
+ * \param[in]	crc32		The crc32 of requested version.
  *
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
@@ -244,9 +245,10 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 int vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
-		const uint32_t version)
+		const uint32_t version,
+		const uint32_t crc32)
 {
-	struct Generic_Cmd *node_subscribe_cmd = v_node_subscribe_create(node_id, version, 0);
+	struct Generic_Cmd *node_subscribe_cmd = v_node_subscribe_create(node_id, version, crc32);
 	return vc_send_command(session_id, prio, node_subscribe_cmd);
 }
 
@@ -1198,20 +1200,33 @@ int vrs_send_connect_request(const char *hostname,
 			return VRS_NO_CB_USER_AUTH;
 		}
 	}
+
+	/* Set security protocol */
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 	/* Check consistency of flags */
-	if((_flags & VRS_DGRAM_SEC_NONE) && (_flags & VRS_DGRAM_SEC_DTLS)) {
+	if((_flags & VRS_SEC_DATA_NONE) && (_flags & VRS_SEC_DATA_TLS)) {
 		if(is_log_level(VRS_PRINT_ERROR))
-			v_print_log(VRS_PRINT_ERROR, "VRS_DGRAM_SEC_NONE or VRS_DGRAM_SEC_DTLS could be set, not both.\n");
+			v_print_log(VRS_PRINT_ERROR, "VRS_SEC_DATA_NONE or VRS_SEC_DATA_TLS could be set, not both.\n");
 		return VRS_FAILURE;
 	}
 #else
-	if (_flags & VRS_DGRAM_SEC_DTLS) {
-		v_print_log(VRS_PRINT_WARNING, "flag VRS_DGRAM_SEC_DTLS could be set due to low version of OpenSSL (at least 1.0 is required).\n");
-		_flags &= ~VRS_DGRAM_SEC_DTLS;
-		_flags |= VRS_DGRAM_SEC_NONE;
+	if (_flags & VRS_SEC_DATA_TLS) {
+		v_print_log(VRS_PRINT_WARNING, "flag VRS_SEC_DATA_TLS could be set due to low version of OpenSSL (at least 1.0 is required).\n");
+		_flags &= ~VRS_SEC_DATA_TLS;
+		_flags |= VRS_SEC_DATA_NONE;
 	}
 #endif
+
+	/* Set transport protocol */
+	if((_flags & VRS_TP_UDP) && (_flags & VRS_TP_TCP)) {
+		if(is_log_level(VRS_PRINT_ERROR))
+			v_print_log(VRS_PRINT_ERROR, "VRS_TP_UDP or VRS_TP_TCP could be set, not both.\n");
+		return VRS_FAILURE;
+	} else if(!(_flags & VRS_TP_UDP) && !(_flags & VRS_TP_TCP)) {
+		/* When no transport protocol is selected, then use UDP as default */
+		_flags |= VRS_TP_UDP;
+	}
+
 
 	/* Check if this client isn't already connected to this server or isn't
 	 * trying to connect to the server with hostname:service */
@@ -1236,9 +1251,9 @@ int vrs_send_connect_request(const char *hostname,
 			/* Copy flags */
 			vsession->flags = _flags;
 			vsession->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
-			v_in_queue_init(vsession->in_queue);
+			v_in_queue_init(vsession->in_queue, IN_QUEUE_DEFAULT_MAX_SIZE);
 			vsession->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
-			v_out_queue_init(vsession->out_queue);
+			v_out_queue_init(vsession->out_queue, OUT_QUEUE_DEFAULT_MAX_SIZE);
 
 			vc_ctx->vsessions[i] = vsession;
 			break;

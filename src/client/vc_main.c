@@ -139,7 +139,7 @@ void vc_load_config_file(VC_CTX *ctx)
 	ctx->max_sessions = 10;					/* This client can connect maximally to 10 servers */
 	ctx->print_log_level = VRS_PRINT_NONE;	/* Client will print all messages to log file */
 	ctx->log_file = stdout;					/* Use stdout for log file */
-	ctx->rwin_scale = 7;					/* RWIN is multiple of 128B */
+	ctx->rwin_scale = 0;					/* RWIN is multiple of 128B */
 	ctx->ca_path = strdup("/etc/pki/tls/certs/");	/* Default directory with CA certificates */
 }
 

@@ -28,4 +28,4 @@ target_link_libraries (pyverse
 install (TARGETS pyverse
 	LIBRARY
 	CONFIGURATIONS "Debug"
-	DESTINATION lib/python3.2/site-packages)
+	DESTINATION lib/python${PYTHON_VERSION}/site-packages)

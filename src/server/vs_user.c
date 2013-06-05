@@ -48,3 +48,13 @@ struct VSUser *vs_user_find(struct VS_CTX *vs_ctx, uint16 user_id)
 
 	return user;
 }
+
+/**
+ * \brief This function free allocated data from VSUser structure
+ */
+void vs_user_free(struct VSUser *user)
+{
+	free(user->username);
+	free(user->realname);
+	if(user->password) free(user->password);
+}

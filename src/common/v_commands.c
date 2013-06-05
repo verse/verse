@@ -2314,7 +2314,6 @@ struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
 {
 	struct VCommandQueue *cmd_queue = NULL;
 	uint16 flag = (copy_bucket==1) ? HASH_COPY_BUCKET : 0;
-	struct Generic_Cmd cmd;
 
 	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
 	cmd_queue->item_size = UINT8_SIZE + cmd_struct[id].size;
@@ -2328,7 +2327,7 @@ struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
 	}
 	v_hash_array_init(&cmd_queue->cmds,
 			HASH_MOD_256 | flag,
-			(char*)&(cmd.data) - (char*)&(cmd),
+			offsetof(Generic_Cmd, data),
 			cmd_struct[id].key_size);
 
 	return cmd_queue;

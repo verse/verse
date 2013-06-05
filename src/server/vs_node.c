@@ -326,9 +326,6 @@ struct VSNode *vs_node_find(struct VS_CTX *vs_ctx, uint32 node_id)
  */
 static void vs_node_init(struct VSNode *node)
 {
-	struct VSTagGroup tg;
-	struct VSLayer layer;
-
 	node->id = 0xFFFFFFFF;
 	node->type = 0;
 
@@ -343,14 +340,14 @@ static void vs_node_init(struct VSNode *node)
 	/* Hashed linked list of TagGroups */
 	v_hash_array_init(&node->tag_groups,
 			HASH_MOD_256,
-			(char*)&tg.id - (char*)&tg,
+			offsetof(VSTagGroup, id),
 			sizeof(uint16));
 	node->last_tg_id = 0;
 
 	/* Hashed linked list of layers */
 	v_hash_array_init(&node->layers,
 			HASH_MOD_256,
-			(char*)&layer.id - (char*)&layer,
+			offsetof(VSLayer, id),
 			sizeof(uint16));
 	node->last_layer_id = 0;
 
@@ -393,11 +390,13 @@ static int vs_node_destroy(struct VS_CTX *vs_ctx, struct VSNode *node)
 			if(node->tag_groups.lb.first != NULL) {
 				vs_node_taggroups_destroy(node);
 			}
+			v_hash_array_destroy(&node->tag_groups);
 
 			/* Remove all layers */
 			if(node->layers.lb.first != NULL) {
 				vs_node_layers_destroy(node);
 			}
+			v_hash_array_destroy(&node->layers);
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Node: %d destroyed\n", node->id);
 
@@ -908,11 +907,9 @@ end:
  */
 static void vs_node_list_init(struct VS_CTX *vs_ctx)
 {
-	struct VSNode node;
-
 	v_hash_array_init(&vs_ctx->data.nodes,
 			HASH_MOD_65536,
-			(char*)&node.id - (char*)&node,
+			offsetof(VSNode, id),
 			sizeof(uint32));
 }
 

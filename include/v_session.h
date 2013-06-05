@@ -59,6 +59,10 @@
 
 #define COOKIE_SIZE		16
 
+/* When negotiation is not used, then client and server consider
+ * FPS to be 60 */
+#define DEFAULT_FPS				60.0
+
 /* Data Exchange Definition */
 typedef struct VDED {
 	char				*str;	/* String of negotiated DED */
@@ -98,7 +102,11 @@ typedef struct VSession {
 	struct VCookie			host_cookie;	/* Cookie negotiated during authentication */
 	/* Queues */
 	struct VOutQueue		*out_queue;		/* Queue of outgoing data (node commands) */
-	struct VInQueue			*in_queue;			/* Queue of incoming data (fake and node commands) */
+	struct VInQueue			*in_queue;		/* Queue of incoming data (fake and node commands) */
+	/* FPS used by UDP and TCP data connection */
+	float					fps_host;		/* FPS used by this host */
+	float					fps_peer;		/* Negotiated FPS used by peer */
+	unsigned char			tmp_flags;		/* Temporary flags (notification of received system commands) */
 } VSession;
 
 void v_init_session(struct VSession *vsession);

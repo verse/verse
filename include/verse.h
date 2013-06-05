@@ -130,11 +130,12 @@ extern "C" {
 #define VRS_PRINT_DEBUG_MSG			4
 
 /* Flags used in function verse_send_connect_request */
-#define VRS_DGRAM_SEC_NONE			1	/* No security at datagram connection */
-#define VRS_DGRAM_SEC_DTLS			2	/* DTLS at datagram connection */
+#define VRS_SEC_DATA_NONE			1	/* No security at data exchange connection */
+#define VRS_SEC_DATA_TLS			2	/* Use TLS/DTLS at data exchange connection */
 #define VRS_TP_UDP					4	/* Transport protocol: UDP*/
-#define VRS_TP_TCP					8	/* TODO: Transport protocol: TCP */
-#define VRS_NO_CMD_CMPR				16	/* TODO: No command compression */
+#define VRS_TP_TCP					8	/* Transport protocol: TCP */
+#define VRS_CMD_CMPR_NONE			16	/* No command compression */
+#define VRS_CMD_CMPR_ADDR_SHARE		32	/* Share command addresses to compress commands */
 
 /* Type of verse value */
 #define VRS_VALUE_TYPE_RESERVED		0
@@ -204,7 +205,8 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 int vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
-		const uint32_t version);
+		const uint32_t version,
+		const uint32_t crc32);
 void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t version,

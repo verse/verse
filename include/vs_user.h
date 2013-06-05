@@ -40,5 +40,6 @@ typedef struct VSUser {
 } VSUser;
 
 struct VSUser *vs_user_find(struct VS_CTX *vs_ctx, uint16 user_id);
+void vs_user_free(struct VSUser *user);
 
 #endif /* V_USER_H_ */

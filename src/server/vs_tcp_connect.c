@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "verse_types.h"
 
@@ -52,6 +53,8 @@
 #include "v_unpack.h"
 #include "v_connection.h"
 #include "v_session.h"
+#include "v_stream.h"
+#include "v_fake_commands.h"
 
 /**
  * \brief Initialize VConnection at Verse server for potential clients
@@ -188,6 +191,10 @@ static int vs_TLS_teardown(struct vContext *C)
 	return 1;
 }
 
+
+/**
+ *
+ */
 static void vs_CLOSING(struct vContext *C)
 {
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
@@ -196,6 +203,71 @@ static void vs_CLOSING(struct vContext *C)
 
 }
 
+
+/**
+ * \brief This function is never ending loop of server state STREAM_OPEN
+ */
+static int vs_STREAM_OPEN_loop(struct vContext *C)
+{
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct VSession *vsession = CTX_current_session(C);
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct timeval tv;
+	fd_set set;
+	int flag, ret;
+
+	/* Set socket non-blocking */
+	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if( (fcntl(io_ctx->sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return -1;
+	}
+
+	/* "Never ending" loop */
+	while(1)
+	{
+		FD_ZERO(&set);
+		FD_SET(io_ctx->sockfd, &set);
+
+		/* Use negotiated FPS */
+		tv.tv_sec = 0;
+		tv.tv_usec = 1000000/vsession->fps_host;
+
+		/* Wait for recieved data */
+		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			goto end;
+			/* Was event on the listen socket */
+		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
+
+			if(v_STREAM_handle_messages(C) == 0) {
+				goto end;
+			}
+
+			/* When some payload data were received, then poke data thread */
+			sem_post(&vs_ctx->data.sem);
+		}
+
+		if(v_STREAM_send_message(C) == 0 ) {
+			goto end;
+		}
+	}
+end:
+
+	/* Set socket blocking again */
+	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if( (fcntl(io_ctx->sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ * \brief This function is called, when server is in NEGOTIATE newhost state
+ */
 static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
@@ -218,10 +290,10 @@ static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CONFIRM_L_ID:
-			if(r_message->sys_cmd[i].confirm_l_cmd.feature==FTR_HOST_URL) {
-				if(r_message->sys_cmd[i].confirm_l_cmd.count == 1) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature==FTR_HOST_URL) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count == 1) {
 					if(vsession->host_url!=NULL &&
-							strcmp(vsession->host_url, (char*)r_message->sys_cmd[i].confirm_l_cmd.value[0].string8.str) == 0) {
+							strcmp(vsession->host_url, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0) {
 						return 1;
 					}
 				}
@@ -233,6 +305,12 @@ static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 	return 0;
 }
 
+
+/**
+ * \brief This function is called, when server is in NEGOTIATE_cookie_ded state
+ *
+ * This function can create new thread for datagrame connection
+ */
 static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
@@ -262,13 +340,13 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CHANGE_R_ID:
 			/* Client has to propose url in this state */
-			if(r_message->sys_cmd[i].change_r_cmd.feature == FTR_HOST_URL) {
-				if(r_message->sys_cmd[i].change_r_cmd.count > 0) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_HOST_URL) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
 					if(vsession->host_url!=NULL) {
 						free(vsession->host_url);
 					}
 					/* Only first proposed URL will be used */
-					vsession->host_url = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
+					vsession->host_url = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					/* Check if proposed URL is correct */
 					ret = v_parse_url(vsession->host_url, &url);
 					if(ret == 1)
@@ -277,25 +355,25 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 						host_url_proposed = 0;
 				}
 			/* Client has to propose host cookie in this state */
-			} else if(r_message->sys_cmd[i].change_r_cmd.feature == FTR_COOKIE) {
-				if(r_message->sys_cmd[i].change_r_cmd.count > 0) {
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
 					if(vsession->host_cookie.str!=NULL) {
 						free(vsession->host_cookie.str);
 					}
-					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
+					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					host_cookie_proposed = 1;
 				}
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
-						r_message->sys_cmd[i].change_r_cmd.feature);
+						r_message->sys_cmd[i].negotiate_cmd.feature);
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
 			/* Client has to confirm peer cookie in this state */
-			if(r_message->sys_cmd[i].confirm_r_cmd.feature == FTR_COOKIE) {
-				if (r_message->sys_cmd[i].confirm_r_cmd.count == 1) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
+				if (r_message->sys_cmd[i].negotiate_cmd.count == 1) {
 					if(vsession->peer_cookie.str!=NULL &&
-						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str) == 0)
+						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						gettimeofday(&tv, NULL);
 						vsession->peer_cookie.tv.tv_sec = tv.tv_sec;
@@ -305,19 +383,19 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 				}
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
-						r_message->sys_cmd[i].change_r_cmd.feature);
+						r_message->sys_cmd[i].negotiate_cmd.feature);
 			}
 			break;
 		case CMD_CONFIRM_L_ID:
 			/* Client has to confirm DED in this state */
-			if(r_message->sys_cmd[i].confirm_l_cmd.feature == FTR_DED) {
-				if(r_message->sys_cmd[i].confirm_l_cmd.count == 1) {
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_DED) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count == 1) {
 					if(vsession->ded.str != NULL &&
-							strcmp(vsession->ded.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str) == 0)
+							strcmp(vsession->ded.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						ded_confirmed = 1;
 					} else {
-						printf("%s != %s\n", vsession->ded.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str);
+						printf("%s != %s\n", vsession->ded.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					}
 				}
 			}
@@ -337,6 +415,9 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			ded_confirmed==1)
 	{
 		struct vContext *new_C;
+		char trans_proto[4];
+		char sec_proto[5];
+		int cmd_rank = 0;
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
@@ -344,9 +425,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		memcpy(&vsession->peer_address, &io_ctx->peer_addr, sizeof(struct VNetworkAddress));
 
 		/* Do not confirm proposed URL */
-		s_message->sys_cmd[0].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_message->sys_cmd[0].confirm_r_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[0].confirm_r_cmd.count = 0;
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_HOST_URL, NULL);
 
 		/* Find first unused port from port range */
 		for(i=vs_ctx->port_low, j=0; i<vs_ctx->port_high; i++, j++) {
@@ -357,76 +436,77 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			}
 		}
 
-		/* Copy settings about dgram connection to the session */
+		/* Do not allow unsecure TCP data connection */
+		if(url.transport_protocol == VRS_TP_TCP) {
+			url.security_protocol = VRS_SEC_DATA_TLS;
+		}
+
+		/* Copy settings about data connection to the session */
 		vsession->flags |= url.security_protocol;
-		vsession->flags |= url.dgram_protocol;
+		vsession->flags |= url.transport_protocol;
 
-		/* Create copy of new Verse context for new thread */
-		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-		memcpy(new_C, C, sizeof(struct vContext));
+		if(vsession->flags & VRS_TP_UDP) {
+			strncpy(trans_proto, "udp", 3);
+			trans_proto[3] = '\0';
 
-		/* Try to create new thread */
-		if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-			return 0;
+			/* Create copy of new Verse context for new thread */
+			new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
+			memcpy(new_C, C, sizeof(struct vContext));
+
+			/* Try to create new thread */
+			if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+				return 0;
+			}
+
+			/* Wait for datagram thread to be in LISTEN state */
+			while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
+				/* Sleep 1 milisecond */
+				usleep(1000);
+			}
+		} else if(vsession->flags & VRS_TP_TCP) {
+			strncpy(trans_proto, "tcp", 3);
+			trans_proto[4] = '\0';
 		}
 
-		/* Wait for datagram thread to be in LISTEN state */
-		while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
-			usleep(10);
+#if OPENSSL_VERSION_NUMBER>=0x10000000
+		if(url.security_protocol==VRS_SEC_DATA_NONE ||
+				!(vs_ctx->security_protocol & VRS_SEC_DATA_TLS))
+		{
+			strncpy(sec_proto, "none", 4);
+			sec_proto[4] = '\0';
+		} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
+			if(vsession->flags & VRS_TP_UDP) {
+				strncpy(sec_proto, "dtls", 4);
+				sec_proto[4] = '\0';
+			} else if(vsession->flags & VRS_TP_TCP) {
+				strncpy(sec_proto, "tls", 3);
+				sec_proto[3] = '\0';
+			}
+		} else {
+			strncpy(sec_proto, "none", 4);
+			sec_proto[4] = '\0';
 		}
+#else
+		strncmp(sec_proto, "none", 4);
+		sec_proto[4] = '\0';
+#endif
 
-		s_message->sys_cmd[1].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_message->sys_cmd[1].change_l_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[1].change_l_cmd.count = 1;
 		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 		if(url.ip_ver==IPV6) {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_DGRAM_SEC_NONE &&
-					(vs_ctx->security_protocol & VRS_DGRAM_SEC_DTLS)) {
-				sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_DGRAM_SEC_DTLS) {
-				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else {
-				/* Default security policy */
-				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			}
-#else
-			sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
+			sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
+					trans_proto,
+					sec_proto,
 					url.node,
 					vsession->dgram_conn->io_ctx.host_addr.port);
-#endif
 		} else {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_DGRAM_SEC_NONE &&
-					(vs_ctx->security_protocol & VRS_DGRAM_SEC_DTLS)) {
-				sprintf(vsession->host_url, "verse-udp-none://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_DGRAM_SEC_DTLS) {
-				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else {
-				/* Default security policy */
-				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			}
-#else
-			sprintf(vsession->host_url, "verse-udp-none://%s:%d",
+			sprintf(vsession->host_url, "verse-%s-%s://%s:%d",
+					trans_proto,
+					sec_proto,
 					url.node,
 					vsession->dgram_conn->io_ctx.host_addr.port);
-#endif
 		}
-		s_message->sys_cmd[1].change_l_cmd.value[0].string8.length = strlen(vsession->host_url);
-		strcpy((char*)s_message->sys_cmd[1].change_l_cmd.value[0].string8.str, vsession->host_url);
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_HOST_URL, vsession->host_url, NULL);
 
 		/* Set time for the host cookie */
 		gettimeofday(&tv, NULL);
@@ -434,13 +514,8 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		vsession->host_cookie.tv.tv_usec = tv.tv_usec;
 
 		/* Send confirmation about host cookie */
-		s_message->sys_cmd[2].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_message->sys_cmd[2].confirm_r_cmd.feature = FTR_COOKIE;
-		s_message->sys_cmd[2].confirm_r_cmd.count = 1;
-		s_message->sys_cmd[2].confirm_r_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-		strcpy((char*)s_message->sys_cmd[2].confirm_r_cmd.value[0].string8.str, vsession->host_cookie.str);
-
-		s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE,
+				vsession->host_cookie.str, NULL);
 
 		/* Pack all system commands to the buffer */
 		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
@@ -467,6 +542,10 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	return 0;
 }
 
+
+/**
+ *
+ */
 static int vs_RESPOND_userauth_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
@@ -474,7 +553,7 @@ static int vs_RESPOND_userauth_loop(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, ret, error;
+	int i, ret, error, cmd_rank = 0;
 	unsigned short buffer_pos = 0;
 
 	/* Reset content of received message */
@@ -511,38 +590,31 @@ static int vs_RESPOND_userauth_loop(struct vContext *C)
 
 					buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
-					s_message->sys_cmd[0].ua_succ.id = CMD_USER_AUTH_SUCCESS;
 					/* Save user_id to the session and send it in
 					 * connect_accept command */
 					vsession->user_id = user_id;
 					vsession->avatar_id = avatar_id;
-					s_message->sys_cmd[0].ua_succ.user_id = user_id;
-					s_message->sys_cmd[0].ua_succ.avatar_id = avatar_id;
 
-					/* Set up negotiate command of the host cookie */
-					s_message->sys_cmd[1].change_r_cmd.id = CMD_CHANGE_R_ID;
-					s_message->sys_cmd[1].change_r_cmd.feature = FTR_COOKIE;
-					s_message->sys_cmd[1].change_r_cmd.count = 1;
-					/* Generate random string */
+					s_message->sys_cmd[cmd_rank].ua_succ.id = CMD_USER_AUTH_SUCCESS;
+					s_message->sys_cmd[cmd_rank].ua_succ.user_id = user_id;
+					s_message->sys_cmd[cmd_rank].ua_succ.avatar_id = avatar_id;
+					cmd_rank++;
+
+					/* Generate random string for coockie */
 					vsession->peer_cookie.str = (char*)calloc((COOKIE_SIZE+1), sizeof(char));
 					for(i=0; i<COOKIE_SIZE; i++) {
 						/* Generate only printable characters (debug prints) */
 						vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
 					}
 					vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-					s_message->sys_cmd[1].change_r_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-					strcpy((char*)s_message->sys_cmd[1].change_r_cmd.value[0].string8.str, vsession->peer_cookie.str);
+					/* Set up negotiate command of the host cookie */
+					v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_COOKIE,
+							vsession->peer_cookie.str, NULL);
 
-					s_message->sys_cmd[2].change_l_cmd.id = CMD_CHANGE_L_ID;
-					s_message->sys_cmd[2].change_l_cmd.feature = FTR_DED;
-					s_message->sys_cmd[2].change_l_cmd.count = 1;
 					/* Load DED from configuration and save it to the session */
 					vsession->ded.str = strdup(vs_ctx->ded);
-					s_message->sys_cmd[2].change_l_cmd.value[0].string8.length = strlen(vsession->ded.str);
-					strcpy((char*)s_message->sys_cmd[2].change_l_cmd.value[0].string8.str, vsession->ded.str);
-
-					/* Terminating command */
-					s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
+					v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_DED,
+							vsession->ded.str, NULL);
 
 					buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
@@ -664,6 +736,7 @@ static int vs_RESPOND_methods_loop(struct vContext *C)
 	return 0;
 }
 
+
 /**
  * \brief Main function for new thread. This thread is created for new
  * connection with client. This thread will try to authenticate new user
@@ -680,6 +753,12 @@ void *vs_tcp_conn_loop(void *arg)
 	fd_set set;
 	int error, ret, user_auth_attempts=0;
 	void *udp_thread_result;
+	unsigned int int_size;
+
+	/* Try to get size of TCP buffer */
+	int_size = sizeof(int_size);
+	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size);
 
 	/* Try to do TLS handshake with client */
 	if(vs_TLS_handshake(C)!=1) {
@@ -711,7 +790,8 @@ void *vs_tcp_conn_loop(void *arg)
 		tv.tv_usec = 0;
 
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
@@ -725,7 +805,8 @@ void *vs_tcp_conn_loop(void *arg)
 			 * header. If this condition is not reached, then somebody tries
 			 * to do some very bad things! .. Close this connection. */
 			if(io_ctx->buf_size < VERSE_MESSAGE_HEADER_SIZE) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "received buffer too small %d\n", io_ctx->buf_size);
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "received buffer too small %d\n",
+						io_ctx->buf_size);
 				goto end;
 			}
 
@@ -778,8 +859,21 @@ void *vs_tcp_conn_loop(void *arg)
 				/* Wait VERSE_TIMEOT seconds to confirming proposed URL */
 				ret = vs_NEGOTIATE_newhost_loop(C);
 				if(ret==1) {
-					/* When URL was confirmed, then go to the end state */
-					goto end;
+					if(vsession->flags & VRS_TP_UDP) {
+						/* When URL was confirmed, then go to the end state */
+						goto end;
+					} else if (vsession->flags & VRS_TP_TCP) {
+						stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
+
+						if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+							printf("%c[%d;%dm", 27, 1, 31);
+							v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: STREAM_OPEN\n");
+							printf("%c[%dm", 27, 0);
+						}
+
+						vs_STREAM_OPEN_loop(C);
+						goto end;
+					}
 				} else {
 					/* When thread was not confirmed, then try to cancel
 					 * UDP thread*/
@@ -789,6 +883,7 @@ void *vs_tcp_conn_loop(void *arg)
 					goto end;
 				}
 				break;
+
 			}
 		} else {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "No response in %d seconds\n", VRS_TIMEOUT);
@@ -851,6 +946,9 @@ end:
 	/* This session could be used again for authentication */
 	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
 
+	/* Clear session flags */
+	vsession->flags = 0;
+
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: LISTEN\n");
@@ -864,12 +962,15 @@ end:
 	return NULL;
 }
 
-/* Main Verse server loop. Server waits for connect attempts, responds to attempts
- * and creates per connection threads */
+
+/**
+ * \brief Main Verse server loop. Server waits for connect attempts, responds to attempts
+ * and creates per connection threads
+ */
 int vs_main_stream_loop(VS_CTX *vs_ctx)
 {
 	struct vContext *C;
-	struct IO_CTX *io_ctx = &vs_ctx->io_ctx;
+	struct IO_CTX *io_ctx = &vs_ctx->tcp_io_ctx;
 	struct timeval start, tv;
 	fd_set set;
 	int count, tmp, i, ret;
@@ -904,7 +1005,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+0s");
 			else
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+%lds", (long int)(tv.tv_sec - start.tv_sec));
-			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\tServer listen on TCP port: %d\n", vs_ctx->io_ctx.host_addr.port);
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\tServer listen on TCP port: %d\n", vs_ctx->tcp_io_ctx.host_addr.port);
 		}
 
 		/* Set up set of sockets */
@@ -950,7 +1051,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 
 				/* Try to accept client connection (do TCP handshake) */
 				if(io_ctx->host_addr.ip_ver==IPV4) {
-					/* Prepare IP6 variables for TCP handshake */
+					/* Prepare IPv4 variables for TCP handshake */
 					struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
 					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
 					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv4);
@@ -961,10 +1062,10 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 						continue;
 					}
 
-					/* Save the IP of the client as string in verse session */
+					/* Save the IPv4 of the client as string in verse session */
 					inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
 				} else if(io_ctx->host_addr.ip_ver==IPV6) {
-					/* Prepare IP6 variables for TCP handshake */
+					/* Prepare IPv6 variables for TCP handshake */
 					struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
 					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
 					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv6);
@@ -975,7 +1076,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 						continue;
 					}
 
-					/* Save the IP of the client as string in verse session */
+					/* Save the IPv6 of the client as string in verse session */
 					inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
 				}
 
@@ -1043,6 +1144,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					/* Close connection (no more free session slots) */
 					close(tmp_sockfd);
 				}
+				/* TODO: Fix this */
 				sleep(1);
 			}
 		}
@@ -1060,7 +1162,11 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN ) {
 					tmp++;
 				}
-				/* TODO: cancel thread with closed connection to speed up server exit */
+				/* TODO: cancel thread with closed connection to speed up server exit
+					pthread_kill(vs_ctx->vsessions[i]->tcp_thread, SIGALRM);
+					pthread_join(vs_ctx->vsessions[i]->tcp_thread, NULL);
+				*/
+
 			}
 		}
 		if(tmp==0) {
@@ -1075,7 +1181,20 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 	return 1;
 }
 
-/* Initialize verse server context */
+
+/**
+ * \brief Destroy stream part of verse context
+ */
+void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
+{
+	if(vs_ctx->tls_ctx != NULL) SSL_CTX_free(vs_ctx->tls_ctx);
+	if(vs_ctx->dtls_ctx != NULL) SSL_CTX_free(vs_ctx->dtls_ctx);
+}
+
+
+/**
+ * \brief Initialize verse server context for connection at TCP
+ */
 int vs_init_stream_ctx(VS_CTX *vs_ctx)
 {
 	int i, flag;
@@ -1189,16 +1308,16 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 	vs_ctx->connected_clients = 0;
 
 	/* Allocate buffer for incoming packets */
-	if ( (vs_ctx->io_ctx.buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
+	if ( (vs_ctx->tcp_io_ctx.buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		return -1;
 	}
 
 	/* "Address" of server */
-	if(vs_ctx->io_ctx.host_addr.ip_ver == IPV4) {		/* IPv4 */
+	if(vs_ctx->tcp_io_ctx.host_addr.ip_ver == IPV4) {		/* IPv4 */
 
 		/* Create socket which server uses for listening for new connections */
-		if ( (vs_ctx->io_ctx.sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		if ( (vs_ctx->tcp_io_ctx.sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
@@ -1212,32 +1331,32 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 
 		/* Set socket to reuse address */
 		flag = 1;
-		if( setsockopt(vs_ctx->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+		if( setsockopt(vs_ctx->tcp_io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_family = AF_INET;
-		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
-		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_port = htons(vs_ctx->port);
-		vs_ctx->io_ctx.host_addr.port = vs_ctx->port;
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv4.sin_family = AF_INET;
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv4.sin_port = htons(vs_ctx->port);
+		vs_ctx->tcp_io_ctx.host_addr.port = vs_ctx->port;
 
 		/* Bind address and socket */
-		if( bind(vs_ctx->io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->io_ctx.host_addr.addr.ipv4), sizeof(vs_ctx->io_ctx.host_addr.addr.ipv4)) == -1) {
+		if( bind(vs_ctx->tcp_io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->tcp_io_ctx.host_addr.addr.ipv4), sizeof(vs_ctx->tcp_io_ctx.host_addr.addr.ipv4)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %s\n", strerror(errno));
 			return -1;
 		}
 
 		/* Create queue for TCP connection attempts */
-		if( listen(vs_ctx->io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
+		if( listen(vs_ctx->tcp_io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
 			return -1;
 		}
 	}
-	else if(vs_ctx->io_ctx.host_addr.ip_ver == IPV6) {	/* IPv6 */
+	else if(vs_ctx->tcp_io_ctx.host_addr.ip_ver == IPV6) {	/* IPv6 */
 
 		/* Create socket which server uses for listening for new connections */
-		if ( (vs_ctx->io_ctx.sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		if ( (vs_ctx->tcp_io_ctx.sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
@@ -1251,46 +1370,37 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 
 		/* Set socket to reuse address */
 		flag = 1;
-		if( setsockopt(vs_ctx->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+		if( setsockopt(vs_ctx->tcp_io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_family = AF_INET6;
-		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_addr = in6addr_any;
-		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_port = htons(vs_ctx->port);
-		vs_ctx->io_ctx.host_addr.port = vs_ctx->port;
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_family = AF_INET6;
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_addr = in6addr_any;
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_port = htons(vs_ctx->port);
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_flowinfo = 0; /* Obsolete value */
+		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_scope_id = 0;
+		vs_ctx->tcp_io_ctx.host_addr.port = vs_ctx->port;
 
 		/* Bind address and socket */
-		if( bind(vs_ctx->io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->io_ctx.host_addr.addr.ipv6), sizeof(vs_ctx->io_ctx.host_addr.addr.ipv6)) == -1) {
+		if( bind(vs_ctx->tcp_io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->tcp_io_ctx.host_addr.addr.ipv6), sizeof(vs_ctx->tcp_io_ctx.host_addr.addr.ipv6)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %d\n", strerror(errno));
 			return -1;
 		}
 
 		/* Create queue for TCP connection attempts, set maximum number of
 		 * attempts in listen queue */
-		if( listen(vs_ctx->io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
+		if( listen(vs_ctx->tcp_io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
 			return -1;
 		}
 	}
 
-	/* Set up free ports for communication with clients */
-	if( (vs_ctx->port_list = (struct VS_Port*)calloc((vs_ctx->port_high - vs_ctx->port_low), sizeof(struct VS_Port))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
-		return -1;
-	} else {
-		for(i=0; i<(vs_ctx->port_high-vs_ctx->port_low); i++) {
-			vs_ctx->port_list[i].port_number = i+vs_ctx->port_low;
-			vs_ctx->port_list[i].flag = 0;
-		}
-	}
-
 	/* Set up flag for V_CTX of server */
-	vs_ctx->io_ctx.flags = 0;
+	vs_ctx->tcp_io_ctx.flags = 0;
 
 	/* Set all bytes of buffer for incoming packet to zero */
-	memset(vs_ctx->io_ctx.buf, 0, MAX_PACKET_SIZE);
+	memset(vs_ctx->tcp_io_ctx.buf, 0, MAX_PACKET_SIZE);
 
 	/* Initialize list of connections */
 	vs_ctx->vsessions = (struct VSession**)calloc(vs_ctx->max_sessions, sizeof(struct VSession*));
@@ -1299,11 +1409,13 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
 			return -1;
 		}
+		/* Set up verse session */
+		v_init_session(vs_ctx->vsessions[i]);
 		/* Set up input and output queues */
 		vs_ctx->vsessions[i]->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
-		v_in_queue_init(vs_ctx->vsessions[i]->in_queue);
+		v_in_queue_init(vs_ctx->vsessions[i]->in_queue, vs_ctx->in_queue_max_size);
 		vs_ctx->vsessions[i]->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
-		v_out_queue_init(vs_ctx->vsessions[i]->out_queue);
+		v_out_queue_init(vs_ctx->vsessions[i]->out_queue, vs_ctx->out_queue_max_size);
 		/* Allocate memory for TCP connection */
 		vs_ctx->vsessions[i]->stream_conn = (struct VStreamConn*)calloc(1, sizeof(struct VStreamConn));
 		/* Allocate memory for peer hostname */

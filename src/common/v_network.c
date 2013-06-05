@@ -94,16 +94,20 @@ int v_parse_url(const char *str, struct VURL *url)
 		/* printf("\t%s\n", &str[str_pos]);*/
 	}
 
-	/* There has to be "udp" protocol, because only UDP is supported now  */
+	/* There has to be "udp" protocolor "tcp" protocol  */
 	if(strncmp(&str[str_pos], "udp", strlen("udp"))==0) {
-		url->dgram_protocol = VRS_TP_UDP;
+		url->transport_protocol = VRS_TP_UDP;
 		str_pos += strlen("udp");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "tcp", strlen("tcp"))==0) {
+			url->transport_protocol = VRS_TP_TCP;
+			str_pos += strlen("tcp");
+			/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else {
 		return 0;
 	}
 
-	/* There has to be '-' after "udp" string */
+	/* There has to be '-' after "udp" or "tcp" string */
 	if(str[str_pos]!='-') {
 		return 0;
 	} else {
@@ -113,12 +117,16 @@ int v_parse_url(const char *str, struct VURL *url)
 
 	/* There could be "none" or "dtls" string */
 	if(strncmp(&str[str_pos], "none", strlen("none"))==0) {
-		url->security_protocol = VRS_DGRAM_SEC_NONE;
+		url->security_protocol = VRS_SEC_DATA_NONE;
 		str_pos += strlen("none");
 		/*printf("\t%s\n", &str[str_pos]);*/
 	} else if(strncmp(&str[str_pos], "dtls", strlen("dtls"))==0) {
-		url->security_protocol = VRS_DGRAM_SEC_DTLS;
+		url->security_protocol = VRS_SEC_DATA_TLS;
 		str_pos += strlen("dtls");
+		/*printf("\t%s\n", &str[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "tls", strlen("tls"))==0) {
+		url->security_protocol = VRS_SEC_DATA_TLS;
+		str_pos += strlen("tls");
 		/*printf("\t%s\n", &str[str_pos]);*/
 	} else {
 		return 0;
@@ -170,14 +178,14 @@ void v_print_url(const int level, struct VURL *url)
 {
 	v_print_log(level, "URL:\n");
 	v_print_log_simple(level, "\tscheme: %s\n", url->scheme);
-	if(url->dgram_protocol==VRS_TP_UDP) {
+	if(url->transport_protocol==VRS_TP_UDP) {
 		v_print_log_simple(level, "\tdgram_protocol: UDP\n");
 	} else {
 		v_print_log_simple(level, "\tdgram_protocol: unknow\n");
 	}
-	if(url->security_protocol==VRS_DGRAM_SEC_NONE) {
+	if(url->security_protocol==VRS_SEC_DATA_NONE) {
 		v_print_log_simple(level, "\tsecurity_protocol: NONE\n");
-	} else if(url->security_protocol==VRS_DGRAM_SEC_DTLS) {
+	} else if(url->security_protocol==VRS_SEC_DATA_TLS) {
 		v_print_log_simple(level, "\tsecurity_protocol: DTLS\n");
 	} else {
 		v_print_log_simple(level, "\tsecurity_protocol: unknown\n");

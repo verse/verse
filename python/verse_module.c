@@ -78,13 +78,13 @@ static struct PyMemberDef Session_members[] = {
 
 /**
  * \brief Generic default callback function that print function name,
- * session ID, keywords and arguments
+ * session ID and arguments
  */
 static PyObject *_print_callback_arguments(const char *func_name, PyObject *self, PyObject *args)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
-	printf("%s(): session_id: %d\n", &func_name[8], session->session_id);
-	printf("arguments: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf("\n");
+	printf("default %s(session_id: %d, ", &func_name[7], session->session_id);
+	printf("args: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf(")\n");
 	Py_RETURN_NONE;
 }
 
@@ -1504,17 +1504,18 @@ static PyObject *Session_send_node_subscribe(PyObject *self, PyObject *args, PyO
 	uint8_t prio;
 	uint32_t node_id;
 	uint32_t version;
+	uint32_t crc32;
 	int ret;
-	static char *kwlist[] = {"prio", "node_id", "version", NULL};
+	static char *kwlist[] = {"prio", "node_id", "version", "crc32", NULL};
 
 	/* Parse arguments */
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BII", kwlist,
-			&prio, &node_id, &version)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIII", kwlist,
+			&prio, &node_id, &version, &crc32)) {
 		return NULL;
 	}
 
 	/* Call C API function */
-	ret = vrs_send_node_subscribe(session->session_id, prio, node_id, version);
+	ret = vrs_send_node_subscribe(session->session_id, prio, node_id, version, crc32);
 
 	/* Check if calling function was successful */
 	if(ret != VRS_SUCCESS) {
@@ -2370,8 +2371,8 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "PRINT_WARNING", VRS_PRINT_WARNING);
 	PyModule_AddIntConstant(module, "PRINT_DEBUG_MSG", VRS_PRINT_DEBUG_MSG);
 
-	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_DGRAM_SEC_NONE);
-	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_DGRAM_SEC_DTLS);
+	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_SEC_DATA_NONE);
+	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_SEC_DATA_TLS);
 
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_UNKNOWN", VRS_CONN_TERM_HOST_UNKNOWN);
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_DOWN", VRS_CONN_TERM_HOST_DOWN);

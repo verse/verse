@@ -109,12 +109,14 @@ typedef struct VS_CTX {
 	/* Data for connections */
 	unsigned short 		connected_clients;			/* Number of connected clients */
 	struct VSession		**vsessions;				/* List of sessions and session with connection attempts */
+	unsigned int		in_queue_max_size;			/* Default value of max size of incoming queue */
+	unsigned int		out_queue_max_size;			/* Default value of max size of outgoing queue */
 	/* Ports for connections */
 	unsigned short		port_low;					/* The lowest port number in port range */
 	unsigned short		port_high;					/* The highest port number in port range */
 	struct VS_Port		*port_list;					/* List of free ports used for communication with clients */
 	/* Data for packet receiving */
-	struct IO_CTX 		io_ctx;						/* Verse context for sending and receiving (connection attempts) */
+	struct IO_CTX 		tcp_io_ctx;					/* Verse context for sending and receiving (connection attempts) */
 	/* SSL context */
 	SSL_CTX				*tls_ctx;					/* SSL context for main secured TCP TLS socket */
 	SSL_CTX				*dtls_ctx;					/* SSL context for secured UDP DTLS connections (shared with all connections) */

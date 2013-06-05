@@ -88,7 +88,7 @@ void vs_handle_signal(int sig)
  */
 static void vs_load_default_values(struct VS_CTX *vs_ctx)
 {
-	int i, j;
+	int i;
 	vs_ctx->max_connection_attempts = 10;
 	vs_ctx->max_sessions = 10;
 	vs_ctx->max_sockets = vs_ctx->max_sessions;
@@ -96,22 +96,21 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->stream_protocol = TCP;			/* For new connection attempts is used TCP protocol */
 	vs_ctx->dgram_protocol = VRS_TP_UDP;	/* For data exchange UDP protocol could be used */
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-	vs_ctx->security_protocol = VRS_DGRAM_SEC_NONE | VRS_DGRAM_SEC_DTLS;
+	vs_ctx->security_protocol = VRS_SEC_DATA_NONE | VRS_SEC_DATA_TLS;
 #else
-	vs_ctx->security_protocol = VRS_DGRAM_SEC_NONE;
+	vs_ctx->security_protocol = VRS_SEC_DATA_NONE;
 #endif
 	vs_ctx->port = 12345;				/* Port number for listening */
 
 	vs_ctx->port_low = 20000;			/* The lowest port number for client-server connection */
 	vs_ctx->port_high = vs_ctx->port_low + vs_ctx->max_sockets;
 	/* Initialize list of free ports */
-	vs_ctx->port_list = (struct VS_Port*)malloc(sizeof(struct VS_Port)*vs_ctx->max_sockets);
-	for(i=vs_ctx->port_low, j=0; i<vs_ctx->port_high; i++, j++) {
-		vs_ctx->port_list[j].port_number = vs_ctx->port_low + j;
-		vs_ctx->port_list[j].flag = 0;
+	vs_ctx->port_list = (struct VS_Port*)calloc(vs_ctx->max_sockets, sizeof(struct VS_Port));
+	for(i=0; i<vs_ctx->max_sockets; i++) {
+		vs_ctx->port_list[i].port_number = (unsigned short)(vs_ctx->port_low + i);
 	}
 
-	vs_ctx->io_ctx.host_addr.ip_ver = IPV6;
+	vs_ctx->tcp_io_ctx.host_addr.ip_ver = IPV6;
 
 	vs_ctx->print_log_level = VRS_PRINT_DEBUG_MSG;
 	vs_ctx->log_file = stdout;
@@ -129,11 +128,17 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->default_perm = VRS_PERM_NODE_READ;
 
 	vs_ctx->cc_meth = CC_NONE;		/* "List" of allowed methods of Congestion Control */
-	vs_ctx->fc_meth = FC_NONE;		/* "List" of allowed methods of Flow Control */
+	vs_ctx->fc_meth = FC_TCP_LIKE;	/* "List" of allowed methods of Flow Control */
 
 	vs_ctx->cmd_cmpr = CMPR_ADDR_SHARE;
 
-	vs_ctx->rwin_scale = 7;			/*  Default scale of Flow Control Window */
+	vs_ctx->rwin_scale = 0;			/*  Default scale of Flow Control Window */
+
+	vs_ctx->in_queue_max_size = 1048576;	/* 1MB */
+	vs_ctx->out_queue_max_size = 1048576;	/* 1MB */
+
+	vs_ctx->tls_ctx = NULL;
+	vs_ctx->dtls_ctx = NULL;
 }
 
 /**
@@ -236,10 +241,14 @@ static int vs_add_superuser_account(struct VS_CTX *vs_ctx)
  */
 static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 {
+	struct VSUser *user;
 	int i;
 
 	/* Free all data shared at verse server */
 	vs_node_destroy_branch(vs_ctx, vs_ctx->data.root_node, 0);
+
+	/* Destroy hashed array of nodes */
+	v_hash_array_destroy(&vs_ctx->data.nodes);
 
 	/* Destroy list of connections */
 	for (i=0; i<vs_ctx->max_sessions; i++) {
@@ -254,7 +263,7 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 
 	free(vs_ctx->port_list); vs_ctx->port_list = NULL;
 
-	free(vs_ctx->io_ctx.buf); vs_ctx->io_ctx.buf = NULL;
+	free(vs_ctx->tcp_io_ctx.buf); vs_ctx->tcp_io_ctx.buf = NULL;
 
 	free(vs_ctx->private_cert_file); vs_ctx->private_cert_file = NULL;
 	if(vs_ctx->ca_cert_file != NULL) {
@@ -271,7 +280,15 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 		free(vs_ctx->csv_user_file);
 		vs_ctx->csv_user_file = NULL;
 	}
+
+	user = (struct VSUser*)vs_ctx->users.first;
+	while(user != NULL) {
+		vs_user_free(user);
+		user = user->next;
+	}
 	v_list_free(&vs_ctx->users);
+
+	vs_destroy_stream_ctx(vs_ctx);
 }
 
 #if 0
@@ -356,6 +373,7 @@ int main(int argc, char *argv[])
 	int opt;
 	char *config_file=NULL;
 	int debug_level_set = 0;
+	void *res;
 
 	/* Set up initial state */
 	vs_ctx.state = SERVER_STATE_CONF;
@@ -400,8 +418,10 @@ int main(int argc, char *argv[])
 	 * context */
 	switch (vs_ctx.auth_type) {
 		case AUTH_METHOD_CSV_FILE:
-			if(vs_load_user_accounts(&vs_ctx) != 1)
+			if(vs_load_user_accounts(&vs_ctx) != 1) {
+				vs_destroy_ctx(&vs_ctx);
 				exit(EXIT_FAILURE);
+			}
 			break;
 		case AUTH_METHOD_PAM:
 			/* TODO: read list of supported usernames and their uids somehow */
@@ -411,6 +431,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		default:
 			/* Not supported method */
+			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 	}
 
@@ -427,15 +448,18 @@ int main(int argc, char *argv[])
 
 	/* Create basic node structure of node tree */
 	if(vs_nodes_init(&vs_ctx) == -1) {
+		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
 
 	if(vs_ctx.stream_protocol == TCP) {
 		/* Initialize Verse server context */
 		if(vs_init_stream_ctx(&vs_ctx) == -1) {
+			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 		}
 	} else {
+		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
 
@@ -458,6 +482,7 @@ int main(int argc, char *argv[])
 
 	/* Initialize data semaphore */
 	if( sem_init(&vs_ctx.data.sem, 0, 0) != 0) {
+		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
 
@@ -486,6 +511,10 @@ int main(int argc, char *argv[])
 
 	/* Free Verse server context */
 	vs_destroy_ctx(&vs_ctx);
+
+	/* Join data thread */
+	pthread_join(vs_ctx.data_thread, &res);
+	if(res != NULL) free(res);
 
 	return EXIT_SUCCESS;
 }

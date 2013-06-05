@@ -186,12 +186,10 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 	dgram_conn->srtt = 0;
 	dgram_conn->rwin_host = 0xFFFFFFFF;	/* Default value */
 	dgram_conn->rwin_peer = 0xFFFFFFFF;	/* Default value */
+	dgram_conn->sent_size = 0;
 	dgram_conn->rwin_host_scale = 0;	/* rwin_host is >> by this value for outgoing packet */
 	dgram_conn->rwin_peer_scale = 0;	/* rwin_host is << by this value for incomming packet */
-	dgram_conn->cwin = 0xFFFF;			/* TODO: Congestion Control */
-	dgram_conn->fps_host = DEFAULT_FPS;	/* Default value */
-	dgram_conn->fps_peer = DEFAULT_FPS;	/* Default value */
-	dgram_conn->tmp_flags = 0;
+	dgram_conn->cwin = 0xFFFFFFFF;		/* TODO: Congestion Control */
 	/* Command compression */
 	dgram_conn->host_cmd_cmpr = CMPR_RESERVED;
 	dgram_conn->peer_cmd_cmpr = CMPR_RESERVED;
@@ -294,6 +292,9 @@ void v_conn_stream_init(struct VStreamConn *stream_conn)
 	memset(&(stream_conn->peer_address), 0, sizeof(VNetworkAddress));
 	/* Initialize connection mutex */
 	pthread_mutex_init(&stream_conn->mutex, NULL);
+	/* Initialize offsets */
+	stream_conn->sent_data_offset = 0;
+	stream_conn->pushed_data_offset = 0;
 }
 
 void v_conn_stream_destroy(struct VStreamConn *stream_conn)

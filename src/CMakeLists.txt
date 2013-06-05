@@ -15,6 +15,7 @@ set (libverse_src
 		common/v_connection.c
 		common/v_common.c
 		common/v_commands.c
+		common/v_stream.c
 		common/sys_cmds/v_user_auth_success.c
 		common/sys_cmds/v_user_auth_request.c
 		common/sys_cmds/v_user_auth_failure.c

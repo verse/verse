@@ -90,8 +90,10 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	/* Server proposes it's own Flow Control */
 	if(change_l_cmd->feature == FTR_FC_ID) {
 		for(value_rank=0; value_rank<change_l_cmd->count; value_rank++) {
-			/* TODO: better implementation */
-			if(change_l_cmd->value[value_rank].uint8 == FC_NONE) { /* list of supported methods */
+			/* Is value in "list" of supported methods */
+			if(change_l_cmd->value[value_rank].uint8 == FC_NONE ||
+					change_l_cmd->value[value_rank].uint8 == FC_TCP_LIKE)
+			{
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Flow Control has not been proposed yet */
@@ -109,7 +111,7 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Local Flow Control ID: %d proposed\n", change_l_cmd->value[0].uint8);
 				return 1;
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control\n");
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control method\n");
 				return 0;
 			}
 		}
@@ -143,8 +145,10 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	if(change_r_cmd->feature == FTR_FC_ID) {
 		for(value_rank=0; value_rank<change_r_cmd->count; value_rank++) {
-			/* TODO: better implementation */
-			if(change_r_cmd->value[value_rank].uint8 == FC_NONE) { /* list of supported methods */
+			/* Is value in "list" of supported methods */
+			if(change_r_cmd->value[value_rank].uint8 == FC_NONE ||
+					change_r_cmd->value[value_rank].uint8 == FC_TCP_LIKE)
+			{
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Flow Control has not been proposed yet */
@@ -165,7 +169,7 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 						change_r_cmd->value[0].uint8);
 				return 1;
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control\n");
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control method\n");
 				return 0;
 			}
 		}
@@ -248,11 +252,13 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 			if(confirm_l_cmd->value[0].uint8 == CMPR_NONE ||
 					confirm_l_cmd->value[0].uint8 == CMPR_ADDR_SHARE)
 			{
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Local Command Compression: %d confirmed\n",
+						confirm_l_cmd->value[0].uint8);
 				dgram_conn->host_cmd_cmpr = confirm_l_cmd->value[0].uint8;
-				return 0;
+				return 1;
 			} else {
 				v_print_log(VRS_PRINT_ERROR, "Unsupported Command Compress\n");
-				return 1;
+				return 0;
 			}
 		}
 	}
@@ -276,7 +282,8 @@ static int vc_REQUEST_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		if(confirm_r_cmd->count == 1 &&	/* Any confirm command has to include only one value */
 				confirm_r_cmd->value[0].uint8 == CC_NONE) /* "List" of supported methods */
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Congestion Control ID: %d confirmed\n", confirm_r_cmd->value[0].uint8);
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Congestion Control ID: %d confirmed\n",
+					confirm_r_cmd->value[0].uint8);
 			dgram_conn->cc_meth = CC_NONE;
 			return 1;
 		} else {
@@ -291,6 +298,8 @@ static int vc_REQUEST_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 			if(confirm_r_cmd->value[0].uint8 == CMPR_NONE ||
 					confirm_r_cmd->value[0].uint8 == CMPR_ADDR_SHARE)
 			{
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Command Compression: %d confirmed\n",
+						confirm_r_cmd->value[0].uint8);
 				dgram_conn->peer_cmd_cmpr = confirm_r_cmd->value[0].uint8;
 				return 1;
 			} else {
@@ -325,36 +334,36 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	/* System commands */
 	if(vsession->host_cookie.str!=NULL) {
 		/* Add negotiated cookie */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 	}
 
 	/* Add CC (local) proposal */
-	cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+	cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 			CMD_CHANGE_L_ID, FTR_CC_ID, &cc_none, NULL);
 
 	/* Add CC (remote) proposal */
-	cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+	cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 			CMD_CHANGE_R_ID, FTR_CC_ID, &cc_none, NULL);
 
 	/* Add Scale Window proposal */
-	cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+	cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 			CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vc_ctx->rwin_scale, NULL);
 
 	/* Add command compression proposal */
-	if(vsession->flags & VRS_NO_CMD_CMPR) {
+	if(vsession->flags & VRS_CMD_CMPR_NONE) {
 		/* Client doesn't want to send compressed commands (local proposal) */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, NULL);
 		/* Client isn't able to receive compressed commands (remote proposal) */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
 	} else {
 		/* Client wants to send compressed commands (local proposal) */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
 		/* Client is able to receive compressed commands (remote proposal) */
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
 	}
 }
@@ -497,21 +506,21 @@ void vc_PARTOPEN_init_send_packet(struct vContext *C)
 
 	/* Confirm proposed COOKIE */
 	if(vsession->peer_cookie.str!=NULL) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 	}
 
 	/* Confirm proposed Flow Control ID */
 	if(dgram_conn->fc_meth != FC_RESERVED) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_FC_ID, &dgram_conn->fc_meth, NULL);
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_R_ID, FTR_FC_ID, &dgram_conn->fc_meth, NULL);
 	}
 
 	/* Confirm proposed shifting of Flow Control Window */
 	if(dgram_conn->rwin_peer_scale != 0) {
-		cmd_rank += v_add_negotiate_cmd(s_packet, cmd_rank,
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
 				CMD_CONFIRM_L_ID, FTR_RWIN_SCALE, &dgram_conn->rwin_peer_scale, NULL);
 	}
 }
@@ -1227,7 +1236,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	freeaddrinfo(result);
 
 	/* When DTLS was negotiated, then set flag */
-	if(url.security_protocol == VRS_DGRAM_SEC_DTLS) {
+	if(url.security_protocol == VRS_SEC_DATA_TLS) {
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 		dgram_conn->io_ctx.flags |= SOCKET_SECURED;
 #else
