@@ -118,7 +118,7 @@ class MySession(vrs.Session):
         # My testing attributes
         self.test_node = None
         self.test_taggroup = None
-        self.test_tag = None
+        self.test_string_tag = None
         #self.test_child_layer = None
         #self.test_parent_layer = None
         
@@ -267,6 +267,7 @@ class MySession(vrs.Session):
             self.test_taggroup = self.test_node.taggroups[taggroup_id]
             #self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_UINT8, 3, 1)
             self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_STRING8, 1, 1)
+            self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_UINT8, 1, 2)
 
     def _receive_taggroup_destroy(self, node_id, taggroup_id):
         """Callback function for taggroup destroy"""
@@ -290,11 +291,15 @@ class MySession(vrs.Session):
         taggroup = self.nodes[node_id].taggroups[taggroup_id]
         tag = MyTag(taggroup, tag_id, data_type, count, custom_type)
         taggroup.tags[tag_id] = tag
-        if self.test_taggroup == taggroup:
-            self.test_tag = tag
+        if self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_STRING8 and custom_type == 1:
+            self.test_string_tag = tag
             #tag.value = [123,124,125]
             tag.value = ["Ahoj"]
             self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tuple(tag.value))
+        elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_UINT8 and custom_type == 2:
+            self.test_int_tag = tag
+            tag.value = 10
+            self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
     
     def _receive_tag_destroy(self, node_id, taggroup_id, tag_id):
         """Callback function for tag destroy"""
