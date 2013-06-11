@@ -928,6 +928,70 @@ static PyObject *_send_tag_set_int(session_SessionObject *session,
 	Py_RETURN_NONE;
 }
 
+static PyObject *_send_tag_set_float(session_SessionObject *session,
+		uint8_t prio,
+		uint32_t node_id,
+		uint16_t taggroup_id,
+		uint16_t tag_id,
+		uint8_t data_type,
+		PyObject *float_value)
+{
+	int ret;
+	long f = PyFloat_AsDouble(float_value);
+
+#if 0
+	switch(data_type) {
+	case VRS_VALUE_TYPE_REAL16:
+		/* TODO: check range */
+		break;
+	case VRS_VALUE_TYPE_REAL32:
+		/* TODO: check range */
+		break;
+	case VRS_VALUE_TYPE_REAL64:
+		/* No need to compare ranges */
+		break;
+	default:
+		break;
+	}
+#endif
+
+	/* Call C API function */
+	ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &f);
+
+	/* Check if calling function was successful */
+	if(ret != VRS_SUCCESS) {
+		PyErr_SetString(VerseError, "Unable to send tag_set_value command");
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
+static PyObject *_send_tag_set_string(session_SessionObject *session,
+		uint8_t prio,
+		uint32_t node_id,
+		uint16_t taggroup_id,
+		uint16_t tag_id,
+		PyObject *string_value)
+{
+	int ret;
+	PyObject *tmp = PyUnicode_AsEncodedString(string_value, "utf-8", "Error: encoding string");
+	void *values = PyBytes_AsString(tmp);
+
+	/* Call C API function */
+	ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, VRS_VALUE_TYPE_STRING8, 1, values);
+
+	if(values != NULL) free(values);
+
+	/* Check if calling function was successful */
+	if(ret != VRS_SUCCESS) {
+		PyErr_SetString(VerseError, "Unable to send tag_set_value command");
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
 static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
@@ -950,6 +1014,10 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, values);
 	} else if(PyLong_Check(values)) {
 		return _send_tag_set_int(session, prio, node_id, taggroup_id, tag_id, data_type, values);
+	} else if(PyFloat_AsDouble(values)) {
+		return _send_tag_set_float(session, prio, node_id, taggroup_id, tag_id, data_type, values);
+	} else if(PyUnicode_Check(values)) {
+		return _send_tag_set_string(session, prio, node_id, taggroup_id, tag_id, values);
 	} else {
 		PyErr_SetString(VerseError, "Value is not int nor float nor string nor tuple");
 		return NULL;
