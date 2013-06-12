@@ -290,23 +290,19 @@ void *vs_data_loop(void *arg)
 
 	gettimeofday(&tv, NULL);
 	ts.tv_sec = tv.tv_sec + 1;
-	ts.tv_nsec = 0;
+	ts.tv_nsec = 1000*tv.tv_usec;
 
 	while(vs_ctx->state != SERVER_STATE_CLOSED) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Wait for data ...\n");
-
 		ret = sem_timedwait(&vs_ctx->data.sem, &ts);
 		if(ret == 0) {
 			for(i=0; i<vs_ctx->max_sessions; i++) {
 				if(vs_ctx->vsessions[i]->dgram_conn->host_state == UDP_SERVER_STATE_OPEN ||
-						vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
+						vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN)
+				{
 					/* Pop all data of incoming messages from queue */
-
 					while(v_in_queue_cmd_count(vs_ctx->vsessions[i]->in_queue) > 0) {
 						cmd = v_in_queue_pop(vs_ctx->vsessions[i]->in_queue);
-
 						vs_handle_node_cmd(vs_ctx, vs_ctx->vsessions[i], cmd);
-
 						v_cmd_destroy(&cmd);
 					}
 				}

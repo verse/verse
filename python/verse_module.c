@@ -937,26 +937,31 @@ static PyObject *_send_tag_set_float(session_SessionObject *session,
 		PyObject *float_value)
 {
 	int ret;
-	long f = PyFloat_AsDouble(float_value);
+	real16 r16;
+	real32 r32;
+	double d = PyFloat_AsDouble(float_value);
 
-#if 0
 	switch(data_type) {
 	case VRS_VALUE_TYPE_REAL16:
 		/* TODO: check range */
+		r16 = (real16)d;
+		/* Call C API function */
+		ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &r16);
 		break;
 	case VRS_VALUE_TYPE_REAL32:
 		/* TODO: check range */
+		r32 = (real32)d;
+		/* Call C API function */
+		ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &r32);
 		break;
 	case VRS_VALUE_TYPE_REAL64:
 		/* No need to compare ranges */
+		ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &d);
 		break;
 	default:
-		break;
+		PyErr_SetString(VerseError, "Unsupported float data type");
+		return NULL;
 	}
-#endif
-
-	/* Call C API function */
-	ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &f);
 
 	/* Check if calling function was successful */
 	if(ret != VRS_SUCCESS) {
@@ -975,13 +980,19 @@ static PyObject *_send_tag_set_string(session_SessionObject *session,
 		PyObject *string_value)
 {
 	int ret;
+	void *values = NULL;
 	PyObject *tmp = PyUnicode_AsEncodedString(string_value, "utf-8", "Error: encoding string");
-	void *values = PyBytes_AsString(tmp);
+
+	if(tmp != NULL) {
+		values = PyBytes_AsString(tmp);
+		printf(">>> %s\n", (char*)values);
+	} else {
+		PyErr_SetString(VerseError, "Unable to encode UTF-8 string");
+		return NULL;
+	}
 
 	/* Call C API function */
 	ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, VRS_VALUE_TYPE_STRING8, 1, values);
-
-	if(values != NULL) free(values);
 
 	/* Check if calling function was successful */
 	if(ret != VRS_SUCCESS) {
@@ -1000,27 +1011,54 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 	uint16_t taggroup_id;
 	uint16_t tag_id;
 	uint8_t data_type;
-	PyObject *values;
+	PyObject *value;
 	static char *kwlist[] = {"prio", "node_id", "taggroup_id", "tag_id", "data_type", "values", NULL};
 
 	/* Parse arguments */
 	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIHHBO", kwlist,
-			&prio, &node_id, &taggroup_id, &tag_id, &data_type, &values)) {
+			&prio, &node_id, &taggroup_id, &tag_id, &data_type, &value)) {
 		return NULL;
 	}
 
 	/* Check if value is tuple */
-	if(PyTuple_Check(values)) {
-		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, values);
-	} else if(PyLong_Check(values)) {
-		return _send_tag_set_int(session, prio, node_id, taggroup_id, tag_id, data_type, values);
-	} else if(PyFloat_AsDouble(values)) {
-		return _send_tag_set_float(session, prio, node_id, taggroup_id, tag_id, data_type, values);
-	} else if(PyUnicode_Check(values)) {
-		return _send_tag_set_string(session, prio, node_id, taggroup_id, tag_id, values);
+	if(PyTuple_Check(value)) {
+		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, value);
+	/* When value is not tuple, then some simple data types are supported too */
 	} else {
-		PyErr_SetString(VerseError, "Value is not int nor float nor string nor tuple");
-		return NULL;
+		switch(data_type) {
+		case VRS_VALUE_TYPE_UINT8:
+		case VRS_VALUE_TYPE_UINT16:
+		case VRS_VALUE_TYPE_UINT32:
+		case VRS_VALUE_TYPE_UINT64:
+			if(PyLong_Check(value)) {
+				return _send_tag_set_int(session, prio, node_id, taggroup_id, tag_id, data_type, value);
+			} else {
+				PyErr_SetString(VerseError, "Value is not int");
+				return NULL;
+			}
+			break;
+		case VRS_VALUE_TYPE_REAL16:
+		case VRS_VALUE_TYPE_REAL32:
+		case VRS_VALUE_TYPE_REAL64:
+			if(PyFloat_AsDouble(value)) {
+				return _send_tag_set_float(session, prio, node_id, taggroup_id, tag_id, data_type, value);
+			} else {
+				PyErr_SetString(VerseError, "Value is not float");
+				return NULL;
+			}
+			break;
+		case VRS_VALUE_TYPE_STRING8:
+			if(PyUnicode_Check(value)) {
+				return _send_tag_set_string(session, prio, node_id, taggroup_id, tag_id, value);
+			} else {
+				PyErr_SetString(VerseError, "Value is not UTF-8 string");
+				return NULL;
+			}
+			break;
+		default:
+			PyErr_SetString(VerseError, "Value is not int nor float nor string nor tuple");
+			return NULL;
+		}
 	}
 
 	Py_RETURN_NONE;
@@ -1032,6 +1070,7 @@ static PyObject *Session_receive_tag_destroy(PyObject *self, PyObject *args)
 {
 	return _print_callback_arguments(__FUNCTION__, self, args);
 }
+
 
 static void cb_c_receive_tag_destroy(const uint8_t session_id,
 		const uint32_t node_id,

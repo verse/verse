@@ -306,7 +306,7 @@ class MySession(vrs.Session):
             self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
         elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_STRING8 and custom_type == 4:
             self.test_string_tag = tag
-            tag.value = ("Ahoj",)
+            tag.value = "Ahoj"
             self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
     
     def _receive_tag_destroy(self, node_id, taggroup_id, tag_id):
@@ -384,7 +384,7 @@ def main(hostname='localhost'):
     received_signal = False
     
     # Set debug level
-    vrs.set_debug_level(vrs.PRINT_NONE)
+    vrs.set_debug_level(vrs.PRINT_DEBUG_MSG)
     
     try:
         session = MySession(hostname, "12345", vrs.DGRAM_SEC_NONE)
