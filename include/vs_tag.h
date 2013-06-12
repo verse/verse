@@ -47,7 +47,7 @@
  */
 typedef struct VSTag {
 	uint16				id;
-	uint8				value_type;	/* (u)int(8/16/32/64), real(16/32/64), string8 */
+	uint8				data_type;	/* (u)int(8/16/32/64), real(16/32/64), string8 */
 	uint8				count;		/* The count of values */
 	uint8				flag;		/* Initialized/unitialized */
 	uint16				type;		/* Client specified type */

@@ -289,16 +289,16 @@ static void cb_receive_tag_set_value(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
 		const uint16_t tag_id,
-		const uint8_t value_type,
+		const uint8_t data_type,
 		const uint8_t count,
 		const void *value)
 {
 	int i;
 
 	printf("%s() session_id: %u, node_id: %u, taggroup_id: %u, tag_id: %u, type: %d, count: %d, value(s): ",
-				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, value_type, count);
+				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, data_type, count);
 
-	switch(value_type) {
+	switch(data_type) {
 	case VRS_VALUE_TYPE_UINT8:
 		for(i=0; i<count; i++) {
 			printf("%d, ", ((uint8_t*)value)[i]);

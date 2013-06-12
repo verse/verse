@@ -47,7 +47,7 @@ void vs_tag_send_set(struct VSession *vsession,
 {
 	struct Generic_Cmd *tag_set_cmd = NULL;
 
-	tag_set_cmd = v_tag_set_create(node->id, tg->id, tag->id, tag->value_type, tag->count, tag->value);
+	tag_set_cmd = v_tag_set_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->value);
 
 	v_out_queue_push_tail(vsession->out_queue, prio, tag_set_cmd);
 }
@@ -92,7 +92,7 @@ int vs_tag_send_create(struct VSEntitySubscriber *tg_subscriber,
 	}
 
 	/* Create new Tag_Create command */
-	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->value_type, tag->count, tag->type);
+	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->type);
 
 	/* Put command to the outgoing queue */
 	if(tag_create != NULL &&
@@ -157,7 +157,7 @@ void vs_tag_init(struct VSTag *tag)
 	tag->type = 0;
 	tag->tag_folls.first = NULL;
 	tag->tag_folls.last = NULL;
-	tag->value_type = VRS_VALUE_TYPE_RESERVED;
+	tag->data_type = VRS_VALUE_TYPE_RESERVED;
 	tag->count = 0;
 	tag->flag = TAG_UNINITIALIZED;
 	tag->value = NULL;
@@ -300,7 +300,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	uint32 					node_id = UINT32(tag_create->data[0]);
 	uint16 					taggroup_id = UINT16(tag_create->data[UINT32_SIZE]);
 	uint16					tag_id = UINT16(tag_create->data[UINT32_SIZE + UINT16_SIZE]);
-	uint8					value_type = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE]);
+	uint8					data_type = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE]);
 	uint8					count = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE]);
 	uint16 					type = UINT16(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE]);
 
@@ -355,9 +355,9 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is type of Tag supported? */
-	if(!(value_type>VRS_VALUE_TYPE_RESERVED && value_type<=VRS_VALUE_TYPE_STRING8)) {
+	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_STRING8)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_type: %d is not supported\n",
-				__FUNCTION__, value_type);
+				__FUNCTION__, data_type);
 		return 0;
 	}
 
@@ -403,12 +403,12 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	tag->value_type = value_type;
+	tag->data_type = data_type;
 	tag->count = count;
 	tag->type = type;
 
 	/* Allocate memory for value (not for type string8) */
-	switch(value_type) {
+	switch(data_type) {
 		case VRS_VALUE_TYPE_UINT8:
 			tag->value = (void*)calloc(count, sizeof(uint8));
 			break;
@@ -636,9 +636,9 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	}
 
 	/* Data type has to match */
-	if(data_type != tag->value_type) {
+	if(data_type != tag->data_type) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() data type (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
-						__FUNCTION__, tag->value_type, tag_id, taggroup_id, node_id, data_type);
+						__FUNCTION__, tag->data_type, tag_id, taggroup_id, node_id, data_type);
 		return 0;
 	}
 
@@ -650,7 +650,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	}
 
 	/* Set value in tag */
-	switch(tag->value_type) {
+	switch(tag->data_type) {
 	case VRS_VALUE_TYPE_UINT8:
 		memcpy(tag->value, &tag_set->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE], UINT8_SIZE*tag->count);
 		break;

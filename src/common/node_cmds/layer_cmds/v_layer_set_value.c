@@ -52,7 +52,7 @@ extern struct Cmd_Struct cmd_struct[];
 struct Generic_Cmd *v_layer_set_value_create(const uint32 node_id,
 		const uint16 layer_id,
 		const uint32 item_id,
-		const uint8 value_type,
+		const uint8 data_type,
 		const uint8 count,
 		const void *value)
 {
@@ -62,7 +62,7 @@ struct Generic_Cmd *v_layer_set_value_create(const uint32 node_id,
 	assert(count<=4);
 
 	/* Tricky part :-) */
-	cmd_id = CMD_LAYER_SET_UINT8 + 4*(value_type-1) + (count-1);
+	cmd_id = CMD_LAYER_SET_UINT8 + 4*(data_type-1) + (count-1);
 
 	layer_set = (struct Generic_Cmd *)malloc(UINT8_SIZE +
 			cmd_struct[cmd_id].size);
@@ -72,7 +72,7 @@ struct Generic_Cmd *v_layer_set_value_create(const uint32 node_id,
 	UINT16(layer_set->data[UINT32_SIZE]) = layer_id;
 	UINT32(layer_set->data[UINT32_SIZE + UINT16_SIZE]) = item_id;
 
-	switch(value_type) {
+	switch(data_type) {
 	case VRS_VALUE_TYPE_UINT8:
 		for(i=0; i<count; i++) {
 			UINT8(layer_set->data[UINT32_SIZE + UINT16_SIZE + UINT32_SIZE + i*INT8_SIZE]) = ((uint8*)value)[i];
