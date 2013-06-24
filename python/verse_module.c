@@ -225,7 +225,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 	}
 
 	/* Check if value is tuple */
-	if(!PyTuple_Check(tuple_values)) {
+	if(tuple_values == NULL || !PyTuple_Check(tuple_values)) {
 		PyErr_SetString(VerseError, "Value is not tuple");
 		return NULL;
 	}
