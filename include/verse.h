@@ -132,7 +132,7 @@ extern "C" {
 /* Flags used in function verse_send_connect_request */
 #define VRS_SEC_DATA_NONE			1	/* No security at data exchange connection */
 #define VRS_SEC_DATA_TLS			2	/* Use TLS/DTLS at data exchange connection */
-#define VRS_TP_UDP					4	/* Transport protocol: UDP*/
+#define VRS_TP_UDP					4	/* Transport protocol: UDP */
 #define VRS_TP_TCP					8	/* Transport protocol: TCP */
 #define VRS_CMD_CMPR_NONE			16	/* No command compression */
 #define VRS_CMD_CMPR_ADDR_SHARE		32	/* Share command addresses to compress commands */

@@ -2580,6 +2580,9 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "VALUE_TYPE_REAL64", VRS_VALUE_TYPE_REAL64);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_STRING8", VRS_VALUE_TYPE_STRING8);
 
+	PyModule_AddIntConstant(module, "PERM_NODE_READ", VRS_PERM_NODE_READ);
+	PyModule_AddIntConstant(module, "PERM_NODE_WRITE", VRS_PERM_NODE_WRITE);
+
 	return module;
 }
 
