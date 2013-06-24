@@ -295,19 +295,19 @@ class MySession(vrs.Session):
         if self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_UINT8 and custom_type == 1:
             self.test_tuple_tag = tag
             tag.value = (123, 124, 125)
-            self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
         elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_UINT8 and custom_type == 2:
             self.test_int_tag = tag
-            tag.value = 10
-            self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+            tag.value = (10,)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
         elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_REAL32 and custom_type == 3:
             self.test_float_tag = tag
-            tag.value = 12.345
-            self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+            tag.value = (12.345,)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
         elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_STRING8 and custom_type == 4:
             self.test_string_tag = tag
-            tag.value = "Ahoj"
-            self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+            tag.value = ("Ahoj",)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
     
     def _receive_tag_destroy(self, node_id, taggroup_id, tag_id):
         """Callback function for tag destroy"""
@@ -320,7 +320,7 @@ class MySession(vrs.Session):
         except KeyError:
             pass
     
-    def _receive_tag_set_value(self, node_id, taggroup_id, tag_id, values):
+    def _receive_tag_set_values(self, node_id, taggroup_id, tag_id, values):
         """Callback function for tag set value"""
         print("MY tag_set_values(): ",
               "node_id: ", node_id,

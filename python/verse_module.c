@@ -601,7 +601,7 @@ static PyObject *Session_send_layer_create(PyObject *self, PyObject *args, PyObj
 
 
 /* Tag Set Value */
-static PyObject *Session_receive_tag_set_value(PyObject *self, PyObject *args)
+static PyObject *Session_receive_tag_set_values(PyObject *self, PyObject *args)
 {
 	return _print_callback_arguments(__FUNCTION__, self, args);
 }
@@ -666,7 +666,7 @@ static void cb_c_receive_tag_set_value(const uint8_t session_id,
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
 
-		PyObject_CallMethod((PyObject*)session, "_receive_tag_set_value", "(IHHO)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_set_values", "(IHHO)",
 				node_id, taggroup_id, tag_id, tuple_values);
 	}
 	return;
@@ -879,6 +879,8 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 	Py_RETURN_NONE;
 }
 
+#if 0
+
 static PyObject *_send_tag_set_int(session_SessionObject *session,
 		uint8_t prio,
 		uint32_t node_id,
@@ -1003,7 +1005,9 @@ static PyObject *_send_tag_set_string(session_SessionObject *session,
 	Py_RETURN_NONE;
 }
 
-static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyObject *kwds)
+#endif
+
+static PyObject *Session_send_tag_set_values(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
 	uint8_t prio;
@@ -1011,18 +1015,24 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 	uint16_t taggroup_id;
 	uint16_t tag_id;
 	uint8_t data_type;
-	PyObject *value;
+	PyObject *values;
 	static char *kwlist[] = {"prio", "node_id", "taggroup_id", "tag_id", "data_type", "values", NULL};
 
 	/* Parse arguments */
 	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIHHBO", kwlist,
-			&prio, &node_id, &taggroup_id, &tag_id, &data_type, &value)) {
+			&prio, &node_id, &taggroup_id, &tag_id, &data_type, &values)) {
 		return NULL;
 	}
 
 	/* Check if value is tuple */
-	if(PyTuple_Check(value)) {
-		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, value);
+	if(values != NULL && PyTuple_Check(values)) {
+		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, values);
+	} else {
+		PyErr_SetString(VerseError, "Value is not tuple");
+		return NULL;
+	}
+
+#if 0
 	/* When value is not tuple, then some simple data types are supported too */
 	} else {
 		switch(data_type) {
@@ -1030,8 +1040,8 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		case VRS_VALUE_TYPE_UINT16:
 		case VRS_VALUE_TYPE_UINT32:
 		case VRS_VALUE_TYPE_UINT64:
-			if(PyLong_Check(value)) {
-				return _send_tag_set_int(session, prio, node_id, taggroup_id, tag_id, data_type, value);
+			if(PyLong_Check(values)) {
+				return _send_tag_set_int(session, prio, node_id, taggroup_id, tag_id, data_type, values);
 			} else {
 				PyErr_SetString(VerseError, "Value is not int");
 				return NULL;
@@ -1040,16 +1050,16 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		case VRS_VALUE_TYPE_REAL16:
 		case VRS_VALUE_TYPE_REAL32:
 		case VRS_VALUE_TYPE_REAL64:
-			if(PyFloat_AsDouble(value)) {
-				return _send_tag_set_float(session, prio, node_id, taggroup_id, tag_id, data_type, value);
+			if(PyFloat_AsDouble(values)) {
+				return _send_tag_set_float(session, prio, node_id, taggroup_id, tag_id, data_type, values);
 			} else {
 				PyErr_SetString(VerseError, "Value is not float");
 				return NULL;
 			}
 			break;
 		case VRS_VALUE_TYPE_STRING8:
-			if(PyUnicode_Check(value)) {
-				return _send_tag_set_string(session, prio, node_id, taggroup_id, tag_id, value);
+			if(PyUnicode_Check(values)) {
+				return _send_tag_set_string(session, prio, node_id, taggroup_id, tag_id, values);
 			} else {
 				PyErr_SetString(VerseError, "Value is not UTF-8 string");
 				return NULL;
@@ -1060,6 +1070,7 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 			return NULL;
 		}
 	}
+#endif
 
 	Py_RETURN_NONE;
 }
@@ -2323,15 +2334,15 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS,
 				"Callback function for tag destroy command received from server"
 		},
-		{"send_tag_set_value",
-				(PyCFunction)Session_send_tag_set_value,
+		{"send_tag_set_values",
+				(PyCFunction)Session_send_tag_set_values,
 				METH_VARARGS | METH_KEYWORDS,
-				"Send tag set value command to the server"
+				"Send tag set values command to the server"
 		},
-		{"_receive_tag_set_value",
-				(PyCFunction)Session_receive_tag_set_value,
+		{"_receive_tag_set_values",
+				(PyCFunction)Session_receive_tag_set_values,
 				METH_VARARGS,
-				"Callback function for tag set value command received from server"
+				"Callback function for tag set values command received from server"
 		},
 		/* Layer commands */
 		{"send_layer_create",
