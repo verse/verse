@@ -29,6 +29,7 @@ option(VERSE_CLANG "Use Clang Compiler" OFF)
 option(VERSE_PYTHON_MODULE "Verse Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
+option(VERSE_WEBSOCKET "Support for WebSocket" ON)
 
 # Clang compiler
 if (VERSE_CLANG)
@@ -99,6 +100,14 @@ if (VERSE_PYTHON_MODULE)
 	
 endif (VERSE_PYTHON_MODULE)
 
+# Support for WebSocket
+if(VERSE_WEBSOCKET)
+
+    # Try to find optional package libWebSockets
+    find_package (LibWebSockets)
+    
+endif(VERSE_WEBSOCKET)
+
 # Doxygen
 if (VERSE_DOXYGEN)
 
@@ -158,6 +167,12 @@ if (CHECK_FOUND)
 else ()
 	message (" * Check:         OFF")
 endif (CHECK_FOUND)
+
+if (LIBWEBSOCKETS_FOUND)
+	message (" * WebSocket:     ON")
+else ()
+	message (" * WebSocket:     OFF")
+endif (LIBWEBSOCKETS_FOUND)
 
 if (DOXYGEN_FOUND)
 	message (" * Doxygen:       ON")
