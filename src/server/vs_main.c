@@ -37,6 +37,7 @@
 #include "vs_data.h"
 #include "vs_node.h"
 #include "vs_config.h"
+#include "vs_websocket.h"
 
 #include "v_common.h"
 #include "v_session.h"
@@ -493,6 +494,15 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+#if 0
+	/* Try to create new WebSocket thread */
+	if(pthread_create(&vs_ctx.websocket_thread, NULL, vs_websocket_loop, (void*)&vs_ctx) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		vs_destroy_ctx(&vs_ctx);
+		exit(EXIT_FAILURE);
+	}
+#endif
+
 	/* Set up pointer to local server CTX -> server server could be terminated
 	 * with signal now. */
 	local_vs_ctx = &vs_ctx;
@@ -509,12 +519,18 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* Free Verse server context */
-	vs_destroy_ctx(&vs_ctx);
-
 	/* Join data thread */
 	pthread_join(vs_ctx.data_thread, &res);
 	if(res != NULL) free(res);
+
+#if 0
+	/* Join WebSocket thread */
+	pthread_join(vs_ctx.websocket_thread, &res);
+	if(res != NULL) free(res);
+#endif
+
+	/* Free Verse server context */
+	vs_destroy_ctx(&vs_ctx);
 
 	return EXIT_SUCCESS;
 }

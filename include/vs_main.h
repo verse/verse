@@ -142,6 +142,9 @@ typedef struct VS_CTX {
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */
 	pthread_attr_t		data_thread_attr;			/* The attribute of data thread */
+	/* WebSocket thread */
+	pthread_t			websocket_thread;			/* WebSocket thread */
+	pthread_attr_t		websocket_thread_attr;		/* The attribute of WebSocket thread*/
 } VS_CTX;
 
 #endif

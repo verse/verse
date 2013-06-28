@@ -80,13 +80,15 @@ set (server_src
 		server/vs_layer.c
 		server/vs_data.c
 		server/vs_config.c
-		server/vs_auth_csv.c)
+		server/vs_auth_csv.c
+		server/vs_websocket.c)
 		
 
 include_directories (../include)
 include_directories (${INIPARSER_INCLUDE_DIRS})
 include_directories (${OPENSSL_INCLUDE_DIR})
 include_directories (${LIBWEBSOCKETS_INCLUDE_DIR})
+
 
 # Make build flags compiler specific
 if (CMAKE_COMPILER_IS_GNUCC)
