@@ -1431,7 +1431,16 @@ static int vs_init_io_ctx(struct IO_CTX *io_ctx,
  */
 static int vs_init_tcp_io_ctx(VS_CTX *vs_ctx)
 {
-	return vs_init_io_ctx(&vs_ctx->tcp_io_ctx, vs_ctx->port, vs_ctx->max_sessions);
+	return vs_init_io_ctx(&vs_ctx->tcp_io_ctx, vs_ctx->tcp_port, vs_ctx->max_sessions);
+}
+
+
+/**
+ * \brief Initialize IO context for WebSocket TCP connection
+ */
+static int vs_init_websocket_io_ctx(VS_CTX *vs_ctx)
+{
+	return vs_init_io_ctx(&vs_ctx->ws_io_ctx, vs_ctx->ws_port, vs_ctx->max_sessions);
 }
 
 
@@ -1497,6 +1506,13 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 	if(ret != 1) {
 		return ret;
 	}
+
+#ifdef WSLAY
+	ret = vs_init_websocket_io_ctx(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+#endif
 
 	ret = vs_init_sessions(vs_ctx);
 	if(ret != 1) {

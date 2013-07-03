@@ -97,7 +97,8 @@ typedef struct VS_CTX {
 	unsigned short 		max_connection_attempts;	/* Maximum number of connection attempts from one address:port */
 	unsigned short 		max_sessions;				/* Maximum number of connected clients */
 	unsigned short		max_sockets;				/* Maximum number of sockets server can create */
-	unsigned short 		port;						/* Port number which server is listening on */
+	unsigned short 		tcp_port;					/* TCP port number which server is listening on */
+	unsigned short		ws_port;					/* WebSocket TCP port number */
 	int					stream_protocol;			/* Transport protocol for listening (Only TCP is supported now) */
 	char				dgram_protocol;				/* Flag with datagrame protocol supported for data exchange (Only UDP now) */
 	char				security_protocol;			/* Flag with security protocol supported for data exchange (Only None and DTLS now)*/

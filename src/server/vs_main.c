@@ -100,7 +100,8 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 #else
 	vs_ctx->security_protocol = VRS_SEC_DATA_NONE;
 #endif
-	vs_ctx->port = 12345;				/* Port number for listening */
+	vs_ctx->tcp_port = 12345;			/* TCP port number for listening */
+	vs_ctx->ws_port = 23456;			/* WebSocket TCP port for listening */
 
 	vs_ctx->port_low = 20000;			/* The lowest port number for client-server connection */
 	vs_ctx->port_high = vs_ctx->port_low + vs_ctx->max_sockets;
@@ -111,6 +112,7 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	}
 
 	vs_ctx->tcp_io_ctx.host_addr.ip_ver = IPV6;
+	vs_ctx->ws_io_ctx.host_addr.ip_ver = IPV6;
 
 	vs_ctx->print_log_level = VRS_PRINT_DEBUG_MSG;
 	vs_ctx->log_file = stdout;
