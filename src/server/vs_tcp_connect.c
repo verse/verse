@@ -1196,13 +1196,11 @@ void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
 }
 
 
-/**
- * \brief Initialize verse server context for connection at TCP
+/*
+ * \brief Initialize OpenSSl of Verse server
  */
-int vs_init_stream_ctx(VS_CTX *vs_ctx)
+static int vs_init_ssl(VS_CTX *vs_ctx)
 {
-	int i, flag;
-
 	/* Set up the library */
 	SSL_library_init();
 	ERR_load_BIO_strings();
@@ -1328,102 +1326,123 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 	vs_ctx->dtls_ctx = NULL;
 #endif
 
-	vs_ctx->connected_clients = 0;
+	return 1;
+}
+
+
+/**
+ * \brief Initialize IO context of Verse server used for incomming connections (TCP, WebSocket)
+ */
+static int vs_init_io_ctx(struct IO_CTX *io_ctx,
+		unsigned short port,
+		int max_sessions)
+{
+	int flag;
 
 	/* Allocate buffer for incoming packets */
-	if ( (vs_ctx->tcp_io_ctx.buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
+	if ( (io_ctx->buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		return -1;
 	}
 
 	/* "Address" of server */
-	if(vs_ctx->tcp_io_ctx.host_addr.ip_ver == IPV4) {		/* IPv4 */
+	if(io_ctx->host_addr.ip_ver == IPV4) {		/* IPv4 */
 
 		/* Create socket which server uses for listening for new connections */
-		if ( (vs_ctx->tcp_io_ctx.sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		if ( (io_ctx->sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		/* Set socket non-blocking */
-/*		flag = fcntl(vs_ctx->io_ctx.sockfd, F_GETFL, 0);
-		if( (fcntl(vs_ctx->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-			return -1;
-		}*/
-
 		/* Set socket to reuse address */
 		flag = 1;
-		if( setsockopt(vs_ctx->tcp_io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+		if( setsockopt(io_ctx->sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv4.sin_family = AF_INET;
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv4.sin_port = htons(vs_ctx->port);
-		vs_ctx->tcp_io_ctx.host_addr.port = vs_ctx->port;
+		io_ctx->host_addr.addr.ipv4.sin_family = AF_INET;
+		io_ctx->host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
+		io_ctx->host_addr.addr.ipv4.sin_port = htons(port);
+		io_ctx->host_addr.port = port;
 
 		/* Bind address and socket */
-		if( bind(vs_ctx->tcp_io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->tcp_io_ctx.host_addr.addr.ipv4), sizeof(vs_ctx->tcp_io_ctx.host_addr.addr.ipv4)) == -1) {
+		if( bind(io_ctx->sockfd,
+				(struct sockaddr*)&(io_ctx->host_addr.addr.ipv4),
+				sizeof(io_ctx->host_addr.addr.ipv4)) == -1)
+		{
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		/* Create queue for TCP connection attempts */
-		if( listen(vs_ctx->tcp_io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
-			return -1;
-		}
 	}
-	else if(vs_ctx->tcp_io_ctx.host_addr.ip_ver == IPV6) {	/* IPv6 */
+	else if(io_ctx->host_addr.ip_ver == IPV6) {	/* IPv6 */
 
 		/* Create socket which server uses for listening for new connections */
-		if ( (vs_ctx->tcp_io_ctx.sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		if ( (io_ctx->sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		/* Set socket non-blocking */
-/*		flag = fcntl(vs_ctx->io_ctx.sockfd, F_GETFL, 0);
-		if( (fcntl(vs_ctx->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-			return -1;
-		}*/
-
 		/* Set socket to reuse address */
 		flag = 1;
-		if( setsockopt(vs_ctx->tcp_io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+		if( setsockopt(io_ctx->sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_family = AF_INET6;
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_addr = in6addr_any;
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_port = htons(vs_ctx->port);
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_flowinfo = 0; /* Obsolete value */
-		vs_ctx->tcp_io_ctx.host_addr.addr.ipv6.sin6_scope_id = 0;
-		vs_ctx->tcp_io_ctx.host_addr.port = vs_ctx->port;
+		io_ctx->host_addr.addr.ipv6.sin6_family = AF_INET6;
+		io_ctx->host_addr.addr.ipv6.sin6_addr = in6addr_any;
+		io_ctx->host_addr.addr.ipv6.sin6_port = htons(port);
+		io_ctx->host_addr.addr.ipv6.sin6_flowinfo = 0; /* Obsolete value */
+		io_ctx->host_addr.addr.ipv6.sin6_scope_id = 0;
+		io_ctx->host_addr.port = port;
 
 		/* Bind address and socket */
-		if( bind(vs_ctx->tcp_io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->tcp_io_ctx.host_addr.addr.ipv6), sizeof(vs_ctx->tcp_io_ctx.host_addr.addr.ipv6)) == -1) {
+		if( bind(io_ctx->sockfd,
+				(struct sockaddr*)&(io_ctx->host_addr.addr.ipv6),
+				sizeof(io_ctx->host_addr.addr.ipv6)) == -1)
+		{
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %d\n", strerror(errno));
 			return -1;
 		}
 
-		/* Create queue for TCP connection attempts, set maximum number of
-		 * attempts in listen queue */
-		if( listen(vs_ctx->tcp_io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
-			return -1;
-		}
+	}
+
+	/* Create queue for TCP connection attempts, set maximum number of
+	 * attempts in listen queue */
+	if( listen(io_ctx->sockfd, max_sessions) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
+		return -1;
 	}
 
 	/* Set up flag for V_CTX of server */
-	vs_ctx->tcp_io_ctx.flags = 0;
+	io_ctx->flags = 0;
 
 	/* Set all bytes of buffer for incoming packet to zero */
-	memset(vs_ctx->tcp_io_ctx.buf, 0, MAX_PACKET_SIZE);
+	memset(io_ctx->buf, 0, MAX_PACKET_SIZE);
+
+	return 1;
+}
+
+
+/**
+ * \brief Initialize IO context for TCP connection
+ */
+static int vs_init_tcp_io_ctx(VS_CTX *vs_ctx)
+{
+	return vs_init_io_ctx(&vs_ctx->tcp_io_ctx, vs_ctx->port, vs_ctx->max_sessions);
+}
+
+
+/**
+ * \brief Initialize list of verse sessions
+ */
+static int vs_init_sessions(VS_CTX *vs_ctx)
+{
+	int i;
+
+	vs_ctx->connected_clients = 0;
 
 	/* Initialize list of connections */
 	vs_ctx->vsessions = (struct VSession**)calloc(vs_ctx->max_sessions, sizeof(struct VSession*));
@@ -1458,5 +1477,31 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		vs_ctx->vsessions[i]->pamh = NULL;
 #endif
 	}
+
+	return 1;
+}
+
+/**
+ * \brief Initialize verse server context for connection at TCP
+ */
+int vs_init_stream_ctx(VS_CTX *vs_ctx)
+{
+	int ret;
+
+	ret = vs_init_ssl(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+
+	ret = vs_init_tcp_io_ctx(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+
+	ret = vs_init_sessions(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+
 	return 1;
 }
