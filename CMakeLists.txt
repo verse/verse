@@ -55,10 +55,6 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 # Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
 
-# Set up required subdirectories
-add_subdirectory (src)
-add_subdirectory (example)
-
 # Check unit test
 if (VERSE_CHECK)
 
@@ -104,7 +100,7 @@ endif (VERSE_PYTHON_MODULE)
 if(VERSE_WEBSOCKET)
 
     # Try to find optional package libWebSockets
-    find_package (LibWebSockets)
+    find_package (WSLay)
     
 endif(VERSE_WEBSOCKET)
 
@@ -125,6 +121,12 @@ if (VERSE_DOXYGEN)
 	endif (DOXYGEN_FOUND)
 
 endif (VERSE_DOXYGEN)
+
+
+# Set up required subdirectories
+add_subdirectory (src)
+add_subdirectory (example)
+
 
 # Copy ./pki directory to ${PROJECT_BINARY_DIR}
 configure_file ("${PROJECT_SOURCE_DIR}/pki/certificate.pem"
@@ -168,11 +170,11 @@ else ()
 	message (" * Check:         OFF")
 endif (CHECK_FOUND)
 
-if (LIBWEBSOCKETS_FOUND)
+if (WSLAY_FOUND)
 	message (" * WebSocket:     ON")
 else ()
 	message (" * WebSocket:     OFF")
-endif (LIBWEBSOCKETS_FOUND)
+endif (WSLAY_FOUND)
 
 if (DOXYGEN_FOUND)
 	message (" * Doxygen:       ON")

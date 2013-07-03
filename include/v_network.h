@@ -221,7 +221,7 @@ typedef struct IO_CTX {
 	struct VNetworkAddress	peer_addr;		/* Address of peer (other side of communication) */
 	char 					*buf;			/* Buffer for incoming/outgoing packet/message */
 	ssize_t					buf_size;		/* Size of received/sent packet/message */
-	int						sockfd;			/* Socket */
+	int						sockfd;			/* UDP/TCP/WebSocket socket */
 	unsigned char			flags;			/* Flags for sending and receiving context */
 	unsigned short			mtu;			/* MTU of connection discovered with PMTU */
 	/* Security */

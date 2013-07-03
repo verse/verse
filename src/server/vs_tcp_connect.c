@@ -56,6 +56,10 @@
 #include "v_stream.h"
 #include "v_fake_commands.h"
 
+#ifdef WSLAY
+#include "vs_websocket.h"
+#endif
+
 /**
  * \brief Initialize VConnection at Verse server for potential clients
  * \param[in]	*stream_conn	The pointer at connection
