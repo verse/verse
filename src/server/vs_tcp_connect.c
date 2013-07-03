@@ -1216,10 +1216,18 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		return -1;
 	}
 
-	/* TODO: use int SSL_CTX_use_certificate_chain_file(SSL_CTX *ctx, const char *file); */
+	/* Load certificate chain file from CA */
+	if(vs_ctx->ca_cert_file != NULL) {
+		if(SSL_CTX_use_certificate_chain_file(vs_ctx->tls_ctx, vs_ctx->ca_cert_file) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate chain file: %s failed.\n",
+					vs_ctx->ca_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+	}
 
 	/* Load certificate with public key for TLS */
-	if (SSL_CTX_use_certificate_file(vs_ctx->tls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
+	if(SSL_CTX_use_certificate_file(vs_ctx->tls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate file: %s failed.\n",
 				vs_ctx->public_cert_file);
 		ERR_print_errors_fp(v_log_file());
@@ -1253,11 +1261,22 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 	}
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
+
 	/* Set up SSL context for DTLS  */
 	if( (vs_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_server_method())) == NULL ) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
 		ERR_print_errors_fp(v_log_file());
 		return -1;
+	}
+
+	/* Load certificate chain file from CA */
+	if(vs_ctx->ca_cert_file != NULL) {
+		if(SSL_CTX_use_certificate_chain_file(vs_ctx->dtls_ctx, vs_ctx->ca_cert_file) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "DTLS: Loading certificate chain file: %s failed.\n",
+					vs_ctx->ca_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
 	}
 
 	/* Load certificate with public key for DTLS */
