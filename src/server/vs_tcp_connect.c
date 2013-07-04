@@ -30,7 +30,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
-#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 
 #include <unistd.h>
@@ -994,6 +994,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 	if(current_session != NULL) {
 		struct vContext *new_C;
+		int flag;
 
 		/* Try to accept client connection (do TCP handshake) */
 		if(io_ctx->host_addr.ip_ver==IPV4) {
@@ -1024,6 +1025,19 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Save the IPv6 of the client as string in verse session */
 			inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
+		}
+
+		/* Set to this socket flag "no delay" */
+		flag = 1;
+		if(setsockopt(current_session->stream_conn->io_ctx.sockfd,
+				IPPROTO_TCP, TCP_NODELAY, &flag, (socklen_t)sizeof(flag)) == -1)
+		{
+			if(is_log_level(VRS_PRINT_ERROR)) {
+				v_print_log(VRS_PRINT_ERROR,
+						"setsockopt: TCP_NODELAY: %d\n",
+						strerror(errno));
+			}
+			return -1;;
 		}
 
 		CTX_current_session_set(C, current_session);
