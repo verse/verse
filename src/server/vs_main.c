@@ -502,7 +502,7 @@ int main(int argc, char *argv[])
 	vs_ctx.state = SERVER_STATE_READY;
 
 	if(vs_ctx.stream_protocol == TCP) {
-		if(vs_main_stream_loop(&vs_ctx) == -1) {
+		if(vs_main_listen_loop(&vs_ctx) == -1) {
 			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 		}

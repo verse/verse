@@ -968,24 +968,152 @@ end:
 
 
 /**
+ * \brief This connection tries to handle new connection attempt. When this
+ * attempt is successful, then it creates new thread
+ */
+static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
+{
+	VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct VSession *current_session = NULL;
+	socklen_t addr_len;
+	int ret, i;
+	static uint32 last_session_id = 0;
+
+	/* Try to find free session */
+	for(i=0; i< vs_ctx->max_sessions; i++) {
+		if(vs_ctx->vsessions[i]->stream_conn->host_state==TCP_SERVER_STATE_LISTEN) {
+			/* TODO: lock mutex here */
+			current_session = vs_ctx->vsessions[i];
+			current_session->stream_conn->host_state=TCP_SERVER_STATE_RESPOND_METHODS;
+			current_session->session_id = last_session_id++;
+			/* TODO: unlock mutex here */
+			break;
+		}
+	}
+
+	if(current_session != NULL) {
+		struct vContext *new_C;
+
+		/* Try to accept client connection (do TCP handshake) */
+		if(io_ctx->host_addr.ip_ver==IPV4) {
+			/* Prepare IPv4 variables for TCP handshake */
+			struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
+			current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
+			addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv4);
+
+			/* Try to do TCP handshake */
+			if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr4, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+
+			/* Save the IPv4 of the client as string in verse session */
+			inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
+		} else if(io_ctx->host_addr.ip_ver==IPV6) {
+			/* Prepare IPv6 variables for TCP handshake */
+			struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
+			current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
+			addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv6);
+
+			/* Try to do TCP handshake */
+			if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr6, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+
+			/* Save the IPv6 of the client as string in verse session */
+			inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
+		}
+
+		CTX_current_session_set(C, current_session);
+		CTX_current_stream_conn_set(C, current_session->stream_conn);
+		CTX_io_ctx_set(C, &current_session->stream_conn->io_ctx);
+
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "New connection from: ");
+			v_print_addr_port(VRS_PRINT_DEBUG_MSG, &(current_session->stream_conn->io_ctx.peer_addr));
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
+		}
+
+		/* Duplicate verse context for new thread */
+		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
+		memcpy(new_C, C, sizeof(struct vContext));
+
+		/* Try to initialize thread attributes */
+		if( (ret = pthread_attr_init(&current_session->tcp_thread_attr)) !=0 ) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
+			return 0;
+		}
+
+		/* Try to set thread attributes as detached */
+		if( (ret = pthread_attr_setdetachstate(&current_session->tcp_thread_attr, PTHREAD_CREATE_DETACHED)) != 0) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
+			return 0;
+		}
+
+		/* Try to create new thread */
+		if((ret = pthread_create(&current_session->tcp_thread, &current_session->tcp_thread_attr, conn_loop, (void*)new_C)) != 0) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		}
+
+		/* Destroy thread attributes */
+		pthread_attr_destroy(&current_session->tcp_thread_attr);
+	} else {
+		int tmp_sockfd;
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Number of session slot: %d reached\n", vs_ctx->max_sessions);
+		/* TODO: return some error. Not only accept and close connection. */
+		/* Try to accept client connection (do TCP handshake) */
+		if(io_ctx->host_addr.ip_ver==IPV4) {
+			/* Prepare IP6 variables for TCP handshake */
+			struct sockaddr_in client_addr4;
+
+			addr_len = sizeof(client_addr4);
+
+			/* Try to do TCP handshake */
+			if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr4, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+			/* Close connection (no more free session slots) */
+			close(tmp_sockfd);
+		} else if(io_ctx->host_addr.ip_ver==IPV6) {
+			/* Prepare IP6 variables for TCP handshake */
+			struct sockaddr_in6 client_addr6;
+			addr_len = sizeof(client_addr6);
+
+			/* Try to do TCP handshake */
+			if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr6, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+			/* Close connection (no more free session slots) */
+			close(tmp_sockfd);
+		}
+		/* TODO: Fix this */
+		sleep(1);
+	}
+
+	return 1;
+}
+
+/**
  * \brief Main Verse server loop. Server waits for connect attempts, responds to attempts
  * and creates per connection threads
  */
-int vs_main_stream_loop(VS_CTX *vs_ctx)
+int vs_main_listen_loop(VS_CTX *vs_ctx)
 {
 	struct vContext *C;
-	struct IO_CTX *io_ctx = &vs_ctx->tcp_io_ctx;
 	struct timeval start, tv;
 	fd_set set;
 	int count, tmp, i, ret;
-	static uint32 last_session_id = 0;
+	int sockfd;
 
 	/* Allocate context for server */
 	C = (struct vContext*)calloc(1, sizeof(struct vContext));
 	/* Set up client context, connection context and IO context */
 	CTX_server_ctx_set(C, vs_ctx);
 	CTX_client_ctx_set(C, NULL);
-	CTX_io_ctx_set(C, io_ctx);
 	CTX_current_dgram_conn_set(C, NULL);
 
 	/* Get time of the start of the server */
@@ -1009,147 +1137,64 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+0s");
 			else
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+%lds", (long int)(tv.tv_sec - start.tv_sec));
-			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\tServer listen on TCP port: %d\n", vs_ctx->tcp_io_ctx.host_addr.port);
+#ifdef WSLAY
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+					"\tServer listen on (TCP port: %d, WebSocket port: %d)\n",
+					vs_ctx->tcp_io_ctx.host_addr.port,
+					vs_ctx->ws_io_ctx.host_addr.port);
+#else
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+					"\tServer listen on TCP port: %d\n",
+					vs_ctx->tcp_io_ctx.host_addr.port);
+#endif
 		}
 
 		/* Set up set of sockets */
 		FD_ZERO(&set);
-		FD_SET(io_ctx->sockfd, &set);
+		FD_SET(vs_ctx->tcp_io_ctx.sockfd, &set);
+		/* When Verse is compiled with support of WebSocket, then listen on
+		 * WebSocket port too */
+#ifdef WSLAY
+		FD_SET(vs_ctx->ws_io_ctx.sockfd, &set);
+		sockfd = (vs_ctx->tcp_io_ctx.sockfd > vs_ctx->ws_io_ctx.sockfd) ?
+				vs_ctx->tcp_io_ctx.sockfd : vs_ctx->ws_io_ctx.sockfd;
+#else
+		sockfd = vs_ctx->tcp_io_ctx.sockfd;
+#endif
 
 		/* We will wait one second for connect attempt, then debug print will
 		 * be print again */
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
 
-		/* Wait for event on listening socket */
-		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
+
+		/* Wait for event on listening sockets */
+		if( (ret = select(sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
 			int err = errno;
 			if(err==EINTR) {
 				break;
 			} else {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__,  __LINE__, strerror(err));
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR,
+						"%s:%s():%d select(): %s\n",
+						__FILE__,
+						__FUNCTION__,
+						__LINE__,
+						strerror(err));
 				return -1;
 			}
 			/* Was event on the listen socket */
-		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
-			struct VSession *current_session = NULL;
-			socklen_t addr_len;
-			int i;
-
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Connection attempt\n");
-
-			/* Try to find free session */
-			for(i=0; i< vs_ctx->max_sessions; i++) {
-				if(vs_ctx->vsessions[i]->stream_conn->host_state==TCP_SERVER_STATE_LISTEN) {
-					/* TODO: lock mutex here */
-					current_session = vs_ctx->vsessions[i];
-					current_session->stream_conn->host_state=TCP_SERVER_STATE_RESPOND_METHODS;
-					current_session->session_id = last_session_id++;
-					/* TODO: unlock mutex here */
-					break;
-				}
-			}
-
-			if(current_session != NULL) {
-				struct vContext *new_C;
-
-				/* Try to accept client connection (do TCP handshake) */
-				if(io_ctx->host_addr.ip_ver==IPV4) {
-					/* Prepare IPv4 variables for TCP handshake */
-					struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
-					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
-					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv4);
-
-					/* Try to do TCP handshake */
-					if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr4, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-
-					/* Save the IPv4 of the client as string in verse session */
-					inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
-				} else if(io_ctx->host_addr.ip_ver==IPV6) {
-					/* Prepare IPv6 variables for TCP handshake */
-					struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
-					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
-					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv6);
-
-					/* Try to do TCP handshake */
-					if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr6, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-
-					/* Save the IPv6 of the client as string in verse session */
-					inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
-				}
-
-				CTX_current_session_set(C, current_session);
-				CTX_current_stream_conn_set(C, current_session->stream_conn);
-				CTX_io_ctx_set(C, &current_session->stream_conn->io_ctx);
-
-				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "New connection from: ");
-					v_print_addr_port(VRS_PRINT_DEBUG_MSG, &(current_session->stream_conn->io_ctx.peer_addr));
-					v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
-				}
-
-				/* Duplicate verse context for new thread */
-				new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-				memcpy(new_C, C, sizeof(struct vContext));
-
-				/* Try to initialize thread attributes */
-				if( (ret = pthread_attr_init(&current_session->tcp_thread_attr)) !=0 ) {
-					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
-					continue;
-				}
-
-				/* Try to set thread attributes as detached */
-				if( (ret = pthread_attr_setdetachstate(&current_session->tcp_thread_attr, PTHREAD_CREATE_DETACHED)) != 0) {
-					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
-					continue;
-				}
-
-				/* Try to create new thread */
-				if((ret = pthread_create(&current_session->tcp_thread, &current_session->tcp_thread_attr, vs_tcp_conn_loop, (void*)new_C)) != 0) {
-					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-				}
-
-				/* Destroy thread attributes */
-				pthread_attr_destroy(&current_session->tcp_thread_attr);
-			} else {
-				int tmp_sockfd;
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Number of session slot: %d reached\n", vs_ctx->max_sessions);
-				/* TODO: return some error. Not only accept and close connection. */
-				/* Try to accept client connection (do TCP handshake) */
-				if(io_ctx->host_addr.ip_ver==IPV4) {
-					/* Prepare IP6 variables for TCP handshake */
-					struct sockaddr_in client_addr4;
-
-					addr_len = sizeof(client_addr4);
-
-					/* Try to do TCP handshake */
-					if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr4, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-					/* Close connection (no more free session slots) */
-					close(tmp_sockfd);
-				} else if(io_ctx->host_addr.ip_ver==IPV6) {
-					/* Prepare IP6 variables for TCP handshake */
-					struct sockaddr_in6 client_addr6;
-					addr_len = sizeof(client_addr6);
-
-					/* Try to do TCP handshake */
-					if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr6, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-					/* Close connection (no more free session slots) */
-					close(tmp_sockfd);
-				}
-				/* TODO: Fix this */
-				sleep(1);
+		} else if(ret>0) {
+			if (FD_ISSET(vs_ctx->tcp_io_ctx.sockfd, &set))
+			{
+				v_print_log(VRS_PRINT_DEBUG_MSG, "TCP Connection attempt\n");
+				CTX_io_ctx_set(C, &vs_ctx->tcp_io_ctx);
+				vs_new_stream_conn(C, vs_tcp_conn_loop);
+#ifdef WSLAY
+			} else if(FD_ISSET(vs_ctx->ws_io_ctx.sockfd, &set)) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "WebSocket Connection attempt\n");
+				CTX_io_ctx_set(C, &vs_ctx->ws_io_ctx);
+				vs_new_stream_conn(C, vs_websocket_loop);
+#endif
 			}
 		}
 	}

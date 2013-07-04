@@ -31,6 +31,6 @@
 void vs_destroy_stream_ctx(VS_CTX *vs_ctx);
 int vs_init_stream_ctx(VS_CTX *vs_ctx);
 void *vs_tcp_conn_loop(void *arg);
-int vs_main_stream_loop(VS_CTX *vs_ctx);
+int vs_main_listen_loop(VS_CTX *vs_ctx);
 
 #endif /* VS_TCP_TLS_MAIN_H */

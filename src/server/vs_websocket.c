@@ -35,7 +35,7 @@
  */
 void *vs_websocket_loop(void *arg)
 {
-	struct VS_CTX *vs_ctx = (struct VS_CTX*)arg;
+	struct vContext *C = (struct vContext*)arg;
 
 end:
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting WebSocket thread\n");

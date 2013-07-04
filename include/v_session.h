@@ -75,8 +75,8 @@ typedef struct VCookie {
 
 typedef struct VSession {
 	/* Thread stuffs */
-	pthread_t				tcp_thread;		/* TCP Thread for this session */
-	pthread_attr_t			tcp_thread_attr;/* Attributes of the TCP thread */
+	pthread_t				tcp_thread;		/* TCP/WebSocket thread for this session */
+	pthread_attr_t			tcp_thread_attr;/* Attributes of the TCP/WebSocket thread */
 	pthread_t				udp_thread;		/* UDP Thread for this session */
 	pthread_attr_t			udp_thread_attr;/* Attributes of the UDP thread */
 	/* Connection */
