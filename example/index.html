@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+        <script type="text/javascript">
+            $(function() {
+                window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+                var websocket = new WebSocket('ws://127.0.0.1:23456',
+                                              'v1.verse.tul.cz');
+
+                websocket.onopen = function () {
+                    $('h1').css('color', 'green');
+                };
+
+                websocket.onerror = function () {
+                    $('h1').css('color', 'red');
+                };
+
+                websocket.onmessage = function (message) {
+                    console.log(message.data);
+                    $('div').prepend($('<p>', { text: message.data }));
+                };
+                
+
+                $('#sendBut').click(function(e) {
+                    e.preventDefault();
+                    websocket.send($('#messageInput').val());
+                    $('#messageInput').val('');
+                });
+            });
+        </script>
+        </head>
+    <body>
+        <h1>WebSockets test</h1>
+        <b>Message:</b>
+        <form>
+            <input id="messageInput" type="text" />
+            <br/>
+            <button id="sendBut">Send</button>
+        </form>
+        <div></div>
+    </body>
+</html>
