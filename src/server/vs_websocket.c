@@ -238,7 +238,9 @@ static int http_handshake(int fd)
  * \brief WIP: Wslay send callback
  */
 ssize_t send_callback(wslay_event_context_ptr ctx,
-		const uint8_t *data, size_t len, int flags,
+		const uint8_t *data,
+		size_t len,
+		int flags,
 		void *user_data)
 {
 	struct VSession *session = (struct VSession*)user_data;
@@ -311,8 +313,8 @@ void on_msg_recv_callback(wslay_event_context_ptr ctx,
 		msgarg.msg_length = arg->msg_length;
 		wslay_event_queue_msg(ctx, &msgarg);
 	}
-	memcpy(session->stream_conn->io_ctx.buf, arg->msg, arg->msg_length+1);
 
+	memcpy(session->stream_conn->io_ctx.buf, arg->msg, arg->msg_length);
 	session->stream_conn->io_ctx.buf[arg->msg_length] = '\0';
 	printf("WS Callback Received data: %s, opcode: %d\n",
 			session->stream_conn->io_ctx.buf,
@@ -332,7 +334,7 @@ void *vs_websocket_loop(void *arg)
 	 */
 	struct VSession *vsession = CTX_current_session(C);
 	wslay_event_context_ptr wslay_ctx;
-	fd_set set;
+	fd_set read_set, write_set;
 	struct timeval tv;
 	int ret;
 	int flags;
@@ -362,20 +364,35 @@ void *vs_websocket_loop(void *arg)
 	/* "Never ending" loop */
 	while(1)
 	{
-		FD_ZERO(&set);
-		FD_SET(io_ctx->sockfd, &set);
+		/* Initialize read set */
+		FD_ZERO(&read_set);
+		FD_SET(io_ctx->sockfd, &read_set);
+
+		/* Initialize write set */
+		FD_ZERO(&write_set);
+		FD_SET(io_ctx->sockfd, &write_set);
 
 		tv.tv_sec = VRS_TIMEOUT;	/* User have to send something in 30 seconds */
 		tv.tv_usec = 0;
 
-		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
+		if( (ret = select(io_ctx->sockfd+1,
+				&read_set,
+				&write_set,
+				NULL,			/* Exception*/
+				&tv)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
-		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
-			if( wslay_event_recv(wslay_ctx) !=0 ) {
-				goto end;
+		} else if(ret>0){
+			if(FD_ISSET(io_ctx->sockfd, &read_set)) {
+				if( wslay_event_recv(wslay_ctx) != 0 ) {
+					goto end;
+				}
+			} else if (FD_ISSET(io_ctx->sockfd, &write_set)) {
+				if( wslay_event_send(wslay_ctx) != 0 ) {
+					goto end;
+				}
 			}
 		}
 	}
