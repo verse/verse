@@ -262,7 +262,7 @@ if(flags & WSLAY_MSG_MORE) {
 			wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		}
 	}
-	printf("WS Callback Send data\n");
+	printf("WS Callback Send Data\n");
 	return r;
 }
 
@@ -292,7 +292,7 @@ ssize_t recv_callback(wslay_event_context_ptr ctx,
 		wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		r = -1;
 	}
-	printf("Data recv callback, len: %ld, flags: %d\n", len, flags);
+	printf("WS Callback Received Data, len: %ld, flags: %d\n", len, flags);
 	return r;
 }
 
@@ -305,20 +305,35 @@ void on_msg_recv_callback(wslay_event_context_ptr ctx,
 		void *user_data)
 {
 	struct VSession *session = (struct VSession*)user_data;
+
 	/* Echo back non-control message */
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
 		struct wslay_event_msg msgarg;
+		memcpy(session->stream_conn->io_ctx.buf, arg->msg, arg->msg_length);
+		session->stream_conn->io_ctx.buf[arg->msg_length] = '\0';
+		if(arg->opcode == WSLAY_TEXT_FRAME) {
+			printf("WS Callback Received Text Message: %s, len %ld, opcode: %d\n",
+					session->stream_conn->io_ctx.buf,
+					arg->msg_length,
+					arg->opcode);
+		} else if(arg->opcode == WSLAY_BINARY_FRAME){
+			printf("WS Callback Received Binary Message: %d, len: %ld, opcode: %d\n",
+					*(int*)session->stream_conn->io_ctx.buf,
+					arg->msg_length,
+					arg->opcode);
+		}
 		msgarg.opcode = arg->opcode;
 		msgarg.msg = arg->msg;
 		msgarg.msg_length = arg->msg_length;
 		wslay_event_queue_msg(ctx, &msgarg);
+	} else {
+		printf("WS Callback Received Ctrl Message: opcode: %d\n",
+				arg->opcode);
+		if(arg->opcode & WSLAY_CONNECTION_CLOSE) {
+			session->stream_conn->host_state = TCP_SERVER_STATE_CLOSED;
+		}
 	}
 
-	memcpy(session->stream_conn->io_ctx.buf, arg->msg, arg->msg_length);
-	session->stream_conn->io_ctx.buf[arg->msg_length] = '\0';
-	printf("WS Callback Received data: %s, opcode: %d\n",
-			session->stream_conn->io_ctx.buf,
-			arg->opcode);
 }
 
 
@@ -328,6 +343,7 @@ void on_msg_recv_callback(wslay_event_context_ptr ctx,
 void *vs_websocket_loop(void *arg)
 {
 	struct vContext *C = (struct vContext*)arg;
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	/*
 	 * This structure is passed as *user_data* in callback functions.
@@ -355,6 +371,8 @@ void *vs_websocket_loop(void *arg)
 
 	http_handshake(io_ctx->sockfd);
 
+	vsession->stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
+
 	/* Set non-blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK);
@@ -362,8 +380,17 @@ void *vs_websocket_loop(void *arg)
 	wslay_event_context_server_init(&wslay_ctx, &callbacks, vsession);
 
 	/* "Never ending" loop */
-	while(1)
+	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED)
 	{
+		if(vs_ctx->state != SERVER_STATE_READY) {
+			vsession->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+			/* Try to close connection with websocket client */
+			wslay_event_queue_close(wslay_ctx,
+					WSLAY_CODE_GOING_AWAY,
+					(uint8_t*)"Server shutdown",
+					15);
+		}
+
 		/* Initialize read set */
 		FD_ZERO(&read_set);
 		FD_SET(io_ctx->sockfd, &read_set);
@@ -399,6 +426,8 @@ void *vs_websocket_loop(void *arg)
 
 end:
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting WebSocket thread\n");
+
+	vsession->stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
 
 	pthread_exit(NULL);
 	return NULL;

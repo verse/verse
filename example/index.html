@@ -9,6 +9,8 @@
 
                 var websocket = new WebSocket('ws://127.0.0.1:23456',
                                               'v1.verse.tul.cz');
+                
+                websocket.binaryType = "arraybuffer";
 
                 websocket.onopen = function () {
                     $('h1').css('color', 'green');
@@ -17,17 +19,45 @@
                 websocket.onerror = function () {
                     $('h1').css('color', 'red');
                 };
+                
+                window.onbeforeunload = function() {
+                    websocket.onclose = function () {}; // disable onclose handler first
+                    websocket.close()
+                };
+                
+                websocket.onclose = function () {
+                    $('h1').css('color', 'red');
+                };
 
                 websocket.onmessage = function (message) {
                     console.log(message.data);
-                    $('div').prepend($('<p>', { text: message.data }));
+                    if(message.data instanceof ArrayBuffer) {
+                        var a = new Int32Array(message.data);
+                        $('div').prepend($('<p>', { text: a[0].toString() }));
+                    } else {
+                        $('div').prepend($('<p>', { text: message.data }));
+                    }
                 };
                 
 
                 $('#sendBut').click(function(e) {
                     e.preventDefault();
-                    websocket.send($('#messageInput').val());
+                    var val = $('#messageInput').val();
+                    var number = Number(val);
+                    if(!isNaN(number)) {
+                        var buf = new ArrayBuffer(4);
+                        var a = new Int32Array(buf);
+                        a[0] = number;
+                        websocket.send(buf);
+                    } else {
+                        websocket.send(val);
+                    }
                     $('#messageInput').val('');
+                });
+                
+                $('#closeBut').click(function(e) {
+                    e.preventDefault();
+                    websocket.close();
                 });
             });
         </script>
@@ -39,6 +69,7 @@
             <input id="messageInput" type="text" />
             <br/>
             <button id="sendBut">Send</button>
+            <button id="closeBut">Close</button>
         </form>
         <div></div>
     </body>
