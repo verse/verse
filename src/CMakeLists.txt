@@ -80,7 +80,8 @@ set (server_src
 		server/vs_layer.c
 		server/vs_data.c
 		server/vs_config.c
-		server/vs_auth_csv.c)
+		server/vs_auth_csv.c
+		server/vs_handshake.c)
 
 # Compile vs_websocket, when Wslay is used
 if (WSLAY_FOUND)

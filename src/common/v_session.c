@@ -52,6 +52,7 @@ void v_init_session(struct VSession *vsession)
 	vsession->conv.appdata_ptr = NULL;
 	vsession->conv.conv = NULL;
 #endif
+	vsession->usr_auth_att = 0;
 	vsession->in_queue = NULL;
 	vsession->out_queue = NULL;
 	vsession->host_url = NULL;

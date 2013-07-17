@@ -27,6 +27,7 @@
 #include <wslay.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <wslay.h>
 
@@ -36,10 +37,11 @@
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
 
+#include "v_common.h"
+
 #include "vs_main.h"
 #include "vs_websocket.h"
-#include "v_common.h"
-#include <fcntl.h>
+#include "vs_handshake.h"
 
 /*
  * Calculates SHA-1 hash of *src*. The size of *src* is *src_length* bytes.
@@ -64,7 +66,7 @@ void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
 	bmem = BIO_new(BIO_s_mem());
 	b64 = BIO_push(b64, bmem);
 	BIO_write(b64, src, src_length);
-	BIO_flush(b64);
+	(void)BIO_flush(b64);
 	BIO_get_mem_ptr(b64, &bptr);
 
 	memcpy(dst, bptr->data, bptr->length-1);
@@ -243,7 +245,8 @@ ssize_t send_callback(wslay_event_context_ptr ctx,
 		int flags,
 		void *user_data)
 {
-	struct VSession *session = (struct VSession*)user_data;
+	struct vContext *C = (struct vContext*)user_data;
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	ssize_t r;
 	int sflags = 0;
 
@@ -253,7 +256,7 @@ if(flags & WSLAY_MSG_MORE) {
 }
 #endif
 
-	while((r = send(session->stream_conn->io_ctx.sockfd, data, len, sflags)) == -1 &&
+	while((r = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
 			errno == EINTR);
 	if(r == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -276,10 +279,12 @@ ssize_t recv_callback(wslay_event_context_ptr ctx,
 		int flags,
 		void *user_data)
 {
-	struct VSession *session = (struct VSession*)user_data;
+	struct vContext *C = (struct vContext*)user_data;
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	ssize_t r;
 	(void)flags;
-	while((r = recv(session->stream_conn->io_ctx.sockfd, buf, len, 0)) == -1 &&
+
+	while((r = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
 			errno == EINTR);
 	if(r == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -304,30 +309,33 @@ void on_msg_recv_callback(wslay_event_context_ptr ctx,
 		const struct wslay_event_on_msg_recv_arg *arg,
 		void *user_data)
 {
-	struct VSession *session = (struct VSession*)user_data;
+	struct vContext *C = (struct vContext*)user_data;
+	struct VSession *session = CTX_current_session(C);
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 
+	(void)ctx;
 	/* Echo back non-control message */
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
-		struct wslay_event_msg msgarg;
-		memcpy(session->stream_conn->io_ctx.buf, arg->msg, arg->msg_length);
-		session->stream_conn->io_ctx.buf[arg->msg_length] = '\0';
-		if(arg->opcode == WSLAY_TEXT_FRAME) {
-			printf("WS Callback Received Text Message: %s, len %ld, opcode: %d\n",
-					session->stream_conn->io_ctx.buf,
-					arg->msg_length,
-					arg->opcode);
-		} else if(arg->opcode == WSLAY_BINARY_FRAME){
-			printf("WS Callback Received Binary Message: %d, len: %ld, opcode: %d\n",
-					*(int*)session->stream_conn->io_ctx.buf,
-					arg->msg_length,
-					arg->opcode);
+
+		if(arg->opcode == WSLAY_BINARY_FRAME){
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"WS Callback received binary message");
+			memcpy(io_ctx->buf,
+					arg->msg,
+					arg->msg_length);
+
+			if( vs_handle_handshake(C) == -1 ) {
+				return;
+			}
 		}
+/*		struct wslay_event_msg msgarg;
 		msgarg.opcode = arg->opcode;
 		msgarg.msg = arg->msg;
 		msgarg.msg_length = arg->msg_length;
-		wslay_event_queue_msg(ctx, &msgarg);
+		wslay_event_queue_msg(ctx, &msgarg);*/
 	} else {
-		printf("WS Callback Received Ctrl Message: opcode: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"WS Callback Received Ctrl Message: opcode: %d\n",
 				arg->opcode);
 		if(arg->opcode & WSLAY_CONNECTION_CLOSE) {
 			session->stream_conn->host_state = TCP_SERVER_STATE_CLOSED;
@@ -342,18 +350,18 @@ void on_msg_recv_callback(wslay_event_context_ptr ctx,
  */
 void *vs_websocket_loop(void *arg)
 {
+	/* The vContext is passed as *user_data* in callback functions. */
 	struct vContext *C = (struct vContext*)arg;
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	/*
-	 * This structure is passed as *user_data* in callback functions.
-	 */
+	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
 	struct VSession *vsession = CTX_current_session(C);
+	struct VMessage *r_message=NULL, *s_message=NULL;
 	wslay_event_context_ptr wslay_ctx;
 	fd_set read_set, write_set;
 	struct timeval tv;
-	int ret;
-	int flags;
+	int ret, flags;
+	unsigned int int_size;
 
 	struct wslay_event_callbacks callbacks = {
 			recv_callback,
@@ -365,11 +373,29 @@ void *vs_websocket_loop(void *arg)
 			on_msg_recv_callback
 	};
 
-	/* Set blocking */
+	/* Set socket blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags & ~O_NONBLOCK);
 
 	http_handshake(io_ctx->sockfd);
+
+	/* Try to get size of TCP buffer */
+	int_size = sizeof(int_size);
+	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size);
+
+	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
+	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
+	CTX_r_message_set(C, r_message);
+	CTX_s_message_set(C, s_message);
+
+	stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
+		printf("%c[%dm", 27, 0);
+	}
 
 	vsession->stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
 
@@ -377,7 +403,7 @@ void *vs_websocket_loop(void *arg)
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK);
 
-	wslay_event_context_server_init(&wslay_ctx, &callbacks, vsession);
+	wslay_event_context_server_init(&wslay_ctx, &callbacks, C);
 
 	/* "Never ending" loop */
 	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED)
@@ -425,10 +451,63 @@ void *vs_websocket_loop(void *arg)
 	}
 
 end:
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting WebSocket thread\n");
-	close(io_ctx->sockfd);
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: CLOSING\n");
+		printf("%c[%dm", 27, 0);
+	}
 
-	vsession->stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
+	/* Set up TCP CLOSING state (non-blocking) */
+	vs_CLOSING(C);
+
+	/* Receive and Send messages are not neccessary any more */
+	if(r_message!=NULL) {
+		free(r_message);
+		r_message = NULL;
+		CTX_r_message_set(C, NULL);
+	}
+	if(s_message!=NULL) {
+		free(s_message);
+		s_message = NULL;
+		CTX_s_message_set(C, NULL);
+	}
+
+	/* TCP connection is considered as CLOSED, but it is not possible to use
+	 * this connection for other client */
+	stream_conn->host_state = TCP_SERVER_STATE_CLOSED;
+
+	/* NULL pointer at stream connection */
+	CTX_current_stream_conn_set(C, NULL);
+
+	/* Set TCP connection to CLOSED */
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: CLOSED\n");
+		printf("%c[%dm", 27, 0);
+	}
+
+
+	pthread_mutex_lock(&vs_ctx->data.mutex);
+	/* Unsubscribe this session (this avatar) from all nodes */
+	vs_node_free_avatar_reference(vs_ctx, vsession);
+	/* Try to destroy avatar node */
+	vs_node_destroy_avatar_node(vs_ctx, vsession);
+	pthread_mutex_unlock(&vs_ctx->data.mutex);
+
+	/* This session could be used again for authentication */
+	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
+
+	/* Clear session flags */
+	vsession->flags = 0;
+
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: LISTEN\n");
+		printf("%c[%dm", 27, 0);
+	}
+
+	free(C);
+	C = NULL;
 
 	pthread_exit(NULL);
 	return NULL;

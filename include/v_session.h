@@ -91,6 +91,7 @@ typedef struct VSession {
 	struct VDED				ded;			/* Data Exchange Definition */
 	uint16					flags;			/* Flags from verse_send_connect_request function */
 	uint8					tmp;			/* Temporary value */
+	int						usr_auth_att;	/* Number of user authentintication attempts */
 #if defined WITH_PAM
 	/* PAM authentication (verse server specific) */
 	struct pam_conv			conv;
