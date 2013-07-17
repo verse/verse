@@ -190,7 +190,6 @@ static int vs_TLS_teardown(struct vContext *C)
 	}
 
 	SSL_free(stream_conn->io_ctx.ssl);
-	close(stream_conn->io_ctx.sockfd);
 
 	return 1;
 }
@@ -205,6 +204,7 @@ static void vs_CLOSING(struct vContext *C)
 
 	if(stream_conn->io_ctx.ssl!=NULL) vs_TLS_teardown(C);
 
+	close(stream_conn->io_ctx.sockfd);
 }
 
 

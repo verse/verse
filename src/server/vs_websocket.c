@@ -426,6 +426,7 @@ void *vs_websocket_loop(void *arg)
 
 end:
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting WebSocket thread\n");
+	close(io_ctx->sockfd);
 
 	vsession->stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
 
