@@ -5,18 +5,29 @@
         <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
         <script type="text/javascript">
             $(function() {
+            	
                 window.WebSocket = window.WebSocket || window.MozWebSocket;
-
-                var websocket = new WebSocket('ws://127.0.0.1:23456',
-                                              'v1.verse.tul.cz');
                 
-                websocket.binaryType = "arraybuffer";
+                function logToConsole(message)
+                {
+                	var pre = document.createElement("p");
+                	pre.style.wordWrap = "break-word";
+                	pre.innerHTML = getSecureTag() + message;
+                	$('#consoleLog').appendChild(pre);
 
-                websocket.onopen = function () {
+                	while (consoleLog.childNodes.length > 50)
+                	{
+                		$('#consoleLog').removeChild(consoleLog.firstChild);
+                	}
+                  
+                	$('#consoleLog').scrollTop = consoleLog.scrollHeight;
+                }
+               
+                function onConnect(event) {
                     $('h1').css('color', 'green');
                 };
 
-                websocket.onerror = function () {
+                function onError(event) {
                     $('h1').css('color', 'red');
                 };
                 
@@ -25,11 +36,11 @@
                     websocket.close()
                 };
                 
-                websocket.onclose = function () {
+                function onClose(event) {
                     $('h1').css('color', 'red');
                 };
 
-                websocket.onmessage = function (message) {
+                function onMessage(message) {
                     console.log(message.data);
                     if(message.data instanceof ArrayBuffer) {
                         var a = new Int32Array(message.data);
@@ -39,9 +50,22 @@
                     }
                 };
                 
+                $('#connectBut').click(function(event) {
+                	var uri = $('#uriInput').val();
+                	logToConsole('<span> Connecting to: ' + uri + '</span>');
+                    var websocket = new WebSocket(uri,
+                    	'v1.verse.tul.cz');
+					websocket.binaryType = "arraybuffer";
+					
+					websocket.onopen = function(event) { onConnect(event) };
+					websocket.onerror = function(event) { onError(event) };
+					websocket.onclose = function(event) { onClose(event) };
+					websocket.onmessage = function(message) { onMessage(message) };
+                });
+                
 
-                $('#sendBut').click(function(e) {
-                    e.preventDefault();
+                $('#sendBut').click(function(event) {
+                    event.preventDefault();
                     var val = $('#messageInput').val();
                     var number = Number(val);
                     if(!isNaN(number)) {
@@ -55,8 +79,8 @@
                     $('#messageInput').val('');
                 });
                 
-                $('#closeBut').click(function(e) {
-                    e.preventDefault();
+                $('#closeBut').click(function(event) {
+                    event.preventDefault();
                     websocket.close();
                 });
             });
@@ -64,13 +88,24 @@
         </head>
     <body>
         <h1>WebSockets test</h1>
-        <b>Message:</b>
         <form>
-            <input id="messageInput" type="text" />
+	        <b>Message:</b>
+	        <br/>
+            <input id="uriInput" type="text" value="ws://127.0.0.1:23456"/>
             <br/>
-            <button id="sendBut">Send</button>
+            <button id="connectBut">Connect</button>
             <button id="closeBut">Close</button>
+            <br/>
+        	<b>Username:</b>
+        	<br/>
+            <input id="username" type="text" value="username"/>
+            <br/>
+            <b>Password:</b>
+            <br/>
+            <input id="password" type="text" value="password"/>
         </form>
+        <div id="consoleLog"></div>
+        <!-- <button id="sendBut">Send</button> -->
         <div></div>
     </body>
 </html>
