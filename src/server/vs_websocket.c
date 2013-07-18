@@ -43,21 +43,27 @@
 #include "vs_websocket.h"
 #include "vs_handshake.h"
 
+
+#define BASE64_ENCODE_RAW_LENGTH(length) ((((length) + 2)/3)*4)
+#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+
 /*
  * Calculates SHA-1 hash of *src*. The size of *src* is *src_length* bytes.
  * *dst* must be at least SHA1_DIGEST_SIZE.
  */
-void sha1(uint8_t *dst, const uint8_t *src, size_t src_length)
+static void sha1(uint8_t *dst, const uint8_t *src, size_t src_length)
 {
 	SHA1(src, src_length, dst);
 }
+
 
 /*
  * Base64-encode *src* and stores it in *dst*.
  * The size of *src* is *src_length*.
  * *dst* must be at least BASE64_ENCODE_RAW_LENGTH(src_length).
  */
-void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
+static void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
 {
 	BIO *bmem, *b64;
 	BUF_MEM *bptr;
@@ -75,8 +81,6 @@ void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
 	BIO_free_all(b64);
 }
 
-#define BASE64_ENCODE_RAW_LENGTH(length) ((((length) + 2)/3)*4)
-#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 /*
  * Create Server's accept key in *dst*.
@@ -84,7 +88,7 @@ void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
  * client's handshake and it must be length of 24.
  * *dst* must be at least BASE64_ENCODE_RAW_LENGTH(20)+1.
  */
-void create_accept_key(char *dst, const char *client_key)
+static void create_accept_key(char *dst, const char *client_key)
 {
 	uint8_t sha1buf[20], key_src[60];
 	memcpy(key_src, client_key, 24);
@@ -94,14 +98,14 @@ void create_accept_key(char *dst, const char *client_key)
 	dst[BASE64_ENCODE_RAW_LENGTH(20)] = '\0';
 }
 
+
 /* We parse HTTP header lines of the format
  *   \r\nfield_name: value1, value2, ... \r\n
  *
  * If the caller is looking for a specific value, we return a pointer to the
  * start of that value, else we simply return the start of values list.
  */
-static char*
-http_header_find_field_value(char *header, char *field_name, char *value)
+static char* http_header_find_field_value(char *header, char *field_name, char *value)
 {
 	char *header_end,
 	*field_start,
@@ -167,6 +171,7 @@ http_header_find_field_value(char *header, char *field_name, char *value)
 
 	return value_start;
 }
+
 
 /*
  * WIP: Performs simple HTTP handshake. *fd* is the file descriptor of the
@@ -239,7 +244,7 @@ static int http_handshake(int fd)
 /**
  * \brief WIP: Wslay send callback
  */
-ssize_t send_callback(wslay_event_context_ptr ctx,
+ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 		const uint8_t *data,
 		size_t len,
 		int flags,
@@ -273,7 +278,7 @@ if(flags & WSLAY_MSG_MORE) {
 /**
  * \brief WIP: Wslay receive callback
  */
-ssize_t recv_callback(wslay_event_context_ptr ctx,
+ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 		uint8_t *buf,
 		size_t len,
 		int flags,
@@ -305,7 +310,7 @@ ssize_t recv_callback(wslay_event_context_ptr ctx,
 /**
  * \brief WIP: recive message
  */
-void on_msg_recv_callback(wslay_event_context_ptr ctx,
+void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 		const struct wslay_event_on_msg_recv_arg *arg,
 		void *user_data)
 {
@@ -364,13 +369,13 @@ void *vs_websocket_loop(void *arg)
 	unsigned int int_size;
 
 	struct wslay_event_callbacks callbacks = {
-			recv_callback,
-			send_callback,
+			vs_recv_ws_callback_data,
+			vs_send_ws_callback_data,
 			NULL,
 			NULL,
 			NULL,
 			NULL,
-			on_msg_recv_callback
+			vs_ws_recv_msg_callback
 	};
 
 	/* Set socket blocking */
