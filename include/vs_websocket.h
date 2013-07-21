@@ -25,6 +25,9 @@
 #ifndef VS_WEBSOCKET_H_
 #define VS_WEBSOCKET_H_
 
+struct vContext;
+
+int vs_STREAM_OPEN_ws_loop(struct vContext *C);
 void *vs_websocket_loop(void *arg);
 
 #endif

@@ -199,14 +199,14 @@ void vs_CLOSING(struct vContext *C)
 /**
  * \brief This function is never ending loop of server state STREAM_OPEN
  */
-int vs_STREAM_OPEN_loop(struct vContext *C)
+int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct timeval tv;
 	fd_set set;
-	int flag, ret;
+	int flag, ret, error;
 
 	/* Set socket non-blocking */
 	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
@@ -233,6 +233,11 @@ int vs_STREAM_OPEN_loop(struct vContext *C)
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
+			/* Try to receive data through SSL connection */
+			if( v_SSL_read(io_ctx, &error) <= 0 ) {
+				goto end;
+			}
+
 			if(v_STREAM_handle_messages(C) == 0) {
 				goto end;
 			}
@@ -241,8 +246,15 @@ int vs_STREAM_OPEN_loop(struct vContext *C)
 			sem_post(&vs_ctx->data.sem);
 		}
 
-		if(v_STREAM_send_message(C) == 0 ) {
+		if( (ret = v_STREAM_pack_message(C)) == 0 ) {
 			goto end;
+		}
+
+		/* Send command to the client */
+		if(ret == 1) {
+			if( v_SSL_write(io_ctx, &error) <= 0) {
+				goto end;
+			}
 		}
 	}
 end:
@@ -310,7 +322,7 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, j, ret, error;
+	int i, j, ret;
 	unsigned short buffer_pos = 0;
 	int host_url_proposed = 0, host_cookie_proposed = 0, peer_cookie_confirmed = 0, ded_confirmed = 0;
 	struct timeval tv;
@@ -459,6 +471,9 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		} else if(vsession->flags & VRS_TP_TCP) {
 			strncpy(trans_proto, "tcp", 3);
 			trans_proto[4] = '\0';
+		} else if(vsession->flags & VRS_TP_WEBSOCKET) {
+			strncpy(trans_proto, "wss", 3);
+			trans_proto[4] = '\0';
 		}
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
@@ -471,7 +486,9 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			if(vsession->flags & VRS_TP_UDP) {
 				strncpy(sec_proto, "dtls", 4);
 				sec_proto[4] = '\0';
-			} else if(vsession->flags & VRS_TP_TCP) {
+			} else if((vsession->flags & VRS_TP_TCP) ||
+					(vsession->flags & VRS_TP_WEBSOCKET))
+			{
 				strncpy(sec_proto, "tls", 3);
 				sec_proto[3] = '\0';
 			}
@@ -521,12 +538,7 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 		v_print_send_message(C);
 
-		/* Send command to the client */
-		if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-			return 0;
-		} else {
-			return 1;
-		}
+		return 1;
 	} else {
 		return 0;
 	}
@@ -545,7 +557,7 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, ret, error, cmd_rank = 0;
+	int i, cmd_rank = 0;
 	unsigned short buffer_pos = 0;
 
 	/* Reset content of received message */
@@ -617,12 +629,7 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 
 					v_print_send_message(C);
 
-					/* Send command to the client */
-					if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-						return 0;
-					} else {
-						return 1;
-					}
+					return 1;
 				} else {
 
 					buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
@@ -641,13 +648,7 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 
 					v_print_send_message(C);
 
-					/* Send command to the client */
-					if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-						/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
-						return 0;
-					} else {
-						return 0;
-					}
+					return 1;
 				}
 			}
 		}
@@ -669,7 +670,7 @@ int vs_RESPOND_methods_loop(struct vContext *C)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, ret, error;
+	int i;
 	unsigned short buffer_pos = 0;
 
 	/* Reset content of received message */
@@ -710,13 +711,7 @@ int vs_RESPOND_methods_loop(struct vContext *C)
 					v_print_send_message(C);
 				}
 
-				/* Send command to the client */
-				if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-					/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
-					return 0;
-				} else {
-					return 1;
-				}
+				return 1;
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This method id: %d is not supported in this state\n", r_message->sys_cmd[i].ua_req.method_type);
 			}
@@ -796,7 +791,7 @@ int vs_handle_handshake(struct vContext *C)
 			if(vsession->flags & VRS_TP_UDP) {
 				/* When URL was confirmed, then go to the end state */
 				return -1;
-			} else if (vsession->flags & VRS_TP_TCP) {
+			} else if(vsession->flags & VRS_TP_TCP) {
 				stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
 
 				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
@@ -805,8 +800,16 @@ int vs_handle_handshake(struct vContext *C)
 					printf("%c[%dm", 27, 0);
 				}
 
-				vs_STREAM_OPEN_loop(C);
+				vs_STREAM_OPEN_tcp_loop(C);
 				return -1;
+			} else if(vsession->flags & VRS_TP_WEBSOCKET) {
+				stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
+
+				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+					printf("%c[%d;%dm", 27, 1, 31);
+					v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: STREAM_OPEN\n");
+					printf("%c[%dm", 27, 0);
+				}
 			}
 		} else {
 			/* When thread was not confirmed, then try to cancel
@@ -820,5 +823,5 @@ int vs_handle_handshake(struct vContext *C)
 
 	}
 
-	return 0;
+	return 1;
 }

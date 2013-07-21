@@ -8,26 +8,60 @@
             	
                 window.WebSocket = window.WebSocket || window.MozWebSocket;
                 
-                function logToConsole(message)
-                {
-                	var pre = document.createElement("p");
-                	pre.style.wordWrap = "break-word";
-                	pre.innerHTML = getSecureTag() + message;
-                	$('#consoleLog').appendChild(pre);
-
-                	while (consoleLog.childNodes.length > 50)
-                	{
-                		$('#consoleLog').removeChild(consoleLog.firstChild);
-                	}
-                  
-                	$('#consoleLog').scrollTop = consoleLog.scrollHeight;
-                }
+                var websocket;
+                
+                setGuiConnected(false);
                
                 function onConnect(event) {
+                	console.log('[Connected]');
+                	setGuiConnected(true);
                     $('h1').css('color', 'green');
+                    
+                    var buf_pos = 0;
+                    
+                    /* Get username */
+                    var name = $('#username').val();
+                    var name_len = name.length;
+                    
+                    console.log('username:' + name + ', len:' + name_len);
+                    
+                    /* Fill buffer with data of Verse header and user_auth
+                     * command */
+                    var message_len = 4+1+1+1+name_len+1;
+                    var buf = new ArrayBuffer(message_len);
+                    var view = new DataView(buf);
+                    /* Verse header starts with version */
+                    view.setInt8(buf_pos, 1 << 4); /* First 4 bits are reserved for version of protocol */
+                    buf_pos += 2;
+                    /* The lenght of the message */
+                    view.setInt16(buf_pos, message_len);
+                    buf_pos += 2;
+                    
+                    /* Pack OpCode of user_auth command */
+                    view.setInt8(buf_pos, 7);
+                    buf_pos++;
+                    /* Pack length of the command */
+                    view.setInt8(buf_pos, 1+1+1+name_len+1);
+                    buf_pos++;
+                    /* Pack length of string */
+                    view.setInt8(buf_pos, name_len);
+                    buf_pos++;
+                    /* Pack the string of the username */
+                    for (var i=0; i<name_len; i++) {
+                        view.setInt8(buf_pos+i, name.charCodeAt(i));
+                    }
+                    buf_pos += name_len;
+                    /* Pack method NONE ... it is not supported and server will
+                     * return list of supported methods in command user_auth_fail */
+                    view.setInt8(buf_pos, 1);
+                    buf_pos++;
+                    
+                    /* Send the blob */
+                    websocket.send(buf);
                 };
 
                 function onError(event) {
+                	console.log('Error:' + event.data);
                     $('h1').css('color', 'red');
                 };
                 
@@ -37,23 +71,26 @@
                 };
                 
                 function onClose(event) {
+                	console.log('[Disconnected], Code:' + event.code + ', Reason: ' + event.reason);
+                	setGuiConnected(false);
                     $('h1').css('color', 'red');
                 };
 
                 function onMessage(message) {
                     console.log(message.data);
                     if(message.data instanceof ArrayBuffer) {
-                        var a = new Int32Array(message.data);
-                        $('div').prepend($('<p>', { text: a[0].toString() }));
+                        /* TODO: do communication here :-) */
+                        $('div').prepend($('<p>', { binary: message.data }));
                     } else {
                         $('div').prepend($('<p>', { text: message.data }));
                     }
                 };
                 
                 $('#connectBut').click(function(event) {
+                	event.preventDefault();
                 	var uri = $('#uriInput').val();
-                	logToConsole('<span> Connecting to: ' + uri + '</span>');
-                    var websocket = new WebSocket(uri,
+                	console.log('Connecting to URI:' + uri + ' ...');
+                    websocket = new WebSocket(uri,
                     	'v1.verse.tul.cz');
 					websocket.binaryType = "arraybuffer";
 					
@@ -63,38 +100,37 @@
 					websocket.onmessage = function(message) { onMessage(message) };
                 });
                 
-
-                $('#sendBut').click(function(event) {
-                    event.preventDefault();
-                    var val = $('#messageInput').val();
-                    var number = Number(val);
-                    if(!isNaN(number)) {
-                        var buf = new ArrayBuffer(4);
-                        var a = new Int32Array(buf);
-                        a[0] = number;
-                        websocket.send(buf);
-                    } else {
-                        websocket.send(val);
-                    }
-                    $('#messageInput').val('');
-                });
-                
                 $('#closeBut').click(function(event) {
+                	console.log('Disconnecting ...')
                     event.preventDefault();
                     websocket.close();
                 });
+                
+                function setGuiConnected(isConnected) {
+                	console.log('Gui connected:'+isConnected);
+                	if(isConnected == true) {
+                        $('#uriInput').attr('disabled', 'disabled');;
+                        $('#connectBut').attr('disabled', 'disabled');
+                        $('#closeBut').removeAttr('disabled');
+                        $('#username').attr('disabled', 'disabled');
+                        $('#password').attr('disabled', 'disabled');
+                	} else {
+                        $('#uriInput').removeAttr('disabled');
+                        $('#connectBut').removeAttr('disabled');
+                        $('#closeBut').attr('disabled', 'disabled');
+                        $('#username').removeAttr('disabled');
+                        $('#password').removeAttr('disabled');                		
+                	}
+                }
             });
         </script>
         </head>
     <body>
         <h1>WebSockets test</h1>
         <form>
-	        <b>Message:</b>
+	        <b>Server URI:</b>
 	        <br/>
             <input id="uriInput" type="text" value="ws://127.0.0.1:23456"/>
-            <br/>
-            <button id="connectBut">Connect</button>
-            <button id="closeBut">Close</button>
             <br/>
         	<b>Username:</b>
         	<br/>
@@ -103,6 +139,10 @@
             <b>Password:</b>
             <br/>
             <input id="password" type="text" value="password"/>
+            <br/>
+            <button id="connectBut">Connect</button>
+            <button id="closeBut">Close</button>
+            <br/>
         </form>
         <div id="consoleLog"></div>
         <!-- <button id="sendBut">Send</button> -->

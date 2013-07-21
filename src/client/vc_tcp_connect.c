@@ -118,7 +118,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct timeval tv;
 	fd_set set;
-	int flag, ret;
+	int flag, ret, error;
 
 	/* Set socket non-blocking */
 	flag = fcntl(io_ctx->sockfd, F_GETFL, 0);
@@ -149,13 +149,25 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
+			/* Try to receive data through SSL connection */
+			if( v_SSL_read(io_ctx, &error) <= 0 ) {
+				goto end;
+			}
+
 			if(v_STREAM_handle_messages(C) == 0) {
 				goto end;
 			}
 		}
 
-		if(v_STREAM_send_message(C) == 0) {
+		if( (ret = v_STREAM_pack_message(C)) == 0) {
 			goto end;
+		}
+
+		/* Send command to the client */
+		if(ret == 1) {
+			if( v_SSL_write(io_ctx, &error) <= 0) {
+				goto end;
+			}
 		}
 	}
 end:

@@ -40,6 +40,6 @@
 #include "v_context.h"
 
 int v_STREAM_handle_messages(struct vContext *C);
-int v_STREAM_send_message(struct vContext *C);
+int v_STREAM_pack_message(struct vContext *C);
 
 #endif /* V_STREAM_H_ */

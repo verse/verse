@@ -59,15 +59,9 @@
 int v_STREAM_handle_messages(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	int error, ret = 1, buffer_pos = 0, i;
+	int ret = 1, buffer_pos = 0, i;
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VSession *vsession = CTX_current_session(C);
-
-	/* Try to receive data through SSL connection */
-	if( v_SSL_read(io_ctx, &error) <= 0 ) {
-		ret = 0;
-		goto end;
-	}
 
 	/* Make sure, that buffer contains at least Verse message
 	 * header. If this condition is not reached, then somebody tries
@@ -119,14 +113,16 @@ end:
 }
 
 /**
- * \brief This function try to send message in STREAM OPEN state
+ * \brief This function try to pack message that is going to be
+ * sent in STREAM OPEN state
  *
  * \param[in] *C The pointer at cpntext
  *
- * \return This function return 1, when it ends successfuly, otherwise it
- * returns 0
+ * \return This function return 1, when there is something to send,
+ * it returns -1, when there is nothing to send and it returns 0, when
+ * there is some error
  */
-int v_STREAM_send_message(struct vContext *C)
+int v_STREAM_pack_message(struct vContext *C)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct VStreamConn *conn = CTX_current_stream_conn(C);
@@ -254,11 +250,8 @@ int v_STREAM_send_message(struct vContext *C)
 			v_print_send_message(C);
 		}
 
-		/* Send command to the client */
-		if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-			/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
-			ret = 0;
-		}
+		ret = 1;
+
 	}
 
 	return ret;

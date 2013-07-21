@@ -133,8 +133,16 @@ void *vs_tcp_conn_loop(void *arg)
 				goto end;
 			}
 
-			if( vs_handle_handshake(C) == -1) {
+			if( (ret = vs_handle_handshake(C)) == -1) {
 				goto end;
+			}
+
+			/* When these is something to send, then send it to peer */
+			if( ret == 1 ) {
+				/* Send command to the client through SSL connection */
+				if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
+					goto end;
+				}
 			}
 
 		} else {
