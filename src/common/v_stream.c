@@ -129,7 +129,7 @@ int v_STREAM_pack_message(struct vContext *C)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct Generic_Cmd *cmd;
-	int ret = 1, error, queue_size, buffer_pos = 0, prio_cmd_count, cmd_rank=0;
+	int ret = -1, error, queue_size, buffer_pos = 0, prio_cmd_count, cmd_rank=0;
 	int8 cmd_share;
 	int16 prio, max_prio, min_prio;
 	uint16 cmd_count, cmd_len, prio_win, swin, sent_size, tot_cmd_size;
