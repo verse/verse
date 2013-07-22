@@ -110,7 +110,7 @@
                         
                         var message_len = rec_view.getUint16(buf_pos);
                         buf_pos += 2;
-                        console.log('Message length: ' + message_len);
+                        console.log('Received message length: ' + message_len);
                         
             			switch(state) {
             				case STATE_USRAUTH_NONE:
@@ -189,6 +189,9 @@
             							return;
             						}
             					}
+            					break;
+            				case STATE_USRAUTH_DATA:
+            					/* TODO: handle received commands */
             					break;
             			}
                     } else {

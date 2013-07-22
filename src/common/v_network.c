@@ -94,15 +94,19 @@ int v_parse_url(const char *str, struct VURL *url)
 		/* printf("\t%s\n", &str[str_pos]);*/
 	}
 
-	/* There has to be "udp" protocolor "tcp" protocol  */
+	/* There has to be "udp" or "tcp" or "wss" protocol  */
 	if(strncmp(&str[str_pos], "udp", strlen("udp"))==0) {
 		url->transport_protocol = VRS_TP_UDP;
 		str_pos += strlen("udp");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else if(strncmp(&str[str_pos], "tcp", strlen("tcp"))==0) {
-			url->transport_protocol = VRS_TP_TCP;
-			str_pos += strlen("tcp");
-			/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
+		url->transport_protocol = VRS_TP_TCP;
+		str_pos += strlen("tcp");
+		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "wss", strlen("wss"))==0) {
+		url->transport_protocol = VRS_TP_WEBSOCKET;
+		str_pos += strlen("wss");
+		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else {
 		return 0;
 	}
@@ -115,7 +119,7 @@ int v_parse_url(const char *str, struct VURL *url)
 		/* printf("\t%s\n", &str[str_pos]);*/
 	}
 
-	/* There could be "none" or "dtls" string */
+	/* There could be "none" or "dtls" or "tls" string */
 	if(strncmp(&str[str_pos], "none", strlen("none"))==0) {
 		url->security_protocol = VRS_SEC_DATA_NONE;
 		str_pos += strlen("none");

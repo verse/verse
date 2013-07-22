@@ -197,7 +197,9 @@ void vs_CLOSING(struct vContext *C)
 
 
 /**
- * \brief This function is never ending loop of server state STREAM_OPEN
+ * \brief This function is never ending loop of server state STREAM_OPEN.
+ * This loop is used, when Verse server uses TCP for data exchange (not
+ * UDP nor WebSocket)
  */
 int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 {
