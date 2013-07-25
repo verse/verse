@@ -103,9 +103,9 @@ int v_parse_url(const char *str, struct VURL *url)
 		url->transport_protocol = VRS_TP_TCP;
 		str_pos += strlen("tcp");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
-	} else if(strncmp(&str[str_pos], "wss", strlen("wss"))==0) {
+	} else if(strncmp(&str[str_pos], "web", strlen("web"))==0) {
 		url->transport_protocol = VRS_TP_WEBSOCKET;
-		str_pos += strlen("wss");
+		str_pos += strlen("web");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else {
 		return 0;
