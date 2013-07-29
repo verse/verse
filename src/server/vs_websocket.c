@@ -24,12 +24,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <wslay.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 
-#include <wslay.h>
+#include <wslay/wslay.h>
 
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
