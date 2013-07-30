@@ -6,7 +6,7 @@
 #
 # This currently works probably only for Linux
 
-FIND_PATH ( WSLAY_INCLUDE_DIR wslay.h
+FIND_PATH ( WSLAY_INCLUDE_DIR wslay/wslay.h
     /usr/local/include
     /usr/include
 )
