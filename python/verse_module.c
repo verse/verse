@@ -704,7 +704,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -727,7 +730,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -750,7 +756,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -773,7 +782,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -791,7 +803,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -810,7 +825,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -828,7 +846,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -849,7 +870,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		py_value = PyTuple_GetItem(tuple_values, 0);
 		if(py_value != NULL) {
 			if(!PyUnicode_Check(py_value)) {
-				PyErr_SetString(VerseError, "Wrong type of tuple item");
+				char err_message[256];
+				sprintf(err_message, "Tuple item type is not str. Item type is: %s",
+						py_value->ob_type->tp_name);
+				PyErr_SetString(VerseError, err_message);
 				return NULL;
 			}
 		}
