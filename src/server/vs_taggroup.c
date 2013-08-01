@@ -208,6 +208,9 @@ struct VSTagGroup *vs_taggroup_create(struct VSNode *node, uint16 custom_type)
 	tg_bucket = v_hash_array_add_item(&node->tag_groups, tg, sizeof(struct VSTagGroup));
 
 	if(tg_bucket == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Tag group could not be added to node: %d.\n",
+				node->id);
 		free(tg);
 		return NULL;
 	}

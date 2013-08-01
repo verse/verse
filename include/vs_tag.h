@@ -69,12 +69,10 @@ int vs_tag_send_destroy(struct VSNode *node,
 		struct VSTagGroup *tg,
 		struct VSTag *tag);
 
-void vs_tag_init(struct VSTag *tag);
-
-struct VSTag *vs_tag_create(struct VSNode *node,
-		struct VSTagGroup *tg,
-		char *name,
-		uint8 type);
+struct VSTag *vs_tag_create(struct VSTagGroup *tg,
+		uint8 data_type,
+		uint8 count,
+		uint16 custom_type);
 int vs_tag_destroy(struct VSTagGroup *tg,
 		struct VSTag *tag);
 

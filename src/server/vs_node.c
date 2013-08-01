@@ -992,11 +992,13 @@ static struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 	}
 
 	if(vs_ctx->data.user_node != NULL) {
-		/* Create node, that is used as parent of user nodes */
+		/* Create node, that is used as user nodes */
 		node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
 
 		if(node != NULL) {
 			struct VSLink *link;
+			struct VSTagGroup *tg;
+			struct VSTag *tag;
 
 			vs_node_init(node);
 
@@ -1026,6 +1028,16 @@ static struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 				free(node);
 				node = NULL;
 			}
+
+			/* Create tag group with user information */
+			tg = vs_taggroup_create(node, 0);
+			tg->state = ENTITY_CREATED;
+
+			/* Create tag holding real name in the tag group */
+			tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 0);
+			tag->state = ENTITY_CREATED;
+			tag->value = strdup(user->realname);
+			tag->flag = TAG_INITIALIZED;
 		}
 	}
 
