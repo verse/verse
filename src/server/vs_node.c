@@ -364,6 +364,51 @@ static void vs_node_init(struct VSNode *node)
 }
 
 /**
+ * \brief This function creates new VSNode at Verse server
+ */
+struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
+		struct VSNode *parent_node,
+		struct VSUser *owner,
+		uint16 custom_type)
+{
+	struct VSNode *node;
+	struct VSLink *link;
+
+	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
+	if(node == NULL) {
+		v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+		return NULL;
+	}
+
+	vs_node_init(node);
+
+	/* Try to find first free node_id. It is fast and easy, When
+	 * VRS_LAST_COMMON_NODE_ID did not reach 0xFFFFFFFF-1 value yet and not used
+	 * node_id are not reused.*/
+	node->id = vs_ctx->data.last_common_node_id + 1;
+	while( v_hash_array_find_item(&vs_ctx->data.nodes, &node) != NULL) {
+		node->id++;
+		/* Node id 0xFFFFFFFF has special purpose and node IDs in range <0, 65535>
+		 * have special purposes too (skip them) */
+		if(node->id > VRS_LAST_COMMON_NODE_ID)
+			node->id = VRS_FIRST_COMMON_NODE_ID;
+		/* TODO: implement faster finding of free node id */
+	}
+	vs_ctx->data.last_common_node_id = node->id;
+
+	link = vs_link_create(parent_node, node);
+	if(link == NULL) {
+		free(node);
+		return NULL;
+	}
+
+	node->owner = owner;
+	node->type = custom_type;
+
+	return node;
+}
+
+/**
  * \brief This function will try to remove node from the server. The node can't
  * have any child node or subscriber.
  */
