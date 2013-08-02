@@ -131,6 +131,35 @@ void vs_layer_destroy(struct VSNode *node, struct VSLayer *layer)
 }
 
 /**
+ * \brief This function unsubscribe client from the layer
+ */
+int vs_layer_unsubscribe(struct VSLayer *layer, struct VSession *vsession)
+{
+	struct VSEntitySubscriber	*layer_subscriber;
+
+	/* Try to find layer subscriber */
+	layer_subscriber = layer->layer_subs.first;
+	while(layer_subscriber != NULL) {
+		if(layer_subscriber->node_sub->session->session_id == vsession->session_id) {
+			break;
+		}
+		layer_subscriber = layer_subscriber->next;
+	}
+
+	/* Client has to be subscribed to the layer */
+	if(layer_subscriber == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to the layer (id: %d)\n",
+								__FUNCTION__, layer->id);
+		return 0;
+	}
+
+	/* Remove client from the list of subscribers */
+	v_list_free_item(&layer->layer_subs, layer_subscriber);
+
+	return 1;
+}
+
+/**
  * \brief This function removes all layers and its values from verse node.
  */
 int vs_node_layers_destroy(struct VSNode *node)
@@ -722,7 +751,6 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSLayer *layer;
-	struct VSEntitySubscriber *layer_subscriber;
 
 	uint32 node_id = UINT32(layer_unsubscribe_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_unsubscribe_cmd->data[UINT32_SIZE]);
@@ -745,26 +773,7 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Try to find layer subscriber */
-	layer_subscriber = layer->layer_subs.first;
-	while(layer_subscriber != NULL) {
-		if(layer_subscriber->node_sub->session->session_id == vsession->session_id) {
-			break;
-		}
-		layer_subscriber = layer_subscriber->next;
-	}
-
-	/* Client has to be subscribed to the layer */
-	if(layer_subscriber == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to the layer (id: %d) in node (id: %d)\n",
-								__FUNCTION__, layer_id, node_id);
-		return 0;
-	}
-
-	/* Remove client from the list of subscribers */
-	v_list_free_item(&layer->layer_subs, layer_subscriber);
-
-	return 1;
+	return vs_layer_unsubscribe(layer, vsession);
 }
 
 

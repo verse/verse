@@ -88,11 +88,13 @@ static int vs_node_unsubscribe(struct VSNode *node,
 {
 	struct VSNode *child_node;
 	struct VSLink *link;
-	struct VBucket *tg_bucket;
+	struct VBucket *tg_bucket, *layer_bucket;
 	struct VSTagGroup *tg;
+	struct VSLayer *layer;
 	struct VSNodeSubscriber *_node_subscriber;
 	struct VSEntityFollower *node_follower;
 	struct VSEntityFollower	*taggroup_follower;
+	struct VSEntityFollower	*layer_follower;
 
 	/* Unsubscribe from all child nodes */
 	link = node->children_links.first;
@@ -133,7 +135,25 @@ static int vs_node_unsubscribe(struct VSNode *node,
 		tg_bucket = tg_bucket->next;
 	}
 
-	/* TODO: Unsubscribe from all layers */
+	/* Unsubscribe client from all layers */
+	layer_bucket = node->layers.lb.first;
+	while(layer_bucket != NULL) {
+		layer = (struct VSLayer*)layer_bucket->data;
+
+		/* Remove client from the list of Layer subscribers */
+		vs_layer_unsubscribe(layer, node_subscriber->session);
+
+		/* Remove client from the list of Layer followers */
+		layer_follower = layer->layer_folls.first;
+		while(layer_follower!=NULL) {
+			if(layer_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
+				v_list_free_item(&layer->layer_folls, layer_follower);
+				break;
+			}
+			layer_follower = layer_follower->next;
+		}
+		layer_bucket = layer_bucket->next;
+	}
 
 	if(level > 0) {
 		/* Remove this session from list of followers too */
@@ -1342,8 +1362,8 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 
 	/* When client is subscribed to this node, then change node priority */
 	if(node_subscriber!= NULL) {
-		/* TODO: change priority for all child nodes */
 		node_subscriber->prio = prio;
+		/* Change priority for this node and all child nodes */
 		vs_node_prio(vsession, node, prio);
 	} else {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to this node (id: %d)\n",
