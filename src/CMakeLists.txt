@@ -75,6 +75,7 @@ set (server_src
 		server/vs_tag.c
 		server/vs_node.c
 		server/vs_node_access.c
+		server/vs_sys_nodes.c
 		server/vs_main.c
 		server/vs_link.c
 		server/vs_layer.c

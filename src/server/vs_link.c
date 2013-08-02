@@ -23,6 +23,8 @@
  *
  */
 
+#include <assert.h>
+
 #include "verse_types.h"
 
 #include "v_common.h"
@@ -77,6 +79,9 @@ int vs_link_test_nodes(struct VSNode *parent, struct VSNode *child)
 struct VSLink *vs_link_create(struct VSNode *parent, struct VSNode *child)
 {
 	struct VSLink *link = NULL;
+
+	assert(parent != NULL);
+	assert(child != NULL);
 
 	link = (struct VSLink*)malloc(sizeof(struct VSLink));
 

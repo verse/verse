@@ -47,6 +47,7 @@
 #include "vs_auth_pam.h"
 #include "vs_auth_csv.h"
 #include "vs_node.h"
+#include "vs_sys_nodes.h"
 
 #include "v_common.h"
 #include "v_pack.h"

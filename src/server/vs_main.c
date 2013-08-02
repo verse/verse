@@ -36,6 +36,7 @@
 #include "vs_auth_csv.h"
 #include "vs_data.h"
 #include "vs_node.h"
+#include "vs_sys_nodes.h"
 
 #if WITH_INIPARSER
 #include "vs_config.h"
