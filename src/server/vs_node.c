@@ -150,8 +150,6 @@ static int vs_node_unsubscribe(struct VSNode *node,
 		}
 	}
 
-	printf(">>>Removing session: %d from list of node: %d subscribers<<<\n",
-			node_subscriber->session->session_id, node->id);
 	/* Finally remove this session from list of node subscribers */
 	v_list_free_item(&node->node_subs, node_subscriber);
 

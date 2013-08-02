@@ -29,6 +29,7 @@ option(VERSE_CLANG "Use Clang Compiler" OFF)
 option(VERSE_PYTHON_MODULE "Verse Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
+option(VERSE_INIPARSER "Iniparser library" ON)
 
 # Clang compiler
 if (VERSE_CLANG)
@@ -46,7 +47,6 @@ set (CMAKE_THREAD_PREFER_PTHREAD)
 # Try to find required packages
 find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
-find_package (Iniparser REQUIRED)
 
 # Set output directory for libraries
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
@@ -54,9 +54,20 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 # Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
 
+
+# Check iniparser library
+if (VERSE_INIPARSER)
+
+    # Try to find iniparser library
+    find_package (Iniparser)
+       
+endif (VERSE_INIPARSER)
+
+
 # Set up required subdirectories
 add_subdirectory (src)
 add_subdirectory (example)
+
 
 # Check unit test
 if (VERSE_CHECK)
@@ -73,6 +84,7 @@ if (VERSE_CHECK)
 	endif (CHECK_FOUND)
 
 endif (VERSE_CHECK)
+
 
 # Python module
 if (VERSE_PYTHON_MODULE)
@@ -99,6 +111,7 @@ if (VERSE_PYTHON_MODULE)
 	
 endif (VERSE_PYTHON_MODULE)
 
+
 # Doxygen
 if (VERSE_DOXYGEN)
 
@@ -116,6 +129,7 @@ if (VERSE_DOXYGEN)
 	endif (DOXYGEN_FOUND)
 
 endif (VERSE_DOXYGEN)
+
 
 # Copy ./pki directory to ${PROJECT_BINARY_DIR}
 configure_file ("${PROJECT_SOURCE_DIR}/pki/certificate.pem"
@@ -144,6 +158,12 @@ message ("* Verse Configuration *")
 message ("")
 
 message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+
+if (INIPARSER_FOUND)
+	message (" * IniParser:     ON")
+else ()
+	message (" * IniParser:     OFF")
+endif (INIPARSER_FOUND)
 	
 if (PYTHON_LIBRARY)
 	message (" * Python:        ON")

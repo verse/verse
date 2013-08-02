@@ -36,7 +36,10 @@
 #include "vs_auth_csv.h"
 #include "vs_data.h"
 #include "vs_node.h"
+
+#if WITH_INIPARSER
 #include "vs_config.h"
+#endif
 
 #include "v_common.h"
 #include "v_session.h"
@@ -155,7 +158,9 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 	/* Load default values first */
 	vs_load_default_values(vs_ctx);
 
-	/* When no configuration file is specified, then load default values */
+#if WITH_INIPARSER
+	/* When no configuration file is specified, then load values from
+	 * default path */
 	if(config_file==NULL) {
 		/* Try to open default configuration file */
 		vs_read_config_file(vs_ctx, DEFAULT_SERVER_CONFIG_FILE);
@@ -163,6 +168,9 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 		/* Try to open configuration file */
 		vs_read_config_file(vs_ctx, config_file);
 	}
+#else
+	(void)config_file;
+#endif
 }
 
 /**

@@ -79,13 +79,20 @@ set (server_src
 		server/vs_link.c
 		server/vs_layer.c
 		server/vs_data.c
-		server/vs_config.c
 		server/vs_auth_csv.c)
 		
 
 include_directories (../include)
-include_directories (${INIPARSER_INCLUDE_DIRS})
 include_directories (${OPENSSL_INCLUDE_DIR})
+
+
+# When iniparser is used
+if (INIPARSER_FOUND)
+    set (server_src ${server_src}  server/vs_config.c)
+    include_directories (${INIPARSER_INCLUDE_DIRS})
+    add_definitions(-DWITH_INIPARSER)
+endif (INIPARSER_FOUND)
+
 
 # Make build flags compiler specific
 if (CMAKE_COMPILER_IS_GNUCC)
@@ -95,6 +102,7 @@ if (CMAKE_COMPILER_IS_GNUCC)
 		set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -fPIC -Wall -Wextra -pedantic -O3")
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
+
 
 # Set up shared verse library (libverse.so)
 add_library (verse_shared_lib SHARED ${libverse_src})
@@ -118,11 +126,18 @@ endif (CMAKE_COMPILER_IS_GNUCC)
 # Set up verse server executable
 add_executable (verse_server ${server_src})
 add_dependencies (verse_server verse_shared_lib)
-target_link_libraries (verse_server
+if (INIPARSER_FOUND)
+    target_link_libraries (verse_server
 		verse_shared_lib
 		${CMAKE_THREAD_LIBS_INIT}
 		${OPENSSL_LIBRARIES}
 		${INIPARSER_LIBRARIES})
+else()
+    target_link_libraries (verse_server
+		verse_shared_lib
+		${CMAKE_THREAD_LIBS_INIT}
+		${OPENSSL_LIBRARIES})
+endif (INIPARSER_FOUND)
 
 
 # The rule to install Verse server

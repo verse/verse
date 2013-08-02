@@ -33,7 +33,9 @@ else (INIPARSER_LIBRARIES AND INIPARSER_INCLUDE_DIRS)
       iniparser
     PATHS
       /usr/lib
+      /usr/lib64
       /usr/local/lib
+      /usr/local/lib64
       /opt/local/lib
       /sw/lib
   )
