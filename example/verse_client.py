@@ -386,6 +386,9 @@ def main(hostname='localhost'):
     # Set debug level
     vrs.set_debug_level(vrs.PRINT_DEBUG_MSG)
     
+    # Set name and version of client
+    vrs.set_client_info("Example Python Verse Client", "0.1")
+    
     try:
         session = MySession(hostname, "12345", vrs.DGRAM_SEC_NONE)
     except vrs.VerseError:

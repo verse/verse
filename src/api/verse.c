@@ -112,10 +112,12 @@ int vrs_set_client_info(char *name, char *version)
 
 	if(vc_ctx->client_name == NULL && name != NULL) {
 		vc_ctx->client_name = strdup(name);
-	}
 
-	if(vc_ctx->client_version == NULL && version != NULL) {
-		vc_ctx->client_version = strdup(version);
+		if(vc_ctx->client_version == NULL && version != NULL) {
+			vc_ctx->client_version = strdup(version);
+		}
+
+		ret = VRS_SUCCESS;
 	}
 
 	return ret;
