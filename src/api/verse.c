@@ -101,6 +101,25 @@ int vrs_set_debug_level(uint8_t debug_level)
 	return ret;
 }
 
+/**
+ * \brief This function can set name and version of current verse client.
+ */
+int vrs_set_client_info(char *name, char *version)
+{
+	int ret = VRS_FAILURE;
+
+	vc_init_VC_CTX();
+
+	if(vc_ctx->client_name == NULL && name != NULL) {
+		vc_ctx->client_name = strdup(name);
+	}
+
+	if(vc_ctx->client_version == NULL && version != NULL) {
+		vc_ctx->client_version = strdup(version);
+	}
+
+	return ret;
+}
 
 /**
  * \brief This function tries to negotiate new FPS with server

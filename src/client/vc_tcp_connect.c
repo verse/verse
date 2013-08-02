@@ -217,6 +217,7 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
  */
 static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 {
+	struct VC_CTX *vc_ctx = CTX_client_ctx(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *r_message = CTX_r_message(C);
@@ -329,6 +330,14 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 
 	/* Send confirmation of proposed DED */
 	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_DED, vsession->ded.str, NULL);
+
+	/* Set up negotiate command of client name and version */
+	if(vc_ctx->client_name != NULL) {
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_NAME, vc_ctx->client_name, NULL);
+		if(vc_ctx->client_version != NULL) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_VERSION, vc_ctx->client_version, NULL);
+		}
+	}
 
 	/* Pack all system commands to the buffer */
 	buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);

@@ -58,6 +58,8 @@
 #define FTR_RWIN_SCALE			6	/* Scale factor of rwin used for Flow Control */
 #define FTR_FPS					7	/* FPS currently used at client */
 #define FTR_CMD_COMPRESS		8	/* Command compression */
+#define FTR_CLIENT_NAME			9	/* The name of Verse client application */
+#define FTR_CLIENT_VERSION		10	/* The version of Verse client application */
 
 /* Minimal and maximal length of negotiate command */
 #define MIN_FTR_CMD_LEN			3

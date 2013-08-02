@@ -320,7 +320,12 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	struct VMessage *s_message = CTX_s_message(C);
 	int i, j, ret, error;
 	unsigned short buffer_pos = 0;
-	int host_url_proposed = 0, host_cookie_proposed = 0, peer_cookie_confirmed = 0, ded_confirmed = 0;
+	int host_url_proposed = 0,
+			host_cookie_proposed = 0,
+			peer_cookie_confirmed = 0,
+			ded_confirmed = 0,
+			client_name_proposed = 0,
+			client_version_proposed = 0;
 	struct timeval tv;
 	struct VURL url;
 
@@ -335,7 +340,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 	v_print_receive_message(C);
 
-	/* Process all system commands */
+	/* Process all received system commands */
 	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CHANGE_R_ID:
@@ -366,6 +371,22 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
 						r_message->sys_cmd[i].negotiate_cmd.feature);
+			}
+			break;
+		case CMD_CHANGE_L_ID:
+			/* Client could propose client name and version */
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_name_proposed = 1;
+				}
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_version_proposed = 1;
+				}
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
@@ -516,6 +537,25 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		/* Send confirmation about host cookie */
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE,
 				vsession->host_cookie.str, NULL);
+
+		/* Send confirmation about client name */
+		if(client_name_proposed == 1) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_NAME,
+					vsession->client_name, NULL);
+		}
+
+		/* Send confirmation about client version only in situation, when
+		 * client proposed client name too */
+		if(client_version_proposed == 1) {
+			if(client_name_proposed == 1) {
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						vsession->client_version, NULL);
+			} else {
+				/* Client version without client name is not allowed */
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						NULL);
+			}
+		}
 
 		/* Pack all system commands to the buffer */
 		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);

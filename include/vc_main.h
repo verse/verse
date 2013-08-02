@@ -185,6 +185,9 @@ typedef struct VC_CTX {
 	/* SSL context */
 	SSL_CTX					*tls_ctx;					/**< SSL context for main secured TCP TLS socket */
 	SSL_CTX					*dtls_ctx;					/**< SSL context for secured UDP DTLS connections (shared with all connections) */
+	/* Information about client */
+	char					*client_name;
+	char					*client_version;
 } VC_CTX;
 
 /* Function prototypes */
