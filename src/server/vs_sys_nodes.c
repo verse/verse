@@ -216,45 +216,25 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx, uint16 user_id)
 {
 	struct VSNode *avatar_parent, *node;
-	struct VSUser *super_user, *other_users, *user;
-	struct VSNodePermission *perm;
+	struct VSUser *user;
 	struct VSNodeSubscriber *node_subscriber;
-	long int avatar_id = -1;
-	uint32 count;
 
-	if((count = v_hash_array_count_items(&vs_ctx->data.nodes)) > VRS_MAX_COMMON_NODE_COUNT) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Limit of nodes reached: %d\n", VRS_MAX_COMMON_NODE_COUNT);
-		goto end;
-	}
-
-	/* Trie to find parent of avatar nodes */
+	/* Try to find parent of avatar nodes */
 	if((avatar_parent = vs_ctx->data.avatar_node) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Parent of node avatars: %d does not exist\n", VRS_AVATAR_PARENT_NODE_ID);
-		goto end;
-	}
-
-	/* Try to find fake user for super user */
-	if((super_user = vs_user_find(vs_ctx, VRS_SUPER_USER_UID)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "super_user: %d not found\n", VRS_SUPER_USER_UID);
-		goto end;
-	}
-
-	/* Try to find fake user for other users */
-	if((other_users = vs_user_find(vs_ctx, VRS_OTHER_USERS_UID)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "other_users: %d not found\n", VRS_SUPER_USER_UID);
-		goto end;
+		return -1;
 	}
 
 	/* Try to find user connected with this avatar */
 	if((user = vs_user_find(vs_ctx, user_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "User with this ID: %d not found\n", user_id);
-		goto end;
+		return -1;
 	}
 
 	/* Try to create new node representing avatar */
-	if( (node = vs_node_create(vs_ctx, avatar_parent, super_user, VRS_RESERVED_NODE_ID, 0)) == NULL) {
+	if( (node = vs_node_create(vs_ctx, avatar_parent, vs_ctx->super_user, VRS_RESERVED_NODE_ID, 0)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar node for user: %d\n", user_id);
-		goto end;
+		return -1;
 	}
 
 	/* Set access permissions for user connected with this avatar. User can write data to its own
@@ -286,10 +266,7 @@ long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx, uint16 user_id)
 		node_subscriber = node_subscriber->next;
 	}
 
-	avatar_id = node->id;
-
-end:
-	return avatar_id;
+	return node->id;
 }
 
 
@@ -298,21 +275,10 @@ end:
  */
 struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
 {
-	struct VSUser *user, *super_user;
 	struct VSNode *node = NULL;
 
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
 	/* Try to create new node representing parent of avatar nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, super_user, VRS_AVATAR_PARENT_NODE_ID, 0)) == NULL) {
+	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_AVATAR_PARENT_NODE_ID, 0)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create parent node of avatar nodes\n");
 		return NULL;
 	}
@@ -333,21 +299,10 @@ struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
  */
 struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx)
 {
-	struct VSUser *user, *super_user;
 	struct VSNode *node = NULL;
 
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
 	/* Try to create new node representing parent of scene nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, super_user, VRS_SCENE_PARENT_NODE_ID, 0)) == NULL) {
+	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_SCENE_PARENT_NODE_ID, 0)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create parent node of scene nodes\n");
 		return NULL;
 	}
@@ -373,20 +328,9 @@ struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 	struct VSNode *node = NULL;
 	struct VSTagGroup *tg;
 	struct VSTag *tag;
-	struct VSUser *tmp_user, *super_user;
-
-	/* Find superuser user */
-	tmp_user = vs_ctx->users.first;
-	while(tmp_user != NULL) {
-		if(tmp_user->user_id == VRS_SUPER_USER_UID) {
-			super_user = tmp_user;
-			break;
-		}
-		tmp_user = tmp_user->next;
-	}
 
 	/* Try to create new node representing user nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.user_node, super_user, user->user_id, 0)) == NULL) {
+	if( (node = vs_node_create(vs_ctx, vs_ctx->data.user_node, vs_ctx->super_user, user->user_id, 0)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create user node\n");
 		return NULL;
 	}
@@ -421,21 +365,10 @@ struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
  */
 struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
 {
-	struct VSUser *user, *super_user;
 	struct VSNode *node = NULL;
 
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
 	/* Try to create new node representing parent of user nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, super_user, VRS_USERS_PARENT_NODE_ID, 0)) == NULL) {
+	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_USERS_PARENT_NODE_ID, 0)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create parent node of user nodes\n");
 		return NULL;
 	}
@@ -456,21 +389,10 @@ struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
  */
 struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx)
 {
-	struct VSUser *user, *super_user;
 	struct VSNode *node = NULL;
 
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
 	/* Try to create new node representing root node */
-	if( (node = vs_node_create(vs_ctx, NULL, super_user, VRS_ROOT_NODE_ID, 0)) == NULL) {
+	if( (node = vs_node_create(vs_ctx, NULL, vs_ctx->super_user, VRS_ROOT_NODE_ID, 0)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create root node\n");
 		return NULL;
 	}

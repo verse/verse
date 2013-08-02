@@ -41,5 +41,7 @@ typedef struct VSUser {
 
 struct VSUser *vs_user_find(struct VS_CTX *vs_ctx, uint16 user_id);
 void vs_user_free(struct VSUser *user);
+int vs_add_other_users_account(struct VS_CTX *vs_ctx);
+int vs_add_superuser_account(struct VS_CTX *vs_ctx);
 
 #endif /* V_USER_H_ */

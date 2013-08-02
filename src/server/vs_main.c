@@ -37,6 +37,7 @@
 #include "vs_data.h"
 #include "vs_node.h"
 #include "vs_sys_nodes.h"
+#include "vs_user.h"
 
 #if WITH_INIPARSER
 #include "vs_config.h"
@@ -187,57 +188,6 @@ static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
 			break;
 		default:
 			break;
-	}
-
-	return ret;
-}
-
-/**
- * \brief This function add fake other users account to the list of user accounts
- */
-static int vs_add_other_users_account(struct VS_CTX *vs_ctx)
-{
-	struct VSUser *other_users;
-	int ret = 0;
-
-	other_users = (struct VSUser*)calloc(1, sizeof(struct VSUser));
-
-	if(other_users != NULL) {
-		other_users->username = strdup("others");
-		other_users->password = NULL;
-		other_users->user_id = VRS_OTHER_USERS_UID;
-		other_users->realname = strdup("Other Users");
-		other_users->fake_user = 1;
-
-		v_list_add_tail(&vs_ctx->users, other_users);
-
-		vs_ctx->other_users = other_users;
-		ret = 1;
-	}
-
-	return ret;
-}
-
-/**
- * \brief This function add fake superuser account to the list of user accounts
- */
-static int vs_add_superuser_account(struct VS_CTX *vs_ctx)
-{
-	struct VSUser *user;
-	int ret = 0;
-
-	user = (struct VSUser*)calloc(1, sizeof(struct VSUser));
-
-	if(user != NULL) {
-		user->username = strdup("superuser");
-		user->password = NULL;
-		user->user_id = VRS_SUPER_USER_UID;
-		user->realname = strdup("Super User");
-		user->fake_user = 1;
-
-		v_list_add_head(&vs_ctx->users, user);
-
-		ret = 1;
 	}
 
 	return ret;
