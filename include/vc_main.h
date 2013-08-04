@@ -38,7 +38,7 @@
 #define VC_MAIN_H
 
 #include <openssl/ssl.h>
-
+#include <sys/types.h>
 #include <stdio.h>
 
 #include "verse_types.h"
@@ -188,6 +188,8 @@ typedef struct VC_CTX {
 	/* Information about client */
 	char					*client_name;
 	char					*client_version;
+	/* Synchronization */
+	pthread_mutex_t			mutex;
 } VC_CTX;
 
 /* Function prototypes */

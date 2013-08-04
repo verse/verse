@@ -451,6 +451,7 @@ int vrs_send_node_lock(const uint8_t session_id,
 
 				v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
 						prio, node_lock_cmd);
+
 				return VRS_SUCCESS;
 			}
 		}
@@ -511,6 +512,7 @@ int vrs_send_node_unlock(const uint8_t session_id,
 
 				v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
 						prio, node_unlock_cmd);
+
 				return VRS_SUCCESS;
 			}
 		}
@@ -1200,7 +1202,7 @@ int vrs_send_connect_request(const char *hostname,
 {
 	struct VSession *vsession = NULL;
 	uint16 _flags = flags;
-	int i;
+	int already_connected = 0, i;
 
 	/* Check if CTX was initialized (initialization is done) */
 	if(vc_ctx==NULL) {
@@ -1248,6 +1250,7 @@ int vrs_send_connect_request(const char *hostname,
 		_flags |= VRS_TP_UDP;
 	}
 
+	pthread_mutex_lock(&vc_ctx->mutex);
 
 	/* Check if this client isn't already connected to this server or isn't
 	 * trying to connect to the server with hostname:service */
@@ -1256,34 +1259,45 @@ int vrs_send_connect_request(const char *hostname,
 			if(strcmp(vc_ctx->vsessions[i]->peer_hostname, hostname) == 0 &&
 					strcmp(vc_ctx->vsessions[i]->service, service) == 0) {
 				v_print_log(VRS_PRINT_ERROR, "Client already connected to this server.\n");
-				return VRS_FAILURE;
+				already_connected = 1;
+				break;
 			}
 		}
 	}
 
-	/* Try to find free verse session slot */
-	for(i=0; i<vc_ctx->max_sessions; i++) {
-		/* When free VSession slot is found, then create new session */
-		if(vc_ctx->vsessions[i]==NULL) {
-			vsession = (struct VSession*)malloc(sizeof(struct VSession));
-			v_init_session(vsession);
-			vsession->peer_hostname = strdup(hostname);
-			vsession->service = strdup(service);
-			/* Copy flags */
-			vsession->flags = _flags;
-			vsession->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
-			v_in_queue_init(vsession->in_queue, IN_QUEUE_DEFAULT_MAX_SIZE);
-			vsession->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
-			v_out_queue_init(vsession->out_queue, OUT_QUEUE_DEFAULT_MAX_SIZE);
+	if(already_connected == 0) {
+		/* Try to find free verse session slot */
+		for(i=0; i<vc_ctx->max_sessions; i++) {
+			/* When free VSession slot is found, then create new session */
+			if(vc_ctx->vsessions[i]==NULL) {
+				vsession = (struct VSession*)malloc(sizeof(struct VSession));
+				v_init_session(vsession);
+				vsession->peer_hostname = strdup(hostname);
+				vsession->service = strdup(service);
+				/* Copy flags */
+				vsession->flags = _flags;
+				vsession->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
+				v_in_queue_init(vsession->in_queue, IN_QUEUE_DEFAULT_MAX_SIZE);
+				vsession->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
+				v_out_queue_init(vsession->out_queue, OUT_QUEUE_DEFAULT_MAX_SIZE);
 
-			vc_ctx->vsessions[i] = vsession;
-			break;
+				vc_ctx->vsessions[i] = vsession;
+				break;
+			}
 		}
+	}
+
+	pthread_mutex_unlock(&vc_ctx->mutex);
+
+	if(already_connected == 1) {
+		return VRS_FAILURE;
 	}
 
 	/* Check if we found free slot for new session */
 	if(vsession == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Maximal count of sessions: %d reached.\n", vc_ctx->max_sessions);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Maximal count of sessions: %d reached.\n",
+				vc_ctx->max_sessions);
 		return VRS_FAILURE;
 	}
 
@@ -1293,9 +1307,11 @@ int vrs_send_connect_request(const char *hostname,
 	/* Create thread for new client session */
 	if(pthread_create(&vsession->tcp_thread, NULL, vc_new_session_thread, (void*)vsession) != 0) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Thread creation failed.\n");
+		pthread_mutex_lock(&vc_ctx->mutex);
 		v_destroy_session(vsession);
 		free(vsession);
 		vc_ctx->vsessions[i] = NULL;
+		pthread_mutex_unlock(&vc_ctx->mutex);
 		return VRS_FAILURE;
 	}
 
@@ -1322,13 +1338,17 @@ int vrs_callback_update(const uint8_t session_id)
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
 		return VRS_NO_CB_FUNC;
 	} else {
+		int session_found = 0;
+
+		pthread_mutex_lock(&vc_ctx->mutex);
+
 		/* Go through all sessions ... */
 		for(i = 0; i<vc_ctx->max_sessions; i++) {
 			/* ... and try to find connection with session_id */
 			if(vc_ctx->vsessions[i] != NULL &&
 					vc_ctx->vsessions[i]->session_id == session_id) {
 
-				/* Pop all data of incoming messages from queue */
+				/* Pop all incoming commands from queue */
 				while(v_in_queue_cmd_count(vc_ctx->vsessions[i]->in_queue) > 0) {
 					cmd = v_in_queue_pop(vc_ctx->vsessions[i]->in_queue);
 
@@ -1336,8 +1356,16 @@ int vrs_callback_update(const uint8_t session_id)
 
 					v_cmd_destroy(&cmd);
 				}
-				return VRS_SUCCESS;
+
+				session_found = 1;
+				break;
 			}
+		}
+
+		pthread_mutex_unlock(&vc_ctx->mutex);
+
+		if(session_found == 1) {
+			return VRS_SUCCESS;
 		}
 	}
 
@@ -1418,8 +1446,9 @@ char *vrs_strerror(const uint32_t error_num)
 
 
 /**
- * \brief This function is generic function for putting command to outgouing
- * queue. Note: not all commands uses this function.
+ * \brief This function is generic function for putting command to outgoing
+ * queue. Note: not all commands uses this function (node_create, node_lock
+ * and node_unlock).
  */
 static int vc_send_command(const uint8 session_id,
 		const uint8 prio,
@@ -1897,19 +1926,24 @@ static void *vc_new_session_thread(void *arg)
 	/* Start "never ending" thread of connection*/
 	vc_main_stream_loop(vc_ctx, vsession);
 
+	pthread_mutex_lock(&vc_ctx->mutex);
+
 	/* Find this session in Verse client session list */
 	for(i=0; i<vc_ctx->max_sessions; i++) {
 		if(vc_ctx->vsessions[i] != NULL) {
 			if(strcmp(vc_ctx->vsessions[i]->peer_hostname, vsession->peer_hostname)==0 &&
 					strcmp(vc_ctx->vsessions[i]->service, vsession->service)==0) {
 				vc_ctx->vsessions[i] = NULL;
+				break;
 			}
 		}
 	}
 
 	/* When connection is closed, then destroy this session*/
 	v_destroy_session(vsession);
-
 	free(vsession);
+
+	pthread_mutex_unlock(&vc_ctx->mutex);
+
 	return NULL;
 }

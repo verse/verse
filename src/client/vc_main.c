@@ -219,5 +219,7 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 	vc_ctx->client_name = NULL;
 	vc_ctx->client_version = NULL;
 
+	pthread_mutex_init(&vc_ctx->mutex, NULL);
+
 	return 1;
 }
