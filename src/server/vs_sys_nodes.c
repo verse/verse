@@ -213,11 +213,16 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 /**
  * \brief This function creates new node representing avatar.
  */
-long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx, uint16 user_id)
+long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx,
+		struct VSession *vsession,
+		uint16 user_id)
 {
-	struct VSNode *avatar_parent, *node;
+	struct VSNode *avatar_parent, *node, *client_info;
 	struct VSUser *user;
 	struct VSNodeSubscriber *node_subscriber;
+	struct VSTagGroup *tg;
+	struct VSTag *tag;
+	struct timeval tv;
 
 	/* Try to find parent of avatar nodes */
 	if((avatar_parent = vs_ctx->data.avatar_node) == NULL) {
@@ -240,11 +245,66 @@ long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx, uint16 user_id)
 	/* Set access permissions for user connected with this avatar. User can write data to its own
 	 * avatar node */
 	vs_node_set_perm(node, user, VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
-
 	/* Set access permissions for other users */
 	vs_node_set_perm(node, vs_ctx->other_users, VRS_PERM_NODE_READ);
 
-	/* TODO: add child node of avatar node with information about connected verse client */
+	/* Try to create child node of avatar node with information about connected verse client */
+	if( (client_info = vs_node_create(vs_ctx, node, vs_ctx->super_user, VRS_RESERVED_NODE_ID, 0)) == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar node for user: %d\n", user_id);
+		return -1;
+	}
+
+	/* Set access permissions only for other users. Every loged user can only read this
+	 * node (including user binded with avatar node) */
+	vs_node_set_perm(client_info, vs_ctx->other_users, VRS_PERM_NODE_READ);
+
+	/* About avatar node doesn't know anybody, then we can set state
+	 * of node to created */
+	client_info->state = ENTITY_CREATED;
+
+	/* Create tag group with client information */
+	tg = vs_taggroup_create(client_info, 0);
+	if(tg != NULL) {
+		tg->state = ENTITY_CREATED;
+
+		/* Create tag holding real name in the tag group */
+		tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 0);
+		if(tag != NULL) {
+			tag->state = ENTITY_CREATED;
+			tag->value = strdup(vsession->peer_hostname);
+			tag->flag = TAG_INITIALIZED;
+		}
+
+		/* Create tag holding time of login */
+		gettimeofday(&tv, NULL);
+		tag = vs_tag_create(tg, VRS_VALUE_TYPE_UINT64, 1, 1);
+		if(tag != NULL) {
+			uint64 sec = (uint64)tv.tv_sec;
+			tag->state = ENTITY_CREATED;
+			memcpy(tag->value, &sec, sizeof(uint64));
+			tag->flag = TAG_INITIALIZED;
+		}
+
+		if(vsession->client_name != NULL) {
+			/* Create tag holding client name */
+			tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 2);
+			if(tag != NULL) {
+				tag->state = ENTITY_CREATED;
+				tag->value = strdup(vsession->client_name);
+				tag->flag = TAG_INITIALIZED;
+			}
+		}
+
+		if(vsession->client_version != NULL) {
+			/* Create tag holding client version */
+			tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 3);
+			if(tag != NULL) {
+				tag->state = ENTITY_CREATED;
+				tag->value = strdup(vsession->client_version);
+				tag->flag = TAG_INITIALIZED;
+			}
+		}
+	}
 
 	/* Send node_create to all subscribers of parent of avatar nodes */
 	node_subscriber = avatar_parent->node_subs.first;

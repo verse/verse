@@ -324,9 +324,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	int host_url_proposed = 0,
 			host_cookie_proposed = 0,
 			peer_cookie_confirmed = 0,
-			ded_confirmed = 0,
-			client_name_proposed = 0,
-			client_version_proposed = 0;
+			ded_confirmed = 0;
 	struct timeval tv;
 	struct VURL url;
 
@@ -372,22 +370,6 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
 						r_message->sys_cmd[i].negotiate_cmd.feature);
-			}
-			break;
-		case CMD_CHANGE_L_ID:
-			/* Client could propose client name and version */
-			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
-				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-					/* Only first proposed client name will be used */
-					vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
-					client_name_proposed = 1;
-				}
-			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
-				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-					/* Only first proposed client name will be used */
-					vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
-					client_version_proposed = 1;
-				}
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
@@ -539,25 +521,6 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE,
 				vsession->host_cookie.str, NULL);
 
-		/* Send confirmation about client name */
-		if(client_name_proposed == 1) {
-			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_NAME,
-					vsession->client_name, NULL);
-		}
-
-		/* Send confirmation about client version only in situation, when
-		 * client proposed client name too */
-		if(client_version_proposed == 1) {
-			if(client_name_proposed == 1) {
-				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
-						vsession->client_version, NULL);
-			} else {
-				/* Client version without client name is not allowed */
-				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
-						NULL);
-			}
-		}
-
 		/* Pack all system commands to the buffer */
 		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
@@ -621,7 +584,7 @@ static int vs_RESPOND_userauth_loop(struct vContext *C)
 					long int avatar_id;
 
 					pthread_mutex_lock(&vs_ctx->data.mutex);
-					avatar_id = vs_node_new_avatar_node(vs_ctx, user_id);
+					avatar_id = vs_node_new_avatar_node(vs_ctx, vsession, user_id);
 					pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 					if(avatar_id == -1) {
@@ -716,9 +679,12 @@ static int vs_RESPOND_userauth_loop(struct vContext *C)
 static int vs_RESPOND_methods_loop(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct VSession *vsession = CTX_current_session(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, ret, error;
+	int i, ret, error, auth_req = 0,
+			client_name_proposed = 0,
+			client_version_proposed = 0;
 	unsigned short buffer_pos = 0;
 
 	/* Reset content of received message */
@@ -733,44 +699,90 @@ static int vs_RESPOND_methods_loop(struct vContext *C)
 	v_print_receive_message(C);
 
 	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-		if(r_message->sys_cmd[i].cmd.id == CMD_USER_AUTH_REQUEST) {
+		switch(r_message->sys_cmd[i].cmd.id) {
+		case CMD_USER_AUTH_REQUEST:
 			if(r_message->sys_cmd[i].ua_req.method_type == VRS_UA_METHOD_NONE) {
-				/* This is not supported method. Send list of
-				 * supported methods. Current implementation supports
-				 * only PASSWORD method now. */
-
-				buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-				s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
-				s_message->sys_cmd[0].ua_fail.count = 1;
-				s_message->sys_cmd[0].ua_fail.method[0] = VRS_UA_METHOD_PASSWORD;
-				s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
-
-				/* Pack USER_AUTH_FAILURE command to the buffer */
-				buffer_pos += v_pack_stream_system_commands(s_message,&io_ctx->buf[buffer_pos]);
-
-				s_message->header.len = io_ctx->buf_size = buffer_pos;
-				s_message->header.version = VRS_VERSION;
-				/* Pack header to the beginning of the buffer */
-				v_pack_message_header(s_message, io_ctx->buf);
-
-				/* Debug print of command to be send */
-				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-					v_print_send_message(C);
-				}
-
-				/* Send command to the client */
-				if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-					/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
-					return 0;
-				} else {
-					return 1;
-				}
+				auth_req = 1;
 			} else {
-				v_print_log(VRS_PRINT_WARNING, "This method id: %d is not supported in this state\n", r_message->sys_cmd[i].ua_req.method_type);
+				v_print_log(VRS_PRINT_WARNING, "This auth method id: %d is not supported in this state\n", r_message->sys_cmd[i].ua_req.method_type);
 			}
+			break;
+		case CMD_CHANGE_L_ID:
+			/* Client could propose client name and version */
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_name_proposed = 1;
+				}
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_version_proposed = 1;
+				}
+			}
+			break;
+		default:
+			v_print_log(VRS_PRINT_WARNING,
+					"This command id: %d is not supported in this state\n",
+					r_message->sys_cmd[i].cmd.id);
+			break;
+		}
+	}
+
+	if(auth_req == 1) {
+		int cmd_rank = 0;
+		/* VRS_UA_METHOD_NONE is not supported method. Send list of
+		 * supported methods. Current implementation supports
+		 * only PASSWORD method now. */
+
+		s_message->sys_cmd[cmd_rank].ua_fail.id = CMD_USER_AUTH_FAILURE;
+		/* List of supported methods */
+		s_message->sys_cmd[cmd_rank].ua_fail.count = 1;
+		s_message->sys_cmd[cmd_rank].ua_fail.method[0] = VRS_UA_METHOD_PASSWORD;
+		cmd_rank++;
+
+		/* Send confirmation about client name */
+		if(client_name_proposed == 1) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_NAME,
+					vsession->client_name, NULL);
+		}
+
+		/* Send confirmation about client version only in situation, when
+		 * client proposed client name too */
+		if(client_version_proposed == 1) {
+			if(client_name_proposed == 1) {
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						vsession->client_version, NULL);
+			} else {
+				/* Client version without client name is not allowed */
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						NULL);
+			}
+		}
+
+		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+		/* Pack system commands to the buffer */
+		buffer_pos += v_pack_stream_system_commands(s_message,&io_ctx->buf[buffer_pos]);
+
+		s_message->header.len = io_ctx->buf_size = buffer_pos;
+		s_message->header.version = VRS_VERSION;
+		/* Pack header to the beginning of the buffer */
+		v_pack_message_header(s_message, io_ctx->buf);
+
+		/* Debug print of command to be send */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			v_print_send_message(C);
+		}
+
+		/* Send command to the client */
+		if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
+			/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
+			return 0;
 		} else {
-			v_print_log(VRS_PRINT_WARNING, "This command id: %d is not supported in this state\n", r_message->sys_cmd[i].cmd.id);
+			return 1;
 		}
 	}
 
@@ -1104,7 +1116,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					}
 
 					/* Save the IPv4 of the client as string in verse session */
-					inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
+					inet_ntop(AF_INET, &client_addr4->sin_addr, current_session->peer_hostname, INET_ADDRSTRLEN);
 				} else if(io_ctx->host_addr.ip_ver==IPV6) {
 					/* Prepare IPv6 variables for TCP handshake */
 					struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
@@ -1118,7 +1130,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					}
 
 					/* Save the IPv6 of the client as string in verse session */
-					inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
+					inet_ntop(AF_INET6, &client_addr6->sin6_addr, current_session->peer_hostname, INET6_ADDRSTRLEN);
 				}
 
 				CTX_current_session_set(C, current_session);

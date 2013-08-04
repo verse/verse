@@ -217,7 +217,6 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
  */
 static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 {
-	struct VC_CTX *vc_ctx = CTX_client_ctx(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *r_message = CTX_r_message(C);
@@ -330,14 +329,6 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 
 	/* Send confirmation of proposed DED */
 	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_DED, vsession->ded.str, NULL);
-
-	/* Set up negotiate command of client name and version */
-	if(vc_ctx->client_name != NULL) {
-		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_NAME, vc_ctx->client_name, NULL);
-		if(vc_ctx->client_version != NULL) {
-			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_VERSION, vc_ctx->client_version, NULL);
-		}
-	}
 
 	/* Pack all system commands to the buffer */
 	buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
@@ -469,6 +460,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 
 	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
+	/* Pack user auth command */
 	s_message->sys_cmd[0].ua_req.id = CMD_USER_AUTH_REQUEST;
 	strncpy(s_message->sys_cmd[0].ua_req.username, vsession->username, VRS_MAX_USERNAME_LENGTH);
 	s_message->sys_cmd[0].ua_req.method_type = ua_data->methods[0];
@@ -590,12 +582,13 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		struct User_Authenticate_Cmd *ua_data)
 {
 	struct VSession *vsession = CTX_current_session(C);
+	struct VC_CTX *vc_ctx = CTX_client_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct timeval tv;
 	fd_set set;
-	int ret, i, error, buffer_pos=0;
+	int ret, i, error, buffer_pos=0, cmd_rank=0;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -614,10 +607,18 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 
 	/* Send USER_AUTH_REQUEST with METHOD_NONE to get list of supported method
 	 * types */
-	s_message->sys_cmd[0].ua_req.id = CMD_USER_AUTH_REQUEST;
+	s_message->sys_cmd[cmd_rank].ua_req.id = CMD_USER_AUTH_REQUEST;
 	strncpy(s_message->sys_cmd[0].ua_req.username, ua_data->username, VRS_MAX_USERNAME_LENGTH);
-	s_message->sys_cmd[0].ua_req.method_type = VRS_UA_METHOD_NONE;
-	s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
+	s_message->sys_cmd[cmd_rank].ua_req.method_type = VRS_UA_METHOD_NONE;
+	cmd_rank++;
+
+	/* Set up negotiate command of client name and version */
+	if(vc_ctx->client_name != NULL) {
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_NAME, vc_ctx->client_name, NULL);
+		if(vc_ctx->client_version != NULL) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_VERSION, vc_ctx->client_version, NULL);
+		}
+	}
 
 	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
