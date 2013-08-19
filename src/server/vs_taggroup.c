@@ -339,6 +339,10 @@ int vs_node_taggroups_destroy(struct VSNode *node)
 		/* Destroy all tags in this taggroup */
 		v_hash_array_destroy(&tg->tags);
 
+		/* Free list of followers and subscribers */
+		v_list_free(&tg->tg_folls);
+		v_list_free(&tg->tg_subs);
+
 		/* Destroy this tag group itself */
 		v_hash_array_remove_item(&node->tag_groups, tg);
 		free(tg);

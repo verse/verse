@@ -119,7 +119,7 @@ static int vs_TLS_handshake(struct vContext *C)
 	}
 
 	/* Set up SSL */
-	if( (stream_conn->io_ctx.ssl=SSL_new(vs_ctx->tls_ctx)) == NULL) {
+	if( (stream_conn->io_ctx.ssl = SSL_new(vs_ctx->tls_ctx)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
