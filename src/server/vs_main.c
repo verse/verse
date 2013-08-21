@@ -49,6 +49,36 @@
 
 struct VS_CTX *local_vs_ctx = NULL;
 
+
+static void vs_request_terminate(struct VS_CTX *vs_ctx)
+{
+	int i;
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Stopping server\n");
+
+	/* Since now server will not be able to accept new clients */
+	vs_ctx->state = SERVER_STATE_CLOSING;
+
+	for(i=0; i<vs_ctx->max_sessions; i++) {
+		if(vs_ctx->vsessions[i] != NULL &&
+				vs_ctx->vsessions[i]->stream_conn != NULL &&
+				vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN) {
+
+			if(vs_ctx->vsessions[i]->dgram_conn != NULL &&
+					vs_ctx->vsessions[i]->dgram_conn->host_state != UDP_SERVER_STATE_CLOSED) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Try to terminate connection: %d\n",
+						vs_ctx->vsessions[i]->dgram_conn->host_id);
+				/* Try to close session in friendly way */
+				vs_close_dgram_conn(vs_ctx->vsessions[i]->dgram_conn);
+			} else if(vs_ctx->vsessions[i]->stream_conn != NULL) {
+				/* TODO: close stream connection (strange state) */
+			} else {
+				/* TODO: destroy session (strange state) */
+			}
+		}
+	}
+}
+
 /**
  * \brief Callback function for handling signals.
  * \param	sig	identifier of signal
@@ -57,33 +87,38 @@ void vs_handle_signal(int sig)
 {
 	if(sig == SIGINT) {
 		struct VS_CTX *vs_ctx = local_vs_ctx;
-		int i;
 
-		/* Since now server will not be able to accept new clients */
-		vs_ctx->state = SERVER_STATE_CLOSING;
-
-		for(i=0; i<vs_ctx->max_sessions; i++) {
-			if(vs_ctx->vsessions[i] != NULL &&
-					vs_ctx->vsessions[i]->stream_conn != NULL &&
-					vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN) {
-
-				if(vs_ctx->vsessions[i]->dgram_conn != NULL &&
-						vs_ctx->vsessions[i]->dgram_conn->host_state != UDP_SERVER_STATE_CLOSED) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Try to terminate connection: %d\n",
-							vs_ctx->vsessions[i]->dgram_conn->host_id);
-					/* Try to close session in friendly way */
-					vs_close_dgram_conn(vs_ctx->vsessions[i]->dgram_conn);
-				} else if(vs_ctx->vsessions[i]->stream_conn != NULL) {
-					/* TODO: close stream connection (strange state) */
-				} else {
-					/* TODO: destroy session (strange state) */
-				}
-			}
-		}
+		vs_request_terminate(vs_ctx);
 
 		/* Reset signal handling to default behavior */
 		signal(SIGINT, SIG_DFL);
 	}
+}
+
+/**
+ * \brief This is function is quick workaround and it waits for
+ * pressing q and <Enter> button. It should be replaces with unix
+ * socket and real application with cli interface.
+ */
+static void *vs_server_cli(void *arg)
+{
+	struct VS_CTX *vs_ctx = (struct VS_CTX*)arg;
+	char ch;
+
+	do {
+		ch = getchar();
+		if(ch == 'q') {
+			vs_request_terminate(vs_ctx);
+
+			/* Reset signal handling to default behavior */
+			signal(SIGINT, SIG_DFL);
+		}
+	} while( vs_ctx->state < SERVER_STATE_CLOSING);
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting cli thread\n");
+
+	pthread_exit(NULL);
+	return NULL;
 }
 
 /**
@@ -452,6 +487,13 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	/* Try to create cli thread */
+	if(pthread_create(&vs_ctx.cli_thread, NULL, vs_server_cli, (void*)&vs_ctx) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		vs_destroy_ctx(&vs_ctx);
+		exit(EXIT_FAILURE);
+	}
+
 	/* Set up pointer to local server CTX -> server server could be terminated
 	 * with signal now. */
 	local_vs_ctx = &vs_ctx;
@@ -470,6 +512,10 @@ int main(int argc, char *argv[])
 
 	/* Free Verse server context */
 	vs_destroy_ctx(&vs_ctx);
+
+	/* Join cli thread */
+	pthread_join(vs_ctx.cli_thread, &res);
+	if(res != NULL) free(res);
 
 	/* Join data thread */
 	pthread_join(vs_ctx.data_thread, &res);

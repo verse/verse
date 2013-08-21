@@ -1121,7 +1121,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 #endif
 
 	if (v_parse_url(vsession->host_url, &url) != 1) {
-		return NULL;
+		goto end;
 	} else {
 		/* v_print_url(VRS_PRINT_DEBUG_MSG, &url); */
 	}
@@ -1142,7 +1142,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 
 	if( (ret = getaddrinfo(url.node, url.service, &hints, &result)) !=0 ) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "getaddrinfo(): %s\n", gai_strerror(ret));
-		return NULL;
+		goto end;
 	}
 
 	/* Try to use addrinfo from getaddrinfo() */
@@ -1169,13 +1169,13 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 			}
 		}
 		freeaddrinfo(result);
-		return NULL;
+		goto end;
 	}
 
 	if( (dgram_conn = (struct VDgramConn*)calloc(1, sizeof(struct VDgramConn))) == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
-		return NULL;
+		goto end;
 	}
 
 	/* Initialize datagram connection */
@@ -1190,7 +1190,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		free(dgram_conn);
 		freeaddrinfo(result);
-		return NULL;
+		goto end;
 	}
 
 	/* Set socket to reuse address */
@@ -1198,7 +1198,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	if( setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 		free(dgram_conn);
-		return NULL;
+		goto end;
 	}
 
 	/* Set address of peer and host */
@@ -1241,7 +1241,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		dgram_conn->io_ctx.flags |= SOCKET_SECURED;
 #else
 		v_print_log(VRS_PRINT_ERROR, "Server tries to force client to use secured connection, but it is not supported\n");
-		return NULL;
+		goto end;
 #endif
 	}
 
@@ -1249,13 +1249,13 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	/* Create BIO, connect and set to already connected */
 	if( (dgram_conn->io_ctx.bio = BIO_new_dgram(dgram_conn->io_ctx.sockfd, BIO_CLOSE)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "BIO_new_dgram()\n");
-		return NULL;
+		goto end;
 	}
 
 	/* Try to do PMTU discovery */
 	if( BIO_ctrl(dgram_conn->io_ctx.bio, BIO_CTRL_DGRAM_MTU_DISCOVER, 0, NULL) < 0) {
 		v_print_log(VRS_PRINT_ERROR, "BIO_ctrl()\n");
-		return NULL;
+		goto end;
 	}
 
 	/* Try to get MTU from the bio */
@@ -1273,6 +1273,8 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 
 	dgram_conn->host_id = (unsigned int)rand();
 
+end:
+	v_clear_url(&url);
 	return dgram_conn;
 }
 

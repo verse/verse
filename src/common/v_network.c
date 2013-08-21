@@ -194,6 +194,28 @@ void v_print_url(const int level, struct VURL *url)
 	v_print_log_simple(level, "\tservice: %s\n", url->service);
 }
 
+void v_clear_url(struct VURL *url)
+{
+	url->transport_protocol = 0;
+	url->security_protocol = 0;
+	url->ip_ver = 0;
+
+	if(url->scheme != NULL) {
+		free(url->scheme);
+		url->scheme = NULL;
+	}
+
+	if(url->node != NULL) {
+		free(url->node);
+		url->node = NULL;
+	}
+
+	if(url->service != NULL) {
+		free(url->service);
+		url->service = NULL;
+	}
+}
+
 /**
  * \brief Return value for exponential backoff. Maximal value could be MAX_BACK_OFF
  * \param[in]	steps	The number of exponential backoff steps

@@ -226,12 +226,9 @@ void v_conn_dgram_destroy(struct VDgramConn *dgram_conn)
 		dgram_conn->io_ctx.buf = NULL;
 	}
 
-	if(dgram_conn->ack_nak.cmds!=NULL) {
-		free(dgram_conn->ack_nak.cmds);
-		dgram_conn->ack_nak.cmds = NULL;
-	}
-
 	v_packet_history_destroy(&dgram_conn->packet_history);
+
+	v_ack_nak_history_clear(&dgram_conn->ack_nak);
 
 	close(dgram_conn->io_ctx.sockfd);
 }

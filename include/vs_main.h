@@ -142,6 +142,7 @@ typedef struct VS_CTX {
 	/* Data shared at verse server */
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */
+	pthread_t			cli_thread;					/* Thread with simple CLI interface */
 	pthread_attr_t		data_thread_attr;			/* The attribute of data thread */
 } VS_CTX;
 

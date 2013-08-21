@@ -213,7 +213,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 {
 	int str_len=0;
 	unsigned short buffer_pos = 0, length, i;
-	unsigned char length8, len8, lenlen;
+	unsigned char length8 = 0, len8, lenlen;
 
 	/* Unpack command ID */
 	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &negotiate_cmd->id);

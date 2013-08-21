@@ -288,6 +288,8 @@ int vs_taggroup_destroy(struct VSNode *node, struct VSTagGroup *tg)
 			tag->value = NULL;
 		}
 
+		free(tag);
+
 		bucket = bucket->next;
 	}
 
@@ -332,6 +334,8 @@ int vs_node_taggroups_destroy(struct VSNode *node)
 				free(tag->value);
 				tag->value = NULL;
 			}
+
+			free(tag);
 
 			bucket = bucket->next;
 		}

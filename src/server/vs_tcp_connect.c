@@ -319,7 +319,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, j, ret, error;
+	int i, j, error;
 	unsigned short buffer_pos = 0;
 	int host_url_proposed = 0,
 			host_cookie_proposed = 0,
@@ -327,6 +327,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			ded_confirmed = 0;
 	struct timeval tv;
 	struct VURL url;
+	int ret = 0;
 
 	/* Reset content of received message */
 	memset(r_message, 0, sizeof(struct VMessage));
@@ -340,14 +341,19 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	v_print_receive_message(C);
 
 	/* Process all received system commands */
-	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
+	for(i = 0;
+			i<MAX_SYSTEM_COMMAND_COUNT &&
+			r_message->sys_cmd[i].cmd.id != CMD_RESERVED_ID;
+			i++)
+	{
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CHANGE_R_ID:
 			/* Client has to propose url in this state */
 			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_HOST_URL) {
 				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-					if(vsession->host_url!=NULL) {
+					if(vsession->host_url != NULL) {
 						free(vsession->host_url);
+						vsession->host_url = NULL;
 					}
 					/* Only first proposed URL will be used */
 					vsession->host_url = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
@@ -361,7 +367,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			/* Client has to propose host cookie in this state */
 			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
 				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-					if(vsession->host_cookie.str!=NULL) {
+					if(vsession->host_cookie.str != NULL) {
 						free(vsession->host_cookie.str);
 					}
 					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
@@ -376,7 +382,7 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			/* Client has to confirm peer cookie in this state */
 			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
 				if (r_message->sys_cmd[i].negotiate_cmd.count == 1) {
-					if(vsession->peer_cookie.str!=NULL &&
+					if(vsession->peer_cookie.str != NULL &&
 						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						gettimeofday(&tv, NULL);
@@ -534,16 +540,14 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		v_print_send_message(C);
 
 		/* Send command to the client */
-		if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-			return 0;
-		} else {
-			return 1;
+		if( v_SSL_write(io_ctx, &error) > 0) {
+			ret = 1;
 		}
-	} else {
-		return 0;
 	}
 
-	return 0;
+	v_clear_url(&url);
+
+	return ret;
 }
 
 

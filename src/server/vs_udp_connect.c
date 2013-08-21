@@ -1622,7 +1622,6 @@ again:
 				 * state, then terminate connection. */
 				if((tv.tv_sec - dgram_conn->state[dgram_conn->host_state].tv_state_began.tv_sec) >= VRS_TIMEOUT) {
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Connection timed out\n");
-					vs_clear_vconn(dgram_conn);
 					break;
 				}
 			}
@@ -1631,7 +1630,6 @@ again:
 			 * connection as dead and free it */
 			if((tv.tv_sec - dgram_conn->tv_pay_recv.tv_sec) >= VRS_TIMEOUT) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Connection timed out\n");
-				vs_clear_vconn(dgram_conn);
 				break;
 			}
 
