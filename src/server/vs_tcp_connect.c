@@ -1244,8 +1244,16 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
  */
 void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
 {
-	if(vs_ctx->tls_ctx != NULL) SSL_CTX_free(vs_ctx->tls_ctx);
-	if(vs_ctx->dtls_ctx != NULL) SSL_CTX_free(vs_ctx->dtls_ctx);
+	int i;
+
+	if(vs_ctx->tls_ctx != NULL) {
+		SSL_CTX_free(vs_ctx->tls_ctx);
+		vs_ctx->tls_ctx = NULL;
+	}
+	if(vs_ctx->dtls_ctx != NULL) {
+		SSL_CTX_free(vs_ctx->dtls_ctx);
+		vs_ctx->dtls_ctx = NULL;
+	}
 }
 
 
