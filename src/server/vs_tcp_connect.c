@@ -502,6 +502,13 @@ static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		sec_proto[4] = '\0';
 #endif
 
+		/* Free proposed and now obsolete URL */
+		if(vsession->host_url != NULL) {
+			free(vsession->host_url);
+			vsession->host_url = NULL;
+		}
+
+		/* Set right host URL */
 		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 		if(url.ip_ver==IPV6) {
 			sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
