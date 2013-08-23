@@ -1482,7 +1482,7 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 	vs_ctx->vsessions = (struct VSession**)calloc(vs_ctx->max_sessions, sizeof(struct VSession*));
 	for (i=0; i<vs_ctx->max_sessions; i++) {
 		if( (vs_ctx->vsessions[i] = (struct VSession*)calloc(1, sizeof(struct VSession))) == NULL ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 			return -1;
 		}
 		/* Set up verse session */
