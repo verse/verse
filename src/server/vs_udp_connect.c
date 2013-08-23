@@ -1202,6 +1202,9 @@ again:
 		v_print_log(VRS_PRINT_DEBUG_MSG, "DTLS connection was shut down.\n");
 	}
 
+	BIO_vfree(dgram_conn->io_ctx.bio);
+	dgram_conn->io_ctx.bio = NULL;
+
 	SSL_free(dgram_conn->io_ctx.ssl);
 }
 
