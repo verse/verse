@@ -244,6 +244,9 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 		v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
 	}
 
+	BIO_vfree(dgram_conn->io_ctx.bio);
+	dgram_conn->io_ctx.bio = NULL;
+
 	close(dgram_conn->io_ctx.sockfd);
 
 	v_conn_dgram_init(dgram_conn);
