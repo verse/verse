@@ -77,6 +77,7 @@ void vs_init_dgram_conn(struct VDgramConn *dgram_conn)
 /* Clear VConnection of Verse server */
 void vs_clear_vconn(struct VDgramConn *dgram_conn)
 {
+	v_packet_history_destroy(&dgram_conn->packet_history);
 	v_conn_dgram_clear(dgram_conn);
 	dgram_conn->host_state = UDP_SERVER_STATE_CLOSED;	/* Server is in closed state */
 }
