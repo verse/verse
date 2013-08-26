@@ -1010,8 +1010,24 @@ end:
 	/* This session could be used again for authentication */
 	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
 
-	/* Clear session flags */
+	/* Clear verse session */
 	vsession->flags = 0;
+	if(vsession->peer_cookie.str != NULL) {
+		free(vsession->peer_cookie.str);
+		vsession->peer_cookie.str = NULL;
+	}
+	if(vsession->ded.str != NULL) {
+		free(vsession->ded.str);
+		vsession->ded.str = NULL;
+	}
+	if(vsession->client_name != NULL) {
+		free(vsession->client_name);
+		vsession->client_name = NULL;
+	}
+	if(vsession->client_version != NULL) {
+		free(vsession->client_version);
+		vsession->client_version = NULL;
+	}
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -1251,8 +1267,6 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
  */
 void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
 {
-	int i;
-
 	if(vs_ctx->tls_ctx != NULL) {
 		SSL_CTX_free(vs_ctx->tls_ctx);
 		vs_ctx->tls_ctx = NULL;
