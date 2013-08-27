@@ -40,6 +40,7 @@
 
 #include <stdlib.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "verse.h"
 #include "verse_types.h"
@@ -1202,7 +1203,7 @@ int vrs_send_connect_request(const char *hostname,
 {
 	struct VSession *vsession = NULL;
 	uint16 _flags = flags;
-	int already_connected = 0, i;
+	int already_connected = 0, i, ret;
 
 	/* Check if CTX was initialized (initialization is done) */
 	if(vc_ctx==NULL) {
@@ -1304,8 +1305,20 @@ int vrs_send_connect_request(const char *hostname,
 	vsession->session_id = vc_ctx->session_counter++;
 	*session_id = vsession->session_id;
 
+	/* Try to initialize thread attributes */
+	if( (ret = pthread_attr_init(&vsession->tcp_thread_attr)) != 0 ) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
+		return VRS_FAILURE;
+	}
+
+	/* Try to set thread attributes as detached */
+	if( (ret = pthread_attr_setdetachstate(&vsession->tcp_thread_attr, PTHREAD_CREATE_DETACHED)) != 0) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
+		return VRS_FAILURE;
+	}
+
 	/* Create thread for new client session */
-	if(pthread_create(&vsession->tcp_thread, NULL, vc_new_session_thread, (void*)vsession) != 0) {
+	if(pthread_create(&vsession->tcp_thread, &vsession->tcp_thread_attr, vc_new_session_thread, (void*)vsession) != 0) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Thread creation failed.\n");
 		pthread_mutex_lock(&vc_ctx->mutex);
 		v_destroy_session(vsession);
@@ -1314,6 +1327,9 @@ int vrs_send_connect_request(const char *hostname,
 		pthread_mutex_unlock(&vc_ctx->mutex);
 		return VRS_FAILURE;
 	}
+
+	/* Destroy thread attributes */
+	pthread_attr_destroy(&vsession->tcp_thread_attr);
 
 	return VRS_SUCCESS;
 }
@@ -1400,7 +1416,7 @@ int vrs_send_user_authenticate(const uint8_t session_id,
 	struct User_Authenticate_Cmd *user_auth;
 	uint8 methods[1];
 	methods[0] = auth_type;
-	user_auth = v_User_Authenticate_create(username, 1, methods, data);
+	user_auth = v_user_auth_create(username, 1, methods, data);
 	return vc_send_command(session_id, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)user_auth);
 }
 

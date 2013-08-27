@@ -90,6 +90,7 @@ static int vc_get_username_passwd(struct VSession *vsession,
 			switch(cmd->id) {
 			case FAKE_CMD_USER_AUTHENTICATE:
 				v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+				/* FIXME: this is fishy */
 				memcpy(ua_data, cmd, sizeof(struct User_Authenticate_Cmd));
 				free(cmd);
 				return 1;
@@ -98,6 +99,7 @@ static int vc_get_username_passwd(struct VSession *vsession,
 				free(cmd);
 				return 0;
 			default:
+				free(cmd);
 				v_print_log(VRS_PRINT_DEBUG_MSG, "This command is not accepted during NEGOTIATE state\n");
 				break;
 			}
@@ -534,7 +536,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 		for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id != CMD_RESERVED_ID; i++) {
 			switch(r_message->sys_cmd[i].cmd.id) {
 			case CMD_USER_AUTH_FAILURE:
-				v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", ua_data->username);
+				v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", vsession->username);
 				return 0;
 			case CMD_USER_AUTH_SUCCESS:
 				vsession->avatar_id = r_message->sys_cmd[i].ua_succ.avatar_id;
@@ -596,7 +598,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		printf("%c[%dm", 27, 0);
 	}
 
-	v_User_Authenticate_init(ua_data, NULL, 0, NULL, NULL);
+	v_user_auth_init(ua_data, NULL, 0, NULL, NULL);
 
 	if( vc_get_username_passwd(vsession, ua_data) != 1) {
 		return 0;
@@ -608,7 +610,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 	/* Send USER_AUTH_REQUEST with METHOD_NONE to get list of supported method
 	 * types */
 	s_message->sys_cmd[cmd_rank].ua_req.id = CMD_USER_AUTH_REQUEST;
-	strncpy(s_message->sys_cmd[0].ua_req.username, ua_data->username, VRS_MAX_USERNAME_LENGTH);
+	strncpy(s_message->sys_cmd[0].ua_req.username, vsession->username, VRS_MAX_USERNAME_LENGTH);
 	s_message->sys_cmd[cmd_rank].ua_req.method_type = VRS_UA_METHOD_NONE;
 	cmd_rank++;
 
@@ -688,8 +690,8 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
 			switch(r_message->sys_cmd[i].cmd.id) {
 			case CMD_USER_AUTH_FAILURE:
-				if(r_message->sys_cmd[i].ua_fail.count==0) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", ua_data->username);
+				if(r_message->sys_cmd[i].ua_fail.count == 0) {
+					v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", vsession->username);
 					return 0;
 				} else {
 					/* Go through the list of supported authentication methods and
@@ -1203,7 +1205,6 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 
 	/* Get list of supported authentication methods */
 	ret = vc_USRAUTH_none_loop(C, &ua_data);
-
 	switch(ret) {
 	case 0:
 		error = -1;
@@ -1219,10 +1220,12 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 
 data:
 	/* Update client and server states */
-	stream_conn->host_state=TCP_CLIENT_STATE_USRAUTH_DATA;
+	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_DATA;
 
 	/* Try to authenticate user with username and password */
 	ret = vc_USRAUTH_data_loop(C, &ua_data);
+	/* Clear user auth data from client application */
+	v_user_auth_clear(&ua_data);
 	switch (ret) {
 		case 0:
 			error = VRS_CONN_TERM_AUTH_FAILED;
@@ -1362,4 +1365,6 @@ closed:
 		/* Sleep 1 milisecond */
 		usleep(1000);
 	}
+
+	free(C);
 }

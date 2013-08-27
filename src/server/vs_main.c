@@ -47,6 +47,7 @@
 #include "v_session.h"
 #include "v_network.h"
 
+
 struct VS_CTX *local_vs_ctx = NULL;
 
 
@@ -89,6 +90,8 @@ void vs_handle_signal(int sig)
 		struct VS_CTX *vs_ctx = local_vs_ctx;
 
 		vs_request_terminate(vs_ctx);
+
+		pthread_cancel(vs_ctx->cli_thread);
 
 		/* Reset signal handling to default behavior */
 		signal(SIGINT, SIG_DFL);
@@ -514,12 +517,20 @@ int main(int argc, char *argv[])
 	vs_destroy_ctx(&vs_ctx);
 
 	/* Join cli thread */
-	pthread_join(vs_ctx.cli_thread, &res);
-	if(res != NULL) free(res);
+	if(pthread_join(vs_ctx.cli_thread, &res) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_join(): %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} else {
+		if(res != PTHREAD_CANCELED && res != NULL) free(res);
+	}
 
 	/* Join data thread */
-	pthread_join(vs_ctx.data_thread, &res);
-	if(res != NULL) free(res);
+	if(pthread_join(vs_ctx.data_thread, &res) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_join(): %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} else {
+		if(res != PTHREAD_CANCELED && res != NULL) free(res);
+	}
 
 	return EXIT_SUCCESS;
 }
