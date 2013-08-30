@@ -13,7 +13,9 @@ FIND_PATH ( WSLAY_INCLUDE_DIR wslay/wslay.h
 
 FIND_LIBRARY ( WSLAY_LIBRARIES wslay
     /usr/local/lib
+    /usr/local/lib64
     /usr/lib
+    /usr/lib64
 )
 
 SET ( WSLAY_FOUND "NO" )

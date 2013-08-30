@@ -47,6 +47,7 @@
 #include "vs_auth_csv.h"
 #include "vs_node.h"
 #include "vs_handshake.h"
+#include "vs_sys_nodes.h"
 
 #include "v_common.h"
 #include "v_pack.h"
@@ -208,6 +209,23 @@ end:
 
 	/* Clear session flags */
 	vsession->flags = 0;
+
+	if(vsession->peer_cookie.str != NULL) {
+		free(vsession->peer_cookie.str);
+		vsession->peer_cookie.str = NULL;
+	}
+	if(vsession->ded.str != NULL) {
+		free(vsession->ded.str);
+		vsession->ded.str = NULL;
+	}
+	if(vsession->client_name != NULL) {
+		free(vsession->client_name);
+		vsession->client_name = NULL;
+	}
+	if(vsession->client_version != NULL) {
+		free(vsession->client_version);
+		vsession->client_version = NULL;
+	}
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -506,8 +524,14 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
  */
 void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
 {
-	if(vs_ctx->tls_ctx != NULL) SSL_CTX_free(vs_ctx->tls_ctx);
-	if(vs_ctx->dtls_ctx != NULL) SSL_CTX_free(vs_ctx->dtls_ctx);
+	if(vs_ctx->tls_ctx != NULL) {
+		SSL_CTX_free(vs_ctx->tls_ctx);
+		vs_ctx->tls_ctx = NULL;
+	}
+	if(vs_ctx->dtls_ctx != NULL) {
+		SSL_CTX_free(vs_ctx->dtls_ctx);
+		vs_ctx->dtls_ctx = NULL;
+	}
 }
 
 
@@ -772,7 +796,7 @@ static int vs_init_sessions(VS_CTX *vs_ctx)
 	vs_ctx->vsessions = (struct VSession**)calloc(vs_ctx->max_sessions, sizeof(struct VSession*));
 	for (i=0; i<vs_ctx->max_sessions; i++) {
 		if( (vs_ctx->vsessions[i] = (struct VSession*)calloc(1, sizeof(struct VSession))) == NULL ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 			return -1;
 		}
 		/* Set up verse session */

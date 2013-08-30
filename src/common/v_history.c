@@ -599,14 +599,26 @@ int v_ack_nak_history_add_cmd(struct AckNakHistory *history, struct Ack_Nak_Cmd 
 /* Initialize history of ACK and NAK commands */
 int v_ack_nak_history_init(struct AckNakHistory *history)
 {
-	if( (history->cmds = (struct Ack_Nak_Cmd*)malloc(sizeof(struct Ack_Nak_Cmd)*INIT_ACK_NAK_HISTORY_SIZE)) == NULL) {
-		history->count = 0;
-		history->len = 0;
-		return 0;
-	} else {
-		history->count = 0;
-		history->len = INIT_ACK_NAK_HISTORY_SIZE;
+	if(history->cmds == NULL) {
+		if( (history->cmds = (struct Ack_Nak_Cmd*)malloc(sizeof(struct Ack_Nak_Cmd)*INIT_ACK_NAK_HISTORY_SIZE)) != NULL) {
+			history->count = 0;
+			history->len = INIT_ACK_NAK_HISTORY_SIZE;
+		} else {
+			history->count = 0;
+			history->len = 0;
+			return 0;
+		}
 	}
 	return 1;
 }
 
+/* Free allocated space for history of ack nak commands */
+void v_ack_nak_history_clear(struct AckNakHistory *history)
+{
+	if(history->cmds != NULL) {
+		free(history->cmds);
+		history->cmds = NULL;
+		history->count = 0;
+		history->len = 0;
+	}
+}

@@ -148,7 +148,7 @@ int vs_node_send_owner(struct VSNodeSubscriber *node_subscriber,
 /*
  * \brief This function do changing/removing/adding of node permissions
  */
-static int vs_node_perm(struct VSNode *node, VSUser *user, uint8 permission)
+int vs_node_set_perm(struct VSNode *node, VSUser *user, uint8 permission)
 {
 	VSNodePermission *perm = node->permissions.first;
 	int perm_found = 0;
@@ -160,11 +160,9 @@ static int vs_node_perm(struct VSNode *node, VSUser *user, uint8 permission)
 			if(permission == 0) {
 				/* When client grant no permissions, then it is better to
 				 * remove such permissions from list of permissions */
-				printf(">>>removing perm: node: %d, user: %d, perm: %d<<<\n", node->id, user->user_id, permission);
 				v_list_free_item(&node->permissions, perm);
 				perm = NULL;
 			} else {
-				printf(">>>changing perm: node: %d, user: %d, perm: %d<<<\n", node->id, user->user_id, permission);
 				perm->permissions = permission;
 			}
 			perm_found = 1;
@@ -173,14 +171,16 @@ static int vs_node_perm(struct VSNode *node, VSUser *user, uint8 permission)
 		perm = perm->next;
 	}
 
-	/* When no permissions are found, then add new permission to this user */
+	/* When no permissions were found, then add new permission to this user */
 	if(perm_found == 0) {
 		/* Create new permission */
-		printf(">>>adding perm: node: %d, user: %d, perm: %d<<<\n", node->id, user->user_id, permission);
 		perm = (VSNodePermission*)calloc(1, sizeof(VSNodePermission));
+		if(perm == NULL) {
+			v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+			return 0;
+		}
 		perm->user = user;
 		perm->permissions = permission;
-
 		/* Add permission to the end of list */
 		v_list_add_tail(&node->permissions, perm);
 	}
@@ -480,7 +480,7 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 	/* User has to be owner of the node, to be able to change permission of this node */
 	if(node->owner == avatar_user) {
 		/* Set permission for this node */
-		vs_node_perm(node, user, permissions);
+		vs_node_set_perm(node, user, permissions);
 
 		/* Set this command to all subscribers */
 		node_subscriber = node->node_subs.first;

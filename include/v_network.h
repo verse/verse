@@ -241,6 +241,7 @@ typedef struct VURL {
 
 int v_parse_url(const char *str, struct VURL *url);
 void v_print_url(const int level, struct VURL *url);
+void v_clear_url(struct VURL *url);
 
 int v_exponential_backoff(const int steps);
 

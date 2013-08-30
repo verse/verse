@@ -58,3 +58,57 @@ void vs_user_free(struct VSUser *user)
 	free(user->realname);
 	if(user->password) free(user->password);
 }
+
+/**
+ * \brief This function add fake other users account to the list of user accounts
+ */
+int vs_add_other_users_account(struct VS_CTX *vs_ctx)
+{
+	struct VSUser *other_users;
+	int ret = 0;
+
+	other_users = (struct VSUser*)calloc(1, sizeof(struct VSUser));
+
+	if(other_users != NULL) {
+		other_users->username = strdup("others");
+		other_users->password = NULL;
+		other_users->user_id = VRS_OTHER_USERS_UID;
+		other_users->realname = strdup("Other Users");
+		other_users->fake_user = 1;
+
+		v_list_add_tail(&vs_ctx->users, other_users);
+
+		vs_ctx->other_users = other_users;
+
+		ret = 1;
+	}
+
+	return ret;
+}
+
+/**
+ * \brief This function add fake superuser account to the list of user accounts
+ */
+int vs_add_superuser_account(struct VS_CTX *vs_ctx)
+{
+	struct VSUser *super_user;
+	int ret = 0;
+
+	super_user = (struct VSUser*)calloc(1, sizeof(struct VSUser));
+
+	if(super_user != NULL) {
+		super_user->username = strdup("superuser");
+		super_user->password = NULL;
+		super_user->user_id = VRS_SUPER_USER_UID;
+		super_user->realname = strdup("Super User");
+		super_user->fake_user = 1;
+
+		v_list_add_head(&vs_ctx->users, super_user);
+
+		vs_ctx->super_user = super_user;
+
+		ret = 1;
+	}
+
+	return ret;
+}

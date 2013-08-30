@@ -77,6 +77,7 @@ void vs_init_dgram_conn(struct VDgramConn *dgram_conn)
 /* Clear VConnection of Verse server */
 void vs_clear_vconn(struct VDgramConn *dgram_conn)
 {
+	v_packet_history_destroy(&dgram_conn->packet_history);
 	v_conn_dgram_clear(dgram_conn);
 	dgram_conn->host_state = UDP_SERVER_STATE_CLOSED;	/* Server is in closed state */
 }
@@ -1622,7 +1623,6 @@ again:
 				 * state, then terminate connection. */
 				if((tv.tv_sec - dgram_conn->state[dgram_conn->host_state].tv_state_began.tv_sec) >= VRS_TIMEOUT) {
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Connection timed out\n");
-					vs_clear_vconn(dgram_conn);
 					break;
 				}
 			}
@@ -1631,7 +1631,6 @@ again:
 			 * connection as dead and free it */
 			if((tv.tv_sec - dgram_conn->tv_pay_recv.tv_sec) >= VRS_TIMEOUT) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Connection timed out\n");
-				vs_clear_vconn(dgram_conn);
 				break;
 			}
 

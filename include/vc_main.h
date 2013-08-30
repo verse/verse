@@ -38,7 +38,7 @@
 #define VC_MAIN_H
 
 #include <openssl/ssl.h>
-
+#include <sys/types.h>
 #include <stdio.h>
 
 #include "verse_types.h"
@@ -185,6 +185,11 @@ typedef struct VC_CTX {
 	/* SSL context */
 	SSL_CTX					*tls_ctx;					/**< SSL context for main secured TCP TLS socket */
 	SSL_CTX					*dtls_ctx;					/**< SSL context for secured UDP DTLS connections (shared with all connections) */
+	/* Information about client */
+	char					*client_name;
+	char					*client_version;
+	/* Synchronization */
+	pthread_mutex_t			mutex;
 } VC_CTX;
 
 /* Function prototypes */

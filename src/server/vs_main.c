@@ -36,13 +36,49 @@
 #include "vs_auth_csv.h"
 #include "vs_data.h"
 #include "vs_node.h"
+#include "vs_sys_nodes.h"
+#include "vs_user.h"
+
+#if WITH_INIPARSER
 #include "vs_config.h"
+#endif
 
 #include "v_common.h"
 #include "v_session.h"
 #include "v_network.h"
 
+
 struct VS_CTX *local_vs_ctx = NULL;
+
+
+static void vs_request_terminate(struct VS_CTX *vs_ctx)
+{
+	int i;
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Stopping server\n");
+
+	/* Since now server will not be able to accept new clients */
+	vs_ctx->state = SERVER_STATE_CLOSING;
+
+	for(i=0; i<vs_ctx->max_sessions; i++) {
+		if(vs_ctx->vsessions[i] != NULL &&
+				vs_ctx->vsessions[i]->stream_conn != NULL &&
+				vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN) {
+
+			if(vs_ctx->vsessions[i]->dgram_conn != NULL &&
+					vs_ctx->vsessions[i]->dgram_conn->host_state != UDP_SERVER_STATE_CLOSED) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Try to terminate connection: %d\n",
+						vs_ctx->vsessions[i]->dgram_conn->host_id);
+				/* Try to close session in friendly way */
+				vs_close_dgram_conn(vs_ctx->vsessions[i]->dgram_conn);
+			} else if(vs_ctx->vsessions[i]->stream_conn != NULL) {
+				/* TODO: close stream connection (strange state) */
+			} else {
+				/* TODO: destroy session (strange state) */
+			}
+		}
+	}
+}
 
 /**
  * \brief Callback function for handling signals.
@@ -52,33 +88,42 @@ void vs_handle_signal(int sig)
 {
 	if(sig == SIGINT) {
 		struct VS_CTX *vs_ctx = local_vs_ctx;
-		int i;
 
-		/* Since now server will not be able to accept new clients */
-		vs_ctx->state = SERVER_STATE_CLOSING;
+		vs_request_terminate(vs_ctx);
 
-		for(i=0; i<vs_ctx->max_sessions; i++) {
-			if(vs_ctx->vsessions[i] != NULL &&
-					vs_ctx->vsessions[i]->stream_conn != NULL &&
-					vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN) {
-
-				if(vs_ctx->vsessions[i]->dgram_conn != NULL &&
-						vs_ctx->vsessions[i]->dgram_conn->host_state != UDP_SERVER_STATE_CLOSED) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Try to terminate connection: %d\n",
-							vs_ctx->vsessions[i]->dgram_conn->host_id);
-					/* Try to close session in friendly way */
-					vs_close_dgram_conn(vs_ctx->vsessions[i]->dgram_conn);
-				} else if(vs_ctx->vsessions[i]->stream_conn != NULL) {
-					/* TODO: close stream connection (strange state) */
-				} else {
-					/* TODO: destroy session (strange state) */
-				}
-			}
-		}
+		/* Force terminating cli thread */
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Canceling cli thread\n");
+		pthread_cancel(vs_ctx->cli_thread);
 
 		/* Reset signal handling to default behavior */
 		signal(SIGINT, SIG_DFL);
 	}
+}
+
+/**
+ * \brief This is function is quick workaround and it waits for
+ * pressing q and <Enter> button. It should be replaces with unix
+ * socket and real application with cli interface.
+ */
+static void *vs_server_cli(void *arg)
+{
+	struct VS_CTX *vs_ctx = (struct VS_CTX*)arg;
+	char ch;
+
+	do {
+		ch = getchar();
+		if(ch == 'q') {
+			vs_request_terminate(vs_ctx);
+
+			/* Reset signal handling to default behavior */
+			signal(SIGINT, SIG_DFL);
+		}
+	} while( vs_ctx->state < SERVER_STATE_CLOSING);
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting cli thread\n");
+
+	pthread_exit(NULL);
+	return NULL;
 }
 
 /**
@@ -157,7 +202,9 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 	/* Load default values first */
 	vs_load_default_values(vs_ctx);
 
-	/* When no configuration file is specified, then load default values */
+#if WITH_INIPARSER
+	/* When no configuration file is specified, then load values from
+	 * default path */
 	if(config_file==NULL) {
 		/* Try to open default configuration file */
 		vs_read_config_file(vs_ctx, DEFAULT_SERVER_CONFIG_FILE);
@@ -165,6 +212,9 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 		/* Try to open configuration file */
 		vs_read_config_file(vs_ctx, config_file);
 	}
+#else
+	(void)config_file;
+#endif
 }
 
 /**
@@ -180,57 +230,6 @@ static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
 			break;
 		default:
 			break;
-	}
-
-	return ret;
-}
-
-/**
- * \brief This function add fake other users account to the list of user accounts
- */
-static int vs_add_other_users_account(struct VS_CTX *vs_ctx)
-{
-	struct VSUser *other_users;
-	int ret = 0;
-
-	other_users = (struct VSUser*)calloc(1, sizeof(struct VSUser));
-
-	if(other_users != NULL) {
-		other_users->username = strdup("others");
-		other_users->password = NULL;
-		other_users->user_id = VRS_OTHER_USERS_UID;
-		other_users->realname = strdup("Other Users");
-		other_users->fake_user = 1;
-
-		v_list_add_tail(&vs_ctx->users, other_users);
-
-		vs_ctx->other_users = other_users;
-		ret = 1;
-	}
-
-	return ret;
-}
-
-/**
- * \brief This function add fake superuser account to the list of user accounts
- */
-static int vs_add_superuser_account(struct VS_CTX *vs_ctx)
-{
-	struct VSUser *user;
-	int ret = 0;
-
-	user = (struct VSUser*)calloc(1, sizeof(struct VSUser));
-
-	if(user != NULL) {
-		user->username = strdup("superuser");
-		user->password = NULL;
-		user->user_id = VRS_SUPER_USER_UID;
-		user->realname = strdup("Super User");
-		user->fake_user = 1;
-
-		v_list_add_head(&vs_ctx->users, user);
-
-		ret = 1;
 	}
 
 	return ret;
@@ -495,6 +494,13 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	/* Try to create cli thread */
+	if(pthread_create(&vs_ctx.cli_thread, NULL, vs_server_cli, (void*)&vs_ctx) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		vs_destroy_ctx(&vs_ctx);
+		exit(EXIT_FAILURE);
+	}
+
 	/* Set up pointer to local server CTX -> server server could be terminated
 	 * with signal now. */
 	local_vs_ctx = &vs_ctx;
@@ -511,12 +517,24 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* Join data thread */
-	pthread_join(vs_ctx.data_thread, &res);
-	if(res != NULL) free(res);
-
 	/* Free Verse server context */
 	vs_destroy_ctx(&vs_ctx);
+
+	/* Join cli thread */
+	if(pthread_join(vs_ctx.cli_thread, &res) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_join(): %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} else {
+		if(res != PTHREAD_CANCELED && res != NULL) free(res);
+	}
+
+	/* Join data thread */
+	if(pthread_join(vs_ctx.data_thread, &res) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_join(): %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	} else {
+		if(res != PTHREAD_CANCELED && res != NULL) free(res);
+	}
 
 	return EXIT_SUCCESS;
 }

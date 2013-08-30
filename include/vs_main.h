@@ -139,10 +139,12 @@ typedef struct VS_CTX {
 	char				*csv_user_file;				/* CSV file with definition of user account */
 	struct VListBase	users;						/* Linked list of users */
 	struct VSUser		*other_users;				/* The pointer at fake user other_users */
+	struct VSUser		*super_user;				/* The pointer at fake user of super user */
 	unsigned char		default_perm;				/* Default permissions for other users */
 	/* Data shared at verse server */
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */
+	pthread_t			cli_thread;					/* Thread with simple CLI interface */
 	pthread_attr_t		data_thread_attr;			/* The attribute of data thread */
 	/* WebSocket thread */
 	pthread_t			websocket_thread;			/* WebSocket thread */

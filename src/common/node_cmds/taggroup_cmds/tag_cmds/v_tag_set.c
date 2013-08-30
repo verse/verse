@@ -108,7 +108,8 @@ struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 		}
 		break;
 	case VRS_VALUE_TYPE_STRING8:
-		if((char*)value != NULL) {
+		assert((char*)value != NULL);
+		{
 			char *name = (char*)value;
 			size_t string8_len = strlen(name);
 

@@ -63,6 +63,8 @@ void v_init_session(struct VSession *vsession)
 	vsession->fps_host = DEFAULT_FPS;	/* Default value */
 	vsession->fps_peer = DEFAULT_FPS;	/* Default value */
 	vsession->tmp_flags = 0;
+	vsession->client_name = NULL;
+	vsession->client_version = NULL;
 }
 
 void v_destroy_session(struct VSession *vsession)
@@ -109,5 +111,13 @@ void v_destroy_session(struct VSession *vsession)
 	if(vsession->host_cookie.str != NULL) {
 		free(vsession->host_cookie.str);
 		vsession->host_cookie.str = NULL;
+	}
+	if(vsession->client_name != NULL) {
+		free(vsession->client_name);
+		vsession->client_name = NULL;
+	}
+	if(vsession->client_version != NULL) {
+		free(vsession->client_version);
+		vsession->client_version = NULL;
 	}
 }

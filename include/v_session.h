@@ -108,6 +108,9 @@ typedef struct VSession {
 	float					fps_host;		/* FPS used by this host */
 	float					fps_peer;		/* Negotiated FPS used by peer */
 	unsigned char			tmp_flags;		/* Temporary flags (notification of received system commands) */
+	/* Information about client program */
+	char					*client_name;
+	char					*client_version;
 } VSession;
 
 void v_init_session(struct VSession *vsession);

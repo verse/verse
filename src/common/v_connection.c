@@ -226,12 +226,9 @@ void v_conn_dgram_destroy(struct VDgramConn *dgram_conn)
 		dgram_conn->io_ctx.buf = NULL;
 	}
 
-	if(dgram_conn->ack_nak.cmds!=NULL) {
-		free(dgram_conn->ack_nak.cmds);
-		dgram_conn->ack_nak.cmds = NULL;
-	}
-
 	v_packet_history_destroy(&dgram_conn->packet_history);
+
+	v_ack_nak_history_clear(&dgram_conn->ack_nak);
 
 	close(dgram_conn->io_ctx.sockfd);
 }
@@ -247,27 +244,12 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 		v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
 	}
 
+	BIO_vfree(dgram_conn->io_ctx.bio);
+	dgram_conn->io_ctx.bio = NULL;
+
 	close(dgram_conn->io_ctx.sockfd);
 
 	v_conn_dgram_init(dgram_conn);
-}
-
-/**
- * \brief This function lock connection, compare state of connection with
- * the state, unlock it and return result of comparing.
- * \return This function returns 1, when state of connection is equal to the
- * state, otherwise it returns 0.
- */
-int v_conn_stream_cmp_state(struct VStreamConn *stream_conn, unsigned short state)
-{
-	int ret = 0;
-
-	pthread_mutex_lock(&stream_conn->mutex);
-	if(stream_conn->host_state == state)
-		ret = 1;
-	pthread_mutex_unlock(&stream_conn->mutex);
-
-	return ret;
 }
 
 /**

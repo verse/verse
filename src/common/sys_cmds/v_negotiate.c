@@ -82,6 +82,8 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 		case FTR_HOST_URL:
 		case FTR_COOKIE:
 		case FTR_DED:
+		case FTR_CLIENT_NAME:
+		case FTR_CLIENT_VERSION:
 			/* Add string */
 			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.length = strlen((char*)value);
 			strcpy((char*)sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.str, (char*)value);
@@ -159,6 +161,12 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 		case FTR_CMD_COMPRESS:
 			v_print_log_simple(level, "feature: CMD_COMPRESS, ");
 			break;
+		case FTR_CLIENT_NAME:
+			v_print_log_simple(level, "feature: CLIENT_NAME, ");
+			break;
+		case FTR_CLIENT_VERSION:
+			v_print_log_simple(level, "feature: CLIENT_VERSION, ");
+			break;
 		default:
 			v_print_log_simple(level, "unknown feature, ");
 			break;
@@ -176,6 +184,8 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 			case FTR_HOST_URL:
 			case FTR_COOKIE:
 			case FTR_DED:
+			case FTR_CLIENT_NAME:
+			case FTR_CLIENT_VERSION:
 				v_print_log_simple(level, "%d:%s, ",
 						negotiate_cmd->value[i].string8.length,
 						negotiate_cmd->value[i].string8.str);
@@ -203,7 +213,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 {
 	int str_len=0;
 	unsigned short buffer_pos = 0, length, i;
-	unsigned char length8, len8, lenlen;
+	unsigned char length8 = 0, len8, lenlen;
 
 	/* Unpack command ID */
 	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &negotiate_cmd->id);
@@ -257,6 +267,8 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 		case FTR_HOST_URL:
 		case FTR_COOKIE:
 		case FTR_DED:
+		case FTR_CLIENT_NAME:
+		case FTR_CLIENT_VERSION:
 			negotiate_cmd->count = 0;
 			while(str_len < (length -(1+lenlen+1))) {
 				vnp_raw_unpack_uint8(&buffer[buffer_pos+str_len], &len8);
@@ -286,6 +298,8 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 			case FTR_HOST_URL:
 			case FTR_COOKIE:
 			case FTR_DED:
+			case FTR_CLIENT_NAME:
+			case FTR_CLIENT_VERSION:
 				buffer_pos += vnp_raw_unpack_string8_(&buffer[buffer_pos],
 						buffer_size-buffer_pos,
 						&negotiate_cmd->value[i].string8);
@@ -336,7 +350,9 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 		negotiate_cmd->feature == FTR_DED ||
 		negotiate_cmd->feature == FTR_RWIN_SCALE ||
 		negotiate_cmd->feature == FTR_FPS ||
-		negotiate_cmd->feature == FTR_CMD_COMPRESS) )
+		negotiate_cmd->feature == FTR_CMD_COMPRESS ||
+		negotiate_cmd->feature == FTR_CLIENT_NAME ||
+		negotiate_cmd->feature == FTR_CLIENT_VERSION) )
 	{
 		v_print_log(VRS_PRINT_WARNING, "Try to send UNKNOWN feature ID: %d\n",
 				negotiate_cmd->feature);
@@ -358,6 +374,8 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 		case FTR_HOST_URL:
 		case FTR_COOKIE:
 		case FTR_DED:
+		case FTR_CLIENT_NAME:
+		case FTR_CLIENT_VERSION:
 			length = 1 + 1 + 1;	/* CommandID + Length + FeatureID */
 			for(i=0; i<negotiate_cmd->count; i++) {
 				/* + String length + String */
@@ -388,6 +406,8 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 			case FTR_HOST_URL:
 			case FTR_COOKIE:
 			case FTR_DED:
+			case FTR_CLIENT_NAME:
+			case FTR_CLIENT_VERSION:
 				buffer_pos += vnp_raw_pack_string8(&buffer[buffer_pos], (char*)negotiate_cmd->value[i].string8.str);
 				break;
 			case FTR_FPS:

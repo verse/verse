@@ -26,6 +26,10 @@
 #ifndef VS_NODE_ACCESS_H_
 #define VS_NODE_ACCESS_H_
 
+int vs_node_set_perm(struct VSNode *node,
+		VSUser *user,
+		uint8 permission);
+
 int vs_node_can_write(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct VSNode *node);

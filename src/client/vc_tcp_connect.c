@@ -62,8 +62,6 @@
 #include "v_connection.h"
 #include "v_stream.h"
 
-#define FPS	60	/* TODO: set it from client application and store it in session */
-
 /**
  * \brief This function tries to get username and password from
  * user of client application.
@@ -80,7 +78,7 @@ static int vc_get_username_passwd(struct VSession *vsession,
 	/* Put request for username and password to the queue */
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)ua_data);
 
-	/* Wait for the username and password from the user of client application */
+	/* Wait for the username and password from user input in client application */
 	while(1) {
 		count = 0;
 		share = 0;
@@ -90,6 +88,7 @@ static int vc_get_username_passwd(struct VSession *vsession,
 			switch(cmd->id) {
 			case FAKE_CMD_USER_AUTHENTICATE:
 				v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+				/* FIXME: this is fishy */
 				memcpy(ua_data, cmd, sizeof(struct User_Authenticate_Cmd));
 				free(cmd);
 				return 1;
@@ -98,11 +97,14 @@ static int vc_get_username_passwd(struct VSession *vsession,
 				free(cmd);
 				return 0;
 			default:
+				free(cmd);
 				v_print_log(VRS_PRINT_DEBUG_MSG, "This command is not accepted during NEGOTIATE state\n");
 				break;
 			}
 		}
-		usleep(1000000/FPS);
+		/* 1000000 micro seconds is one second
+		 * and vsession->fps_host is current FPS of this client */
+		usleep(1000000/vsession->fps_host);
 	}
 
 	return 0;
@@ -139,6 +141,8 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 
 		/* Use negotiated FPS */
 		tv.tv_sec = 0;
+		/* 1000000 micro seconds is one second
+		 * and vsession->fps_host is current FPS of this client */
 		tv.tv_usec = 1000000/vsession->fps_host;
 
 		/* Wait for recieved data */
@@ -472,6 +476,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 
 	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
+	/* Pack user auth command */
 	s_message->sys_cmd[0].ua_req.id = CMD_USER_AUTH_REQUEST;
 	strncpy(s_message->sys_cmd[0].ua_req.username, vsession->username, VRS_MAX_USERNAME_LENGTH);
 	s_message->sys_cmd[0].ua_req.method_type = ua_data->methods[0];
@@ -545,7 +550,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 		for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id != CMD_RESERVED_ID; i++) {
 			switch(r_message->sys_cmd[i].cmd.id) {
 			case CMD_USER_AUTH_FAILURE:
-				v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", ua_data->username);
+				v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", vsession->username);
 				return 0;
 			case CMD_USER_AUTH_SUCCESS:
 				vsession->avatar_id = r_message->sys_cmd[i].ua_succ.avatar_id;
@@ -593,12 +598,13 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		struct User_Authenticate_Cmd *ua_data)
 {
 	struct VSession *vsession = CTX_current_session(C);
+	struct VC_CTX *vc_ctx = CTX_client_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct timeval tv;
 	fd_set set;
-	int ret, i, error, buffer_pos=0;
+	int ret, i, error, buffer_pos=0, cmd_rank=0;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -606,7 +612,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		printf("%c[%dm", 27, 0);
 	}
 
-	v_User_Authenticate_init(ua_data, NULL, 0, NULL, NULL);
+	v_user_auth_init(ua_data, NULL, 0, NULL, NULL);
 
 	if( vc_get_username_passwd(vsession, ua_data) != 1) {
 		return 0;
@@ -617,10 +623,18 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 
 	/* Send USER_AUTH_REQUEST with METHOD_NONE to get list of supported method
 	 * types */
-	s_message->sys_cmd[0].ua_req.id = CMD_USER_AUTH_REQUEST;
-	strncpy(s_message->sys_cmd[0].ua_req.username, ua_data->username, VRS_MAX_USERNAME_LENGTH);
-	s_message->sys_cmd[0].ua_req.method_type = VRS_UA_METHOD_NONE;
-	s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
+	s_message->sys_cmd[cmd_rank].ua_req.id = CMD_USER_AUTH_REQUEST;
+	strncpy(s_message->sys_cmd[0].ua_req.username, vsession->username, VRS_MAX_USERNAME_LENGTH);
+	s_message->sys_cmd[cmd_rank].ua_req.method_type = VRS_UA_METHOD_NONE;
+	cmd_rank++;
+
+	/* Set up negotiate command of client name and version */
+	if(vc_ctx->client_name != NULL) {
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_NAME, vc_ctx->client_name, NULL);
+		if(vc_ctx->client_version != NULL) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_CLIENT_VERSION, vc_ctx->client_version, NULL);
+		}
+	}
 
 	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
@@ -690,8 +704,8 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
 			switch(r_message->sys_cmd[i].cmd.id) {
 			case CMD_USER_AUTH_FAILURE:
-				if(r_message->sys_cmd[i].ua_fail.count==0) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", ua_data->username);
+				if(r_message->sys_cmd[i].ua_fail.count == 0) {
+					v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", vsession->username);
 					return 0;
 				} else {
 					/* Go through the list of supported authentication methods and
@@ -1205,7 +1219,6 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 
 	/* Get list of supported authentication methods */
 	ret = vc_USRAUTH_none_loop(C, &ua_data);
-
 	switch(ret) {
 	case 0:
 		error = -1;
@@ -1221,10 +1234,12 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 
 data:
 	/* Update client and server states */
-	stream_conn->host_state=TCP_CLIENT_STATE_USRAUTH_DATA;
+	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_DATA;
 
 	/* Try to authenticate user with username and password */
 	ret = vc_USRAUTH_data_loop(C, &ua_data);
+	/* Clear user auth data from client application */
+	v_user_auth_clear(&ua_data);
 	switch (ret) {
 		case 0:
 			error = VRS_CONN_TERM_AUTH_FAILED;
@@ -1364,4 +1379,6 @@ closed:
 		/* Sleep 1 milisecond */
 		usleep(1000);
 	}
+
+	free(C);
 }

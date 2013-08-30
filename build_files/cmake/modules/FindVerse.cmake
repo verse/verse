@@ -14,7 +14,9 @@ FIND_PATH ( VERSE_INCLUDE_DIR verse.h
 
 FIND_LIBRARY ( VERSE_LIBRARIES verse
     /usr/local/lib
+    /usr/local/lib64
     /usr/lib
+    /usr/lib64
 )
 
 GET_FILENAME_COMPONENT( VERSE_LIBRARY_DIR ${VERSE_LIBRARIES} PATH )

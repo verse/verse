@@ -704,7 +704,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -727,7 +730,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -750,7 +756,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -773,7 +782,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -791,7 +803,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -810,7 +825,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -828,7 +846,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -849,7 +870,10 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		py_value = PyTuple_GetItem(tuple_values, 0);
 		if(py_value != NULL) {
 			if(!PyUnicode_Check(py_value)) {
-				PyErr_SetString(VerseError, "Wrong type of tuple item");
+				char err_message[256];
+				sprintf(err_message, "Tuple item type is not str. Item type is: %s",
+						py_value->ob_type->tp_name);
+				PyErr_SetString(VerseError, err_message);
 				return NULL;
 			}
 		}
@@ -2464,7 +2488,7 @@ static PyTypeObject session_SessionType = {
 
 /* The function doc string for callback_update */
 PyDoc_STRVAR(set_debug_level__doc__,
-		"set_debug_level(level) -> none\n\n"
+		"set_debug_level(level) -> None\n\n"
 		"This method set debug level of this client");
 
 /* This function set debug level of python client */
@@ -2497,15 +2521,57 @@ static PyObject *verse_set_debug_level(PyObject *self, PyObject *args, PyObject 
 	return result;
 }
 
-/* Table of methods */
+
+/* The function doc string for callback_update */
+PyDoc_STRVAR(set_client_info__doc__,
+		"set_client_info(name, version) -> None\n\n"
+		"This method set name and version of client");
+
+/* This function set debug level of python client */
+static PyObject *verse_set_client_info(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *result = NULL;
+	char *name, *version;
+	int ret;
+	static char *kwlist[] = {"name", "version", NULL};
+
+	(void)self;
+
+	/* Parse arguments */
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|ss", kwlist,
+			&name, &version)) {
+		return NULL;
+	}
+
+	ret = vrs_set_client_info(name, version);
+
+	/* Check if command was calling function was successful */
+	if(ret != VRS_SUCCESS) {
+		PyErr_SetString(VerseError, "Unable to set client info");
+		return NULL;
+	}
+
+	Py_INCREF(Py_None);
+	result = Py_None;
+
+	return result;
+}
+
+/* Table of module methods */
 static PyMethodDef VerseMethods[] = {
 	{"set_debug_level",
 			(PyCFunction)verse_set_debug_level,
 			METH_VARARGS | METH_KEYWORDS,
 			set_debug_level__doc__
 	},
+	{"set_client_info",
+			(PyCFunction)verse_set_client_info,
+			METH_VARARGS | METH_KEYWORDS,
+			set_client_info__doc__
+	},
 	{NULL, NULL, 0, NULL}
 };
+
 
 /* Module definition */
 static struct PyModuleDef verse_module = {
@@ -2519,6 +2585,7 @@ static struct PyModuleDef verse_module = {
 	NULL,			/* Not needed */
 	NULL			/* Not needed */
 };
+
 
 /* Initialization of module */
 PyMODINIT_FUNC PyInit_verse(void)

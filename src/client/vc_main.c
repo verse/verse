@@ -127,6 +127,8 @@ void vc_free_ctx(VC_CTX *vc_ctx)
 		}
 	}
 	free(vc_ctx->ca_path);
+	if(vc_ctx->client_name) free(vc_ctx->client_name);
+	if(vc_ctx->client_version) free(vc_ctx->client_version);
 }
 
 /* Fake load of Verse client configuration,
@@ -212,6 +214,12 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 #else
 	vc_ctx->dtls_ctx = NULL;
 #endif
+
+	/* Default name and version */
+	vc_ctx->client_name = NULL;
+	vc_ctx->client_version = NULL;
+
+	pthread_mutex_init(&vc_ctx->mutex, NULL);
 
 	return 1;
 }

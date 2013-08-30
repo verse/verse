@@ -181,6 +181,8 @@ int vrs_callback_update(const uint8_t session_id);
 
 int vrs_set_debug_level(uint8_t debug_level);
 
+int vrs_set_client_info(char *name, char *version);
+
 char *vrs_strerror(const uint32_t error_num);
 
 int vrs_send_fps(const uint8_t session_id,

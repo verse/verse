@@ -1,5 +1,4 @@
 /*
- * $Id: vs_user.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -23,25 +22,30 @@
  *
  */
 
-#ifndef VS_USER_H_
-#define VS_USER_H_
+#ifndef VS_SYS_NODES_H_
+#define VS_SYS_NODES_H_
 
-#include "verse_types.h"
+int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
+		struct VSession *session);
 
-struct VS_CTX;
+int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
+		struct VSession *session);
 
-typedef struct VSUser {
-	struct VSUser	*prev, *next;
-	uint16			user_id;
-	char			*username;
-	char			*password;
-	char			*realname;
-	uint8			fake_user;
-} VSUser;
+long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx,
+		struct VSession *vsession,
+		uint16 user_id);
 
-struct VSUser *vs_user_find(struct VS_CTX *vs_ctx, uint16 user_id);
-void vs_user_free(struct VSUser *user);
-int vs_add_other_users_account(struct VS_CTX *vs_ctx);
-int vs_add_superuser_account(struct VS_CTX *vs_ctx);
+struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx);
 
-#endif /* V_USER_H_ */
+struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
+		struct VSUser *user);
+
+struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx);
+
+struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx);
+
+struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx);
+
+int vs_nodes_init(struct VS_CTX *vs_ctx);
+
+#endif /* VS_SYS_NODES_H_ */

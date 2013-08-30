@@ -41,6 +41,7 @@
 #include "vs_main.h"
 #include "vs_websocket.h"
 #include "vs_handshake.h"
+#include "vs_sys_nodes.h"
 
 #include "v_stream.h"
 

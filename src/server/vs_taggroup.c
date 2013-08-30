@@ -145,7 +145,7 @@ int vs_taggroup_send_destroy(struct VSNode *node,
  * \brief This function initialize structure storing informations about
  * one tag group
  */
-void vs_taggroup_init(struct VSTagGroup *tg)
+static void vs_taggroup_init(struct VSTagGroup *tg)
 {
 	tg->id = 0;
 	tg->type = 0;
@@ -163,6 +163,62 @@ void vs_taggroup_init(struct VSTagGroup *tg)
 	tg->tg_subs.last = NULL;
 
 	tg->state = ENTITY_RESERVED;
+}
+
+/**
+ * \brief This function create new tag group
+ */
+struct VSTagGroup *vs_taggroup_create(struct VSNode *node, uint16 custom_type)
+{
+	struct VSTagGroup *tg = NULL;
+	struct VBucket *tg_bucket;
+
+	if ( !(v_hash_array_count_items(&node->tag_groups) < MAX_TAGGROUPS_COUNT) ) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Maximal number of tag groups in node: %d reached.\n",
+				node->id);
+		return NULL;
+	}
+
+	/* Try to create new tag group */
+	tg = (struct VSTagGroup*)calloc(1, sizeof(VSTagGroup));
+	if(tg == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Out of memory.\n");
+		return NULL;
+	}
+
+	/* Initialize new tag group */
+	vs_taggroup_init(tg);
+
+	/* Try to find first free taggroup_id */
+	tg->id = node->last_tg_id;
+	while( v_hash_array_find_item(&node->tag_groups, tg) != NULL) {
+		/* When not found, then try higher value */
+		tg->id++;
+
+		/* Skip IDs with special purpose */
+		if(tg->id > LAST_TAGGROUP_ID)
+			tg->id = FIRST_TAGGROUP_ID;
+
+		/* TODO: make this faster */
+	}
+	node->last_tg_id = tg->id;
+
+	/* Try to add TagGroup to the hashed linked list */
+	tg_bucket = v_hash_array_add_item(&node->tag_groups, tg, sizeof(struct VSTagGroup));
+
+	if(tg_bucket == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Tag group could not be added to node: %d.\n",
+				node->id);
+		free(tg);
+		return NULL;
+	}
+
+	/* Copy type */
+	tg->type = custom_type;
+
+	return tg;
 }
 
 /**
@@ -232,6 +288,8 @@ int vs_taggroup_destroy(struct VSNode *node, struct VSTagGroup *tg)
 			tag->value = NULL;
 		}
 
+		free(tag);
+
 		bucket = bucket->next;
 	}
 
@@ -277,11 +335,17 @@ int vs_node_taggroups_destroy(struct VSNode *node)
 				tag->value = NULL;
 			}
 
+			free(tag);
+
 			bucket = bucket->next;
 		}
 
 		/* Destroy all tags in this taggroup */
 		v_hash_array_destroy(&tg->tags);
+
+		/* Free list of followers and subscribers */
+		v_list_free(&tg->tg_folls);
+		v_list_free(&tg->tg_subs);
 
 		/* Destroy this tag group itself */
 		v_hash_array_remove_item(&node->tag_groups, tg);
@@ -457,61 +521,34 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of this node or can user write to this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
-
-		if( v_hash_array_count_items(&node->tag_groups) < MAX_TAGGROUPS_COUNT) {
-			struct VBucket *tg_bucket;
-
-			tg_bucket = node->tag_groups.lb.first;
-
-			/* Otherwise create new tag group */
-			tg = (struct VSTagGroup*)calloc(1, sizeof(VSTagGroup));
-			vs_taggroup_init(tg);
-
-			/* Try to find first free taggroup_id */
-			tg->id = node->last_tg_id;
-			while( v_hash_array_find_item(&node->tag_groups, tg) != NULL) {
-				/* When not found, then try higher value */
-				tg->id++;
-
-				/* Skip IDs with special purpose */
-				if(tg->id > LAST_TAGGROUP_ID)
-					tg->id = FIRST_TAGGROUP_ID;
-			}
-			node->last_tg_id = tg->id;
-
-			/* Try to add TagGroup to the hashed linked list */
-			tg_bucket = v_hash_array_add_item(&node->tag_groups, tg, sizeof(struct VSTagGroup));
-
-			if(tg_bucket == NULL) {
-				free(tg);
-				return 0;
-			} else {
-				struct VSNodeSubscriber *node_subscriber;
-				/* Copy type */
-				tg->type = type;
-				/* Set state for this entity */
-				tg->state = ENTITY_CREATING;
-
-				/* Send tag group create command to all subscribers to the node
-				 * that can read this node */
-				for(node_subscriber = node->node_subs.first;
-						node_subscriber != NULL;
-						node_subscriber = node_subscriber->next)
-				{
-					if( vs_node_can_read(vs_ctx, node_subscriber->session, node) == 1) {
-						vs_taggroup_send_create(node_subscriber, node, tg);
-					}
-				}
-			}
-		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Maximal number of tag groups in node: %d reached.\n",
-					node->id);
-		}
-	} else {
+	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__, user->username, node->id);
 		return 0;
+	}
+
+	/* Try to create new tag group */
+	tg = vs_taggroup_create(node, type);
+	if(tg == NULL) {
+		return 0;
+	} else {
+		struct VSNodeSubscriber *node_subscriber;
+
+		/* Set state for this entity */
+		tg->state = ENTITY_CREATING;
+
+		/* Send tag group create command to all subscribers to the node
+		 * that can read this node */
+		for(node_subscriber = node->node_subs.first;
+				node_subscriber != NULL;
+				node_subscriber = node_subscriber->next)
+		{
+			if( vs_node_can_read(vs_ctx, node_subscriber->session, node) == 1) {
+				vs_taggroup_send_create(node_subscriber, node, tg);
+			}
+		}
+
+		return 1;
 	}
 
 	return 0;

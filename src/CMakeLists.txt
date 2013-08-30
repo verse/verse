@@ -75,34 +75,28 @@ set (server_src
 		server/vs_tag.c
 		server/vs_node.c
 		server/vs_node_access.c
+		server/vs_sys_nodes.c
 		server/vs_main.c
 		server/vs_link.c
 		server/vs_layer.c
 		server/vs_data.c
-		server/vs_config.c
 		server/vs_auth_csv.c
 		server/vs_handshake.c)
 
-# Compile vs_websocket, when Wslay is used
-if (WSLAY_FOUND)
-    set (server_src ${server_src} server/vs_websocket.c) 
-endif (WSLAY_FOUND)
-
-
 include_directories (../include)
-include_directories (${INIPARSER_INCLUDE_DIRS})
 include_directories (${OPENSSL_INCLUDE_DIR})
-include_directories (${LIBWEBSOCKETS_INCLUDE_DIR})
 
 
-# Make build flags compiler specific
+# Make build flags compiler specific for libverse.so
 if (CMAKE_COMPILER_IS_GNUCC)
+    set (CMAKE_C_FLAGS "-D_REETRANT -fPIC -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-		set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -fPIC -Wall -Wextra -pedantic -O0")
+		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-		set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -fPIC -Wall -Wextra -pedantic -O3")
+		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3")
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
+
 
 # Set up shared verse library (libverse.so)
 add_library (verse_shared_lib SHARED ${libverse_src})
@@ -113,42 +107,51 @@ set_target_properties (verse_shared_lib PROPERTIES
 		clean_direct_output 1)
 
 
-# Make build flags compiler specific
+# Make build flags compiler specific for verse_server
 if (CMAKE_COMPILER_IS_GNUCC)
+    set (CMAKE_C_FLAGS "-D_REETRANT -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-	    if (WSLAY_FOUND)
-    	    set (CMAKE_C_FLAGS "-D_REETRANT -DWSLAY -ggdb -Wall -Wextra -pedantic")
-    	else()
-    	    set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -Wall -Wextra -pedantic")
-    	endif (WSLAY_FOUND)
+   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-	    if (WSLAY_FOUND)
-		    set (CMAKE_C_FLAGS "-D_REETRANT -DWSLAY -DNDEBUG -Wall -Wextra -pedantic")
-		else()
-		    set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -Wall -Wextra -pedantic")
-		endif (WSLAY_FOUND)
+	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3")
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
+
+
+# Basic libraries used by verse_server
+set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES} )
+
+
+# Compile vs_websocket, when Wslay is used
+if (WSLAY_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${WSLAY_LIBRARIES})
+    set (server_src ${server_src} server/vs_websocket.c)
+    include_directories (${WSLAY_INCLUDE_DIR})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWSLAY")
+endif (WSLAY_FOUND)
+
+
+# When iniparser is used
+if (INIPARSER_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${INIPARSER_LIBRARIES})
+    set (server_src ${server_src}  server/vs_config.c)
+    include_directories (${INIPARSER_INCLUDE_DIRS})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INIPARSER")
+endif (INIPARSER_FOUND)
+
+# Debug print
+message (" Verse Server Libraries: ${verse_server_libs}")
+message (" Verse Server Src: ${server_src}" )
+message (" C flags: ${CMAKE_C_FLAGS}")
 
 
 # Set up verse server executable
 add_executable (verse_server ${server_src})
 add_dependencies (verse_server verse_shared_lib)
 
-if (WSLAY_FOUND)
 target_link_libraries (verse_server
-		verse_shared_lib
-		${CMAKE_THREAD_LIBS_INIT}
-		${OPENSSL_LIBRARIES}
-		${INIPARSER_LIBRARIES}
-		${WSLAY_LIBRARIES})
-else()
-target_link_libraries (verse_server
-		verse_shared_lib
-		${CMAKE_THREAD_LIBS_INIT}
-		${OPENSSL_LIBRARIES}
-		${INIPARSER_LIBRARIES})
-endif (WSLAY_FOUND)
+	verse_shared_lib
+	${verse_server_libs} )
 
 
 # The rule to install Verse server

@@ -47,6 +47,7 @@
 #include "vs_auth_pam.h"
 #include "vs_auth_csv.h"
 #include "vs_node.h"
+#include "vs_sys_nodes.h"
 
 #include "v_common.h"
 #include "v_pack.h"
@@ -109,7 +110,7 @@ int vs_TLS_handshake(struct vContext *C)
 	}
 
 	/* Set up SSL */
-	if( (stream_conn->io_ctx.ssl=SSL_new(vs_ctx->tls_ctx)) == NULL) {
+	if( (stream_conn->io_ctx.ssl = SSL_new(vs_ctx->tls_ctx)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
@@ -326,7 +327,12 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	struct VMessage *s_message = CTX_s_message(C);
 	int i, j, ret;
 	unsigned short buffer_pos = 0;
-	int host_url_proposed = 0, host_cookie_proposed = 0, peer_cookie_confirmed = 0, ded_confirmed = 0;
+	int host_url_proposed = 0,
+			host_cookie_proposed = 0,
+			peer_cookie_confirmed = 0,
+			ded_confirmed = 0,
+			client_name_proposed = 0,
+			client_version_proposed = 0;
 	struct timeval tv;
 	struct VURL url;
 
@@ -341,8 +347,12 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 	v_print_receive_message(C);
 
-	/* Process all system commands */
-	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
+	/* Process all received system commands */
+	for(i=0;
+			i<MAX_SYSTEM_COMMAND_COUNT &&
+			r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID;
+			i++)
+	{
 		switch(r_message->sys_cmd[i].cmd.id) {
 		case CMD_CHANGE_R_ID:
 			/* Client has to propose url in this state */
@@ -363,7 +373,7 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			/* Client has to propose host cookie in this state */
 			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
 				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-					if(vsession->host_cookie.str!=NULL) {
+					if(vsession->host_cookie.str != NULL) {
 						free(vsession->host_cookie.str);
 					}
 					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
@@ -374,11 +384,27 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 						r_message->sys_cmd[i].negotiate_cmd.feature);
 			}
 			break;
+		case CMD_CHANGE_L_ID:
+			/* Client could propose client name and version */
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_name_proposed = 1;
+				}
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_version_proposed = 1;
+				}
+			}
+			break;
 		case CMD_CONFIRM_R_ID:
 			/* Client has to confirm peer cookie in this state */
 			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
 				if (r_message->sys_cmd[i].negotiate_cmd.count == 1) {
-					if(vsession->peer_cookie.str!=NULL &&
+					if(vsession->peer_cookie.str != NULL &&
 						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						gettimeofday(&tv, NULL);
@@ -462,7 +488,8 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			/* Try to create new thread */
 			if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
 				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-				return 0;
+				ret = 0;
+				goto end;
 			}
 
 			/* Wait for datagram thread to be in LISTEN state */
@@ -472,10 +499,10 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			}
 		} else if(vsession->flags & VRS_TP_TCP) {
 			strncpy(trans_proto, "tcp", 3);
-			trans_proto[4] = '\0';
+			trans_proto[3] = '\0';
 		} else if(vsession->flags & VRS_TP_WEBSOCKET) {
 			strncpy(trans_proto, "wss", 3);
-			trans_proto[4] = '\0';
+			trans_proto[3] = '\0';
 		}
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
@@ -503,6 +530,13 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		sec_proto[4] = '\0';
 #endif
 
+		/* Free proposed and now obsolete URL */
+		if(vsession->host_url != NULL) {
+			free(vsession->host_url);
+			vsession->host_url = NULL;
+		}
+
+		/* Set right host URL */
 		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 		if(url.ip_ver==IPV6) {
 			sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
@@ -528,6 +562,25 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE,
 				vsession->host_cookie.str, NULL);
 
+		/* Send confirmation about client name */
+		if(client_name_proposed == 1) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_NAME,
+					vsession->client_name, NULL);
+		}
+
+		/* Send confirmation about client version only in situation, when
+		 * client proposed client name too */
+		if(client_version_proposed == 1) {
+			if(client_name_proposed == 1) {
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						vsession->client_version, NULL);
+			} else {
+				/* Client version without client name is not allowed */
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						NULL);
+			}
+		}
+
 		/* Pack all system commands to the buffer */
 		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
@@ -540,12 +593,15 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 
 		v_print_send_message(C);
 
-		return 1;
+		ret = 1;
 	} else {
-		return 0;
+		ret = 0;
 	}
 
-	return 0;
+end:
+	v_clear_url(&url);
+
+	return ret;
 }
 
 
@@ -586,7 +642,7 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 					long int avatar_id;
 
 					pthread_mutex_lock(&vs_ctx->data.mutex);
-					avatar_id = vs_node_new_avatar_node(vs_ctx, user_id);
+					avatar_id = vs_node_new_avatar_node(vs_ctx, vsession, user_id);
 					pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 					if(avatar_id == -1) {

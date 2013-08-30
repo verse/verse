@@ -64,7 +64,8 @@ int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 int vs_taggroup_send_destroy(struct VSNode *node,
 		struct VSTagGroup *tg);
 
-void vs_taggroup_init(struct VSTagGroup *tg);
+struct VSTagGroup *vs_taggroup_create(struct VSNode *node,
+		uint16 custom_type);
 int vs_taggroup_destroy(struct VSNode *node,
 		struct VSTagGroup *tg);
 

@@ -992,6 +992,9 @@ int main(int argc, char *argv[])
 	vrs_register_receive_layer_set_value(cb_receive_layer_set_value);
 	vrs_register_receive_layer_unset_value(cb_receive_layer_unset_value);
 
+	/* Set client name and version */
+	vrs_set_client_info("Example Verse Client", "0.1");
+
 	/* Send connect request to the server (it will also create independent thread for connection) */
 	error_num = vrs_send_connect_request(argv[optind], "12345", flags, &session_id);
 	if(error_num != VRS_SUCCESS) {
