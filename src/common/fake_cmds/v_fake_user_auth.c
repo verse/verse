@@ -137,7 +137,6 @@ struct User_Authenticate_Cmd *v_user_auth_create(const char *username,
  */
 void v_user_auth_clear(struct User_Authenticate_Cmd *user_auth)
 {
-	printf(">>>v_user_auth_clear()<<<\n");
     if(user_auth != NULL) {
     	if(user_auth->username != NULL) {
     		free(user_auth->username);

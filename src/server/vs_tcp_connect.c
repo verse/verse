@@ -64,7 +64,7 @@
 static void vs_init_stream_conn(struct VStreamConn *stream_conn)
 {
 	v_conn_stream_init(stream_conn);
-	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;	/* Server is in listen mode */
+	v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_LISTEN);	/* Server is in listen mode */
 }
 
 /**
@@ -834,7 +834,7 @@ void *vs_tcp_conn_loop(void *arg)
 	CTX_r_message_set(C, r_message);
 	CTX_s_message_set(C, s_message);
 
-	stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+	v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_RESPOND_METHODS);
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -878,7 +878,7 @@ void *vs_tcp_conn_loop(void *arg)
 			case TCP_SERVER_STATE_RESPOND_METHODS:
 				ret = vs_RESPOND_methods_loop(C);
 				if(ret==1) {
-					stream_conn->host_state = TCP_SERVER_STATE_RESPOND_USRAUTH;
+					v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_RESPOND_USRAUTH);
 					if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 						printf("%c[%d;%dm", 27, 1, 31);
 						v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_userauth\n");
@@ -891,7 +891,7 @@ void *vs_tcp_conn_loop(void *arg)
 			case TCP_SERVER_STATE_RESPOND_USRAUTH:
 				ret = vs_RESPOND_userauth_loop(C);
 				if(ret==1) {
-					stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
+					v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED);
 
 					if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 						printf("%c[%d;%dm", 27, 1, 31);
@@ -908,7 +908,7 @@ void *vs_tcp_conn_loop(void *arg)
 			case TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED:
 				ret = vs_NEGOTIATE_cookie_ded_loop(C);
 				if(ret==1) {
-					stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_NEWHOST;
+					v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_NEGOTIATE_NEWHOST);
 
 					if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 						printf("%c[%d;%dm", 27, 1, 31);
@@ -927,7 +927,7 @@ void *vs_tcp_conn_loop(void *arg)
 						/* When URL was confirmed, then go to the end state */
 						goto end;
 					} else if (vsession->flags & VRS_TP_TCP) {
-						stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
+						v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_STREAM_OPEN);
 
 						if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 							printf("%c[%d;%dm", 27, 1, 31);
@@ -979,7 +979,7 @@ end:
 
 	/* TCP connection is considered as CLOSED, but it is not possible to use
 	 * this connection for other client */
-	stream_conn->host_state = TCP_SERVER_STATE_CLOSED;
+	v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_CLOSED);
 
 	/* NULL pointer at stream connection */
 	CTX_current_stream_conn_set(C, NULL);
@@ -1008,7 +1008,7 @@ end:
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 	/* This session could be used again for authentication */
-	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
+	v_conn_stream_set_state(stream_conn, TCP_SERVER_STATE_LISTEN);
 
 	/* Clear verse session */
 	vsession->flags = 0;
@@ -1055,6 +1055,7 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 	fd_set set;
 	int count, tmp, i, ret;
 	static uint32 last_session_id = 0;
+	int free_session_found = 0;
 
 	/* Allocate context for server */
 	C = (struct vContext*)calloc(1, sizeof(struct vContext));
@@ -1115,13 +1116,17 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Connection attempt\n");
 
 			/* Try to find free session */
+			free_session_found = 0;
 			for(i=0; i< vs_ctx->max_sessions; i++) {
-				if(vs_ctx->vsessions[i]->stream_conn->host_state==TCP_SERVER_STATE_LISTEN) {
-					/* TODO: lock mutex here */
+				pthread_mutex_lock(&vs_ctx->vsessions[i]->stream_conn->mutex);
+				if(vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_LISTEN) {
 					current_session = vs_ctx->vsessions[i];
-					current_session->stream_conn->host_state=TCP_SERVER_STATE_RESPOND_METHODS;
+					current_session->stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
 					current_session->session_id = last_session_id++;
-					/* TODO: unlock mutex here */
+					free_session_found = 1;
+				}
+				pthread_mutex_unlock(&vs_ctx->vsessions[i]->stream_conn->mutex);
+				if(free_session_found == 1) {
 					break;
 				}
 			}
@@ -1238,9 +1243,12 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 		tmp = 0;
 		for(i=0; i<vs_ctx->max_sessions; i++) {
 			if(vs_ctx->vsessions[i] != NULL) {
-				if(vs_ctx->vsessions[i]->stream_conn != NULL &&
-					vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN ) {
-					tmp++;
+				if(vs_ctx->vsessions[i]->stream_conn) {
+					pthread_mutex_lock(&vs_ctx->vsessions[i]->stream_conn->mutex);
+					if( vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN ) {
+						tmp++;
+					}
+					pthread_mutex_unlock(&vs_ctx->vsessions[i]->stream_conn->mutex);
 				}
 				/* TODO: cancel thread with closed connection to speed up server exit
 					pthread_kill(vs_ctx->vsessions[i]->tcp_thread, SIGALRM);

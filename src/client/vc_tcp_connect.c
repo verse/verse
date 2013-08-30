@@ -62,8 +62,6 @@
 #include "v_connection.h"
 #include "v_stream.h"
 
-#define FPS	60	/* TODO: set it from client application and store it in session */
-
 /**
  * \brief This function tries to get username and password from
  * user of client application.
@@ -80,7 +78,7 @@ static int vc_get_username_passwd(struct VSession *vsession,
 	/* Put request for username and password to the queue */
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)ua_data);
 
-	/* Wait for the username and password from the user of client application */
+	/* Wait for the username and password from user input in client application */
 	while(1) {
 		count = 0;
 		share = 0;
@@ -104,7 +102,9 @@ static int vc_get_username_passwd(struct VSession *vsession,
 				break;
 			}
 		}
-		usleep(1000000/FPS);
+		/* 1000000 micro seconds is one second
+		 * and vsession->fps_host is current FPS of this client */
+		usleep(1000000/vsession->fps_host);
 	}
 
 	return 0;
@@ -141,6 +141,8 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 
 		/* Use negotiated FPS */
 		tv.tv_sec = 0;
+		/* 1000000 micro seconds is one second
+		 * and vsession->fps_host is current FPS of this client */
 		tv.tv_usec = 1000000/vsession->fps_host;
 
 		/* Wait for recieved data */
