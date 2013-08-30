@@ -15,8 +15,8 @@ BSD-LICENSE and GPL-LICENSE.
 Important links
 ---------------
 
- * http://verse.github.com/
- * http://verse.github.com/verse/
+ * http://verse.github.io/
+ * http://verse.github.io/verse/
  * https://github.com/verse/verse
 
 Compile
@@ -31,10 +31,11 @@ be possible.
  * GCC http://gcc.gnu.org/ or Clang http://clang.llvm.org/
  * CMake http://www.cmake.org/
  * OpenSSL http://www.openssl.org/
- * IniParser http://ndevilla.free.fr/iniparser/
+ * IniParser (optional) http://ndevilla.free.fr/iniparser/
  * Check (optional) http://check.sourceforge.net/
  * Spin (optional) http://spinroot.com/
- * Python3 (optional) http://www.python.org
+ * Python3 (optional) http://www.python.org/
+ * WSLay (optional) http://wslay.sourceforge.net/
 
 ### Building ###
 
