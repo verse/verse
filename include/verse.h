@@ -103,6 +103,15 @@ extern "C" {
 #define VRS_USERS_PARENT_NODE_ID	2
 #define VRS_SCENE_PARENT_NODE_ID	3
 
+/* There are some special custom_types of special nodes */
+#define VRS_ROOT_NODE_CT			0
+#define VRS_AVATAR_PARENT_NODE_CT	1
+#define VRS_USERS_PARENT_NODE_CT	2
+#define VRS_SCENE_PARENT_NODE_CT	3
+#define VRS_AVATAR_NODE_CT			4
+#define VRS_AVATAR_INFO_NODE_CT		5
+#define VRS_USER_NODE_CT			6
+
 /* Superuser of verse server has defined UID */
 #define VRS_SUPER_USER_UID			100
 #define VRS_OTHER_USERS_UID			65535	/* 2^16 - 1*/
