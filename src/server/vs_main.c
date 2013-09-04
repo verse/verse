@@ -91,6 +91,8 @@ void vs_handle_signal(int sig)
 
 		vs_request_terminate(vs_ctx);
 
+		/* Force terminating cli thread */
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Canceling cli thread\n");
 		pthread_cancel(vs_ctx->cli_thread);
 
 		/* Reset signal handling to default behavior */

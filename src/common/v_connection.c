@@ -253,24 +253,6 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 }
 
 /**
- * \brief This function lock connection, compare state of connection with
- * the state, unlock it and return result of comparing.
- * \return This function returns 1, when state of connection is equal to the
- * state, otherwise it returns 0.
- */
-int v_conn_stream_cmp_state(struct VStreamConn *stream_conn, unsigned short state)
-{
-	int ret = 0;
-
-	pthread_mutex_lock(&stream_conn->mutex);
-	if(stream_conn->host_state == state)
-		ret = 1;
-	pthread_mutex_unlock(&stream_conn->mutex);
-
-	return ret;
-}
-
-/**
  * \brief This function lock connection, change state and unlock it.
  */
 void v_conn_stream_set_state(struct VStreamConn *stream_conn, unsigned short state)
