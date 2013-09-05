@@ -83,8 +83,8 @@ set (server_src
 		server/vs_auth_csv.c
 		server/vs_handshake.c)
 
+
 include_directories (../include)
-include_directories (${OPENSSL_INCLUDE_DIR})
 
 
 # Make build flags compiler specific for libverse.so
@@ -119,10 +119,18 @@ endif (CMAKE_COMPILER_IS_GNUCC)
 
 
 # Basic libraries used by verse_server
-set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES} )
+set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
 
 
-# Compile vs_websocket, when Wslay is used
+# When OpenSSL is enabled
+if (OPENSSL_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
+    include_directories (${OPENSSL_INCLUDE_DIR})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
+endif (OPENSSL_FOUND)
+
+
+# When WSLay library is enabled
 if (WSLAY_FOUND)
     set (verse_server_libs ${verse_server_libs} ${WSLAY_LIBRARIES})
     set (server_src ${server_src} server/vs_websocket.c)
@@ -152,13 +160,11 @@ target_link_libraries (verse_server
 # The rule to install Verse server
 install (TARGETS verse_server
 	RUNTIME
-	CONFIGURATIONS "Debug"
 	DESTINATION bin)
 
 # The rule to install shared library used by Verse server and Verse clients
 install (TARGETS verse_shared_lib
 	LIBRARY
-	CONFIGURATIONS "Debug"
 	DESTINATION lib)
 
 # TODO: Make building static verse library (libverse.a) optional

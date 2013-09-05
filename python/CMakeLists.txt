@@ -14,6 +14,15 @@ include_directories (${PYTHON_INCLUDE_DIRS})
 
 set (verse_module_src verse_module.c)
 
+# Basic libraries used by verse Python module
+set ( verse_python_libs ${CMAKE_THREAD_LIBS_INIT} )
+
+# When OpenSSL is enabled
+if (OPENSSL_FOUND)
+    set (verse_python_libs ${verse_python_libs} ${OPENSSL_LIBRARIES})
+    include_directories (${OPENSSL_INCLUDE_DIR})
+endif (OPENSSL_FOUND)
+
 add_library (pyverse SHARED ${verse_module_src})
 set_target_properties (pyverse PROPERTIES PREFIX "")
 set_target_properties (pyverse PROPERTIES 
@@ -22,10 +31,8 @@ set_target_properties (pyverse PROPERTIES
 add_dependencies (pyverse verse_shared_lib)
 target_link_libraries (pyverse
 		verse_shared_lib
-		${CMAKE_THREAD_LIBS_INIT}
-		${OPENSSL_LIBRARIES})
+		${verse_python_libs})
 
 install (TARGETS pyverse
 	LIBRARY
-	CONFIGURATIONS "Debug"
 	DESTINATION lib/python${PYTHON_VERSION}/site-packages)

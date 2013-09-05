@@ -25,6 +25,7 @@ set (${PROJECT_NAME}_VERSION
 	"${${PROJECT_NAME}_VERSION_MAJOR}.${${PROJECT_NAME}_VERSION_MINOR}")
 
 # Build options
+option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
 option(VERSE_PYTHON_MODULE "Verse Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
@@ -46,7 +47,6 @@ set (CMAKE_MODULE_PATH
 set (CMAKE_THREAD_PREFER_PTHREAD)
 
 # Try to find required packages
-find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
 
 # Set output directory for libraries
@@ -54,6 +54,15 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 
 # Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
+
+
+# Check OpenSSL library
+if (VERSE_OPENSSL)
+
+    # Try to find OpenSSL library
+    find_package (OpenSSL)
+    
+endif (VERSE_OPENSSL)
 
 
 # Check iniparser library
@@ -168,6 +177,12 @@ message ("* Verse Configuration *")
 message ("")
 
 message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+
+if (OPENSSL_FOUND)
+	message (" * OpenSSL:       ON")
+else ()
+	message (" * OpenSSL:       OFF")
+endif (OPENSSL_FOUND)
 
 if (INIPARSER_FOUND)
 	message (" * IniParser:     ON")
