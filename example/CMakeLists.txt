@@ -26,7 +26,7 @@ set ( verse_client_libs ${CMAKE_THREAD_LIBS_INIT} )
 
 # When OpenSSL is enabled
 if (OPENSSL_FOUND)
-    set (verse_client_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
+    set (verse_client_libs ${verse_client_libs} ${OPENSSL_LIBRARIES})
     include_directories (${OPENSSL_INCLUDE_DIR})
 endif (OPENSSL_FOUND)
 
