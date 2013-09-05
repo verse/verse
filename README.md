@@ -1,6 +1,8 @@
 Verse 2.0
 =========
 
+![Travis CI build status](https://api.travis-ci.org/verse/verse.png "Travis CI build status")
+
 Verse 2.0 is network protocol for real-time sharing of 3D data. It is successor of old Verse protocol developed at KTH.
 Verse 2.0 is still in alpha version.
 
