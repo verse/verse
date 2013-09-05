@@ -1,9 +1,5 @@
-before_script:
-  - echo "yes" | sudo add-apt-repository ppa:markhannon/ppa
-  - sudo apt-get update
-  - sudo apt-get install iniparser
 language: c
 compiler:
   - gcc
   - clang
-script: mkdir build && cd build && cmake ../ && make && make install
+script: mkdir build && cd build && cmake ../ && make

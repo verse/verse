@@ -2613,17 +2613,25 @@ PyMODINIT_FUNC PyInit_verse(void)
 	/* Add constants to verse module */
 	PyModule_AddIntConstant(module, "VERSION", VRS_VERSION);
 
+	/* Timeout in seconds */
 	PyModule_AddIntConstant(module, "TIMEOUT", VRS_TIMEOUT);
 
+	/* Debug levels */
 	PyModule_AddIntConstant(module, "PRINT_NONE", VRS_PRINT_NONE);
 	PyModule_AddIntConstant(module, "PRINT_INFO", VRS_PRINT_INFO);
 	PyModule_AddIntConstant(module, "PRINT_ERROR", VRS_PRINT_ERROR);
 	PyModule_AddIntConstant(module, "PRINT_WARNING", VRS_PRINT_WARNING);
 	PyModule_AddIntConstant(module, "PRINT_DEBUG_MSG", VRS_PRINT_DEBUG_MSG);
 
+	/* Flags used in connect request (verse.Session) */
 	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_SEC_DATA_NONE);
 	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_SEC_DATA_TLS);
+	PyModule_AddIntConstant(module, "TP_UDP", VRS_TP_UDP);
+	PyModule_AddIntConstant(module, "TP_TCP", VRS_TP_TCP);
+	PyModule_AddIntConstant(module, "CMD_CMPR_NONE", VRS_CMD_CMPR_NONE);
+	PyModule_AddIntConstant(module, "CMD_CMPR_ADDR_SHARE", VRS_CMD_CMPR_ADDR_SHARE);
 
+	/* Error constant used, when connection with server is closed */
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_UNKNOWN", VRS_CONN_TERM_HOST_UNKNOWN);
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_DOWN", VRS_CONN_TERM_HOST_DOWN);
 	PyModule_AddIntConstant(module, "CONN_TERM_SERVER_DOWN", VRS_CONN_TERM_SERVER_DOWN);
@@ -2633,11 +2641,14 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "CONN_TERM_CLIENT", VRS_CONN_TERM_CLIENT);
 	PyModule_AddIntConstant(module, "CONN_TERM_SERVER", VRS_CONN_TERM_SERVER);
 
+	/* Default priority of nodes */
 	PyModule_AddIntConstant(module, "DEFAULT_PRIORITY",	VRS_DEFAULT_PRIORITY);
 
+	/* Supported authentication types */
 	PyModule_AddIntConstant(module, "UA_METHOD_NONE", VRS_UA_METHOD_NONE);
 	PyModule_AddIntConstant(module, "UA_METHOD_PASSWORD", VRS_UA_METHOD_PASSWORD);
 
+	/* Types of values used in tags and layers */
 	PyModule_AddIntConstant(module, "VALUE_TYPE_UINT8", VRS_VALUE_TYPE_UINT8);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_UINT16", VRS_VALUE_TYPE_UINT16);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_UINT32", VRS_VALUE_TYPE_UINT32);
@@ -2647,8 +2658,28 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "VALUE_TYPE_REAL64", VRS_VALUE_TYPE_REAL64);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_STRING8", VRS_VALUE_TYPE_STRING8);
 
+	/* Access permission flags */
 	PyModule_AddIntConstant(module, "PERM_NODE_READ", VRS_PERM_NODE_READ);
 	PyModule_AddIntConstant(module, "PERM_NODE_WRITE", VRS_PERM_NODE_WRITE);
+
+	/* ID od special nodes */
+	PyModule_AddIntConstant(module, "ROOT_NODE_ID", VRS_ROOT_NODE_ID);
+	PyModule_AddIntConstant(module, "AVATAR_PARENT_NODE_ID", VRS_AVATAR_PARENT_NODE_ID);
+	PyModule_AddIntConstant(module, "USERS_PARENT_NODE_ID", VRS_USERS_PARENT_NODE_ID);
+	PyModule_AddIntConstant(module, "SCENE_PARENT_NODE_ID", VRS_SCENE_PARENT_NODE_ID);
+
+	/* Node custom_types of specila nodes */
+	PyModule_AddIntConstant(module, "ROOT_NODE_CT", VRS_ROOT_NODE_CT);
+	PyModule_AddIntConstant(module, "AVATAR_PARENT_NODE_CT", VRS_AVATAR_PARENT_NODE_CT);
+	PyModule_AddIntConstant(module, "USERS_PARENT_NODE_CT", VRS_USERS_PARENT_NODE_CT);
+	PyModule_AddIntConstant(module, "SCENE_PARENT_NODE_CT", VRS_SCENE_PARENT_NODE_CT);
+	PyModule_AddIntConstant(module, "AVATAR_NODE_CT", VRS_AVATAR_NODE_CT);
+	PyModule_AddIntConstant(module, "AVATAR_INFO_NODE_CT", VRS_AVATAR_INFO_NODE_CT);
+	PyModule_AddIntConstant(module, "USER_NODE_CT", VRS_USER_NODE_CT);
+
+	/* User ID os special users */
+	PyModule_AddIntConstant(module, "SUPER_USER_UID", VRS_SUPER_USER_UID);
+	PyModule_AddIntConstant(module, "OTHER_USERS_UID", VRS_OTHER_USERS_UID);
 
 	return module;
 }
