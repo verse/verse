@@ -773,7 +773,7 @@ static int vs_init_tcp_io_ctx(VS_CTX *vs_ctx)
 	return vs_init_io_ctx(&vs_ctx->tcp_io_ctx, vs_ctx->tcp_port, vs_ctx->max_sessions);
 }
 
-
+#ifdef WSLAY
 /**
  * \brief Initialize IO context for WebSocket TCP connection
  */
@@ -781,7 +781,7 @@ static int vs_init_websocket_io_ctx(VS_CTX *vs_ctx)
 {
 	return vs_init_io_ctx(&vs_ctx->ws_io_ctx, vs_ctx->ws_port, vs_ctx->max_sessions);
 }
-
+#endif
 
 /**
  * \brief Initialize list of verse sessions

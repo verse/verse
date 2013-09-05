@@ -139,11 +139,6 @@ if (INIPARSER_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INIPARSER")
 endif (INIPARSER_FOUND)
 
-# Debug print
-message (" Verse Server Libraries: ${verse_server_libs}")
-message (" Verse Server Src: ${server_src}" )
-message (" C flags: ${CMAKE_C_FLAGS}")
-
 
 # Set up verse server executable
 add_executable (verse_server ${server_src})
