@@ -8,8 +8,10 @@
 # This currently works probably only for Linux
 
 FIND_PATH ( VERSE_INCLUDE_DIR verse.h
-    /usr/local/include
     /usr/include
+    /usr/local/include
+    /opt/local/include
+    /sw/include
 )
 
 FIND_LIBRARY ( VERSE_LIBRARIES verse
@@ -28,7 +30,7 @@ IF ( VERSE_INCLUDE_DIR )
     ENDIF ( VERSE_LIBRARIES )
 ENDIF ( VERSE_INCLUDE_DIR )
 
-MARK_AS_ADVANCED(
+MARK_AS_ADVANCED (
     VERSE_LIBRARY_DIR
     VERSE_INCLUDE_DIR
     VERSE_LIBRARIES
