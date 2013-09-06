@@ -176,7 +176,7 @@ message ("")
 message ("* Verse Configuration *")
 message ("")
 
-message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+    message (" * Configuration: ${CMAKE_BUILD_TYPE}")
 
 if (OPENSSL_FOUND)
 	message (" * OpenSSL:       ON")
@@ -204,11 +204,11 @@ else ()
 	message (" * Check:         OFF")
 endif (CHECK_FOUND)
 
-if (WSLAY_FOUND)
+if (WSLAY_FOUND AND OPENSSL_FOUND)
 	message (" * WebSocket:     ON")
 else ()
 	message (" * WebSocket:     OFF")
-endif (WSLAY_FOUND)
+endif ()
 
 if (DOXYGEN_FOUND)
 	message (" * Doxygen:       ON")

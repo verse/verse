@@ -289,7 +289,9 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	}
 	v_list_free(&vs_ctx->users);
 
+#ifdef WITH_OPENSSL
 	vs_destroy_stream_ctx(vs_ctx);
+#endif
 }
 
 #if 0

@@ -34,9 +34,11 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -47,6 +49,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "verse_types.h"
 
@@ -154,7 +157,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
 			/* Try to receive data through SSL connection */
-			if( v_SSL_read(io_ctx, &error) <= 0 ) {
+			if( v_tcp_read(io_ctx, &error) <= 0 ) {
 				goto end;
 			}
 
@@ -169,7 +172,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 
 		/* Send command to the client */
 		if(ret == 1) {
-			if( v_SSL_write(io_ctx, &error) <= 0) {
+			if( v_tcp_write(io_ctx, &error) <= 0) {
 				goto end;
 			}
 		}
@@ -218,7 +221,7 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
 	v_print_send_message(C);
 
 	/* Send command to the server */
-	if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
+	if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
 		return 0;
 	} else {
 		return 1;
@@ -359,7 +362,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 	v_print_send_message(C);
 
 	/* Send command to the server */
-	if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
+	if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
 		return 0;
 	}
 
@@ -379,7 +382,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 		buffer_pos = 0;
 
 		/* Try to receive data through SSL connection */
-		if( v_SSL_read(io_ctx, &error) <= 0 ) {
+		if( v_tcp_read(io_ctx, &error) <= 0 ) {
 			return 0;
 		}
 
@@ -498,7 +501,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 	v_print_send_message(C);
 
 	/* Send command to the server */
-	if( (ret = v_SSL_write(&stream_conn->io_ctx, &error)) <= 0) {
+	if( (ret = v_tcp_write(&stream_conn->io_ctx, &error)) <= 0) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "v_SSL_write() failed.\n");
 		return 0;
 	}
@@ -519,7 +522,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 		buffer_pos = 0;
 
 		/* Try to receive data through SSL connection */
-		if( v_SSL_read(&stream_conn->io_ctx, &error) <= 0 ) {
+		if( v_tcp_read(&stream_conn->io_ctx, &error) <= 0 ) {
 			/* TODO: try to read more data */
 			return 0;
 		}
@@ -653,7 +656,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 	v_print_send_message(C);
 
 	/* Send message to the server */
-	if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
+	if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "v_SSL_write() failed.\n");
 		return 0;
 	}
@@ -674,7 +677,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		buffer_pos = 0;
 
 		/* Try to receive data through SSL connection */
-		if( v_SSL_read(io_ctx, &error) <= 0 ) {
+		if( v_tcp_read(io_ctx, &error) <= 0 ) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "v_SSL_read() failed.\n");
 			return 0;
 		}
@@ -741,6 +744,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
  */
 void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 {
+#ifdef WITH_OPENSSL
 	int ret;
 
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
@@ -764,12 +768,13 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 	}
 
 	SSL_free(stream_conn->io_ctx.ssl);
+#endif
 
 	close(stream_conn->io_ctx.sockfd);
 
-	/*v_conn_stream_destroy(stream_conn);*/
 }
 
+#ifdef WITH_OPENSSL
 /**
  * \brief This function verify certificate presented by server
  *
@@ -1000,6 +1005,7 @@ void vc_verify_certificate(struct vContext *C)
 
 	/* TODO: appropriate callback function */
 }
+#endif
 
 /**
  * \brief Create new TCP connection to the server
@@ -1065,7 +1071,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		}
 	}
 
-	if(rp==NULL) {
+	if(rp == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Could not connect to the [%s]:%s\n", node, service);
 		freeaddrinfo(result);
 		*error = VRS_CONN_TERM_SERVER_DOWN;
@@ -1131,6 +1137,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		return NULL;
 	}
 
+#ifdef WITH_OPENSSL
 	/* Set up SSL */
 	if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
@@ -1168,6 +1175,9 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection uses: %s cipher.\n", SSL_get_cipher(stream_conn->io_ctx.ssl));
 	}
+#else
+	(void)ctx;
+#endif
 
 	return stream_conn;
 }
@@ -1211,11 +1221,13 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	CTX_s_message_set(C, s_message);
 	vsession->stream_conn = stream_conn;
 
+#ifdef WITH_OPENSSL
 	/* Verify server certificate */
 	vc_verify_certificate(C);
+#endif
 
 	/* Update client and server states */
-	stream_conn->host_state=TCP_CLIENT_STATE_USRAUTH_NONE;
+	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_NONE;
 
 	/* Get list of supported authentication methods */
 	ret = vc_USRAUTH_none_loop(C, &ua_data);

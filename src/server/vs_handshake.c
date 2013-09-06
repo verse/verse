@@ -22,16 +22,18 @@
  *
  */
 
-
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#endif
 
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -88,6 +90,7 @@ int vs_user_auth(struct vContext *C, const char *username, const char *data)
 	return uid;
 }
 
+#ifdef WITH_OPENSSL
 /**
  * \brief do TLS negotiation with client application
  * \param[in]	*C	The context of verse server
@@ -181,7 +184,7 @@ int vs_TLS_teardown(struct vContext *C)
 
 	return 1;
 }
-
+#endif
 
 /**
  * \brief This function do TLS teardown, when it is reuired and it
@@ -191,7 +194,9 @@ void vs_CLOSING(struct vContext *C)
 {
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
 
+#ifdef WITH_OPENSSL
 	if(stream_conn->io_ctx.ssl!=NULL) vs_TLS_teardown(C);
+#endif
 
 	close(stream_conn->io_ctx.sockfd);
 }
@@ -237,7 +242,7 @@ int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
 			/* Try to receive data through SSL connection */
-			if( v_SSL_read(io_ctx, &error) <= 0 ) {
+			if( v_tcp_read(io_ctx, &error) <= 0 ) {
 				goto end;
 			}
 
@@ -255,7 +260,7 @@ int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 
 		/* Send command to the client */
 		if(ret == 1) {
-			if( v_SSL_write(io_ctx, &error) <= 0) {
+			if( v_tcp_write(io_ctx, &error) <= 0) {
 				goto end;
 			}
 		}

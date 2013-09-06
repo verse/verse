@@ -244,8 +244,10 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 		v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
 	}
 
+#ifdef WITH_OPENSSL
 	BIO_vfree(dgram_conn->io_ctx.bio);
 	dgram_conn->io_ctx.bio = NULL;
+#endif
 
 	close(dgram_conn->io_ctx.sockfd);
 

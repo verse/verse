@@ -31,7 +31,7 @@ be possible.
 
  * GCC http://gcc.gnu.org/ or Clang http://clang.llvm.org/
  * CMake http://www.cmake.org/
- * OpenSSL http://www.openssl.org/
+ * OpenSSL (optional) http://www.openssl.org/
  * IniParser (optional) http://ndevilla.free.fr/iniparser/
  * Check (optional) http://check.sourceforge.net/
  * Spin (optional) http://spinroot.com/

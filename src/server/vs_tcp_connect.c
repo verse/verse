@@ -22,9 +22,11 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#endif
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -37,6 +39,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "verse_types.h"
 
@@ -95,10 +98,12 @@ void *vs_tcp_conn_loop(void *arg)
 	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
 			(void *)&stream_conn->socket_buffer_size, &int_size);
 
+#ifdef WITH_OPENSSL
 	/* Try to do TLS handshake with client */
 	if(vs_TLS_handshake(C)!=1) {
 		goto end;
 	}
+#endif
 
 	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
@@ -130,7 +135,7 @@ void *vs_tcp_conn_loop(void *arg)
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
 			/* Try to receive data through SSL connection */
-			if( v_SSL_read(io_ctx, &error) <= 0 ) {
+			if( v_tcp_read(io_ctx, &error) <= 0 ) {
 				goto end;
 			}
 
@@ -140,8 +145,8 @@ void *vs_tcp_conn_loop(void *arg)
 
 			/* When these is something to send, then send it to peer */
 			if( ret == 1 ) {
-				/* Send command to the client through SSL connection */
-				if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
+				/* Send response message to the client */
+				if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
 					goto end;
 				}
 			}
@@ -163,12 +168,12 @@ end:
 	vs_CLOSING(C);
 
 	/* Receive and Send messages are not neccessary any more */
-	if(r_message!=NULL) {
+	if(r_message != NULL) {
 		free(r_message);
 		r_message = NULL;
 		CTX_r_message_set(C, NULL);
 	}
-	if(s_message!=NULL) {
+	if(s_message != NULL) {
 		free(s_message);
 		s_message = NULL;
 		CTX_s_message_set(C, NULL);
@@ -205,7 +210,7 @@ end:
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 	/* This session could be used again for authentication */
-	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
+	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
 
 	/* Clear session flags */
 	vsession->flags = 0;
@@ -256,7 +261,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 	/* Try to find free session */
 	for(i=0; i< vs_ctx->max_sessions; i++) {
-		if(vs_ctx->vsessions[i]->stream_conn->host_state==TCP_SERVER_STATE_LISTEN) {
+		if(vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_LISTEN) {
 			/* TODO: lock mutex here */
 			current_session = vs_ctx->vsessions[i];
 			current_session->stream_conn->host_state=TCP_SERVER_STATE_RESPOND_METHODS;
@@ -352,7 +357,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Number of session slot: %d reached\n", vs_ctx->max_sessions);
 		/* TODO: return some error. Not only accept and close connection. */
 		/* Try to accept client connection (do TCP handshake) */
-		if(io_ctx->host_addr.ip_ver==IPV4) {
+		if(io_ctx->host_addr.ip_ver == IPV4) {
 			/* Prepare IP6 variables for TCP handshake */
 			struct sockaddr_in client_addr4;
 
@@ -365,7 +370,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			}
 			/* Close connection (no more free session slots) */
 			close(tmp_sockfd);
-		} else if(io_ctx->host_addr.ip_ver==IPV6) {
+		} else if(io_ctx->host_addr.ip_ver == IPV6) {
 			/* Prepare IP6 variables for TCP handshake */
 			struct sockaddr_in6 client_addr6;
 			addr_len = sizeof(client_addr6);
@@ -519,6 +524,7 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 }
 
 
+#ifdef WITH_OPENSSL
 /**
  * \brief Destroy stream part of verse context
  */
@@ -667,6 +673,7 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 
 	return 1;
 }
+#endif
 
 
 /**
@@ -836,10 +843,12 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 {
 	int ret;
 
+#ifdef WITH_OPENSSL
 	ret = vs_init_ssl(vs_ctx);
 	if(ret != 1) {
 		return ret;
 	}
+#endif
 
 	ret = vs_init_tcp_io_ctx(vs_ctx);
 	if(ret != 1) {

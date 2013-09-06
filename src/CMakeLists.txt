@@ -97,6 +97,10 @@ if (CMAKE_COMPILER_IS_GNUCC)
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
 
+# When OpenSSL is enabled
+if (OPENSSL_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
+endif (OPENSSL_FOUND)
 
 # Set up shared verse library (libverse.so)
 add_library (verse_shared_lib SHARED ${libverse_src})
@@ -131,12 +135,12 @@ endif (OPENSSL_FOUND)
 
 
 # When WSLay library is enabled
-if (WSLAY_FOUND)
+if (WSLAY_FOUND AND OPENSSL_FOUND)
     set (verse_server_libs ${verse_server_libs} ${WSLAY_LIBRARIES})
     set (server_src ${server_src} server/vs_websocket.c)
     include_directories (${WSLAY_INCLUDE_DIR})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWSLAY")
-endif (WSLAY_FOUND)
+endif ()
 
 
 # When iniparser is used

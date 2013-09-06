@@ -34,9 +34,11 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -161,6 +163,7 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 	/* Initialize callback function */
 	vc_init_func_storage(&vc_ctx->vfs);
 
+#ifdef WITH_OPENSSL
 	/* Set up the library */
 	SSL_library_init();
 	ERR_load_BIO_strings();
@@ -182,8 +185,9 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Path %s with CA certificates loaded successfully.\n",
 				vc_ctx->ca_path);
 	}
+#endif
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	/* Set up SSL context for DTSL */
 	if( (vc_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_client_method())) == NULL ) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX for DTLS failed.\n");

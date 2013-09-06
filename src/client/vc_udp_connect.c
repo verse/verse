@@ -34,7 +34,9 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/err.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -456,12 +458,14 @@ int vc_REQUEST_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	/* Maximal count of connection attempts reached and the client is
@@ -599,12 +603,14 @@ int vc_PARTOPEN_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	if(dgram_conn->host_state == UDP_CLIENT_STATE_PARTOPEN) {
@@ -689,12 +695,14 @@ int vc_OPEN_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	return STATE_EXIT_SUCCESS;
@@ -790,12 +798,14 @@ int vc_CLOSING_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	if(dgram_conn->host_state == UDP_CLIENT_STATE_CLOSING) {
@@ -847,7 +857,7 @@ int vc_receive_and_handle_packet(struct vContext *C, int handle_packet(struct vC
 	/* Check if the event occurred on sockfd */
 	else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 		/* Try to receive packet from server */
-		if(v_receive_packet(io_ctx, &error_num)==-1) {
+		if(v_receive_packet(io_ctx, &error_num) == -1) {
 			switch(error_num) {
 				case ECONNREFUSED:	/* A remote host refused this connection */
 					return RECEIVE_PACKET_ERROR;
@@ -969,7 +979,7 @@ int vc_send_packet(struct vContext *C)
 	/* Send buffer */
 	ret = v_send_packet(io_ctx, &error_num);
 
-	if(ret==SEND_PACKET_SUCCESS) {
+	if(ret == SEND_PACKET_SUCCESS) {
 
 		/* Update time of sending last packet */
 		gettimeofday(&tv, NULL);
@@ -1000,7 +1010,8 @@ int vc_send_packet(struct vContext *C)
 	return ret;
 }
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 
 void vc_destroy_dtls_connection(struct vContext *C)
 {
@@ -1098,6 +1109,7 @@ again:
 }
 
 #endif
+
 
 /* Create new UDP connection to the server */
 struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
@@ -1237,7 +1249,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 
 	/* When DTLS was negotiated, then set flag */
 	if(url.security_protocol == VRS_SEC_DATA_TLS) {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 		dgram_conn->io_ctx.flags |= SOCKET_SECURED;
 #else
 		v_print_log(VRS_PRINT_ERROR, "Server tries to force client to use secured connection, but it is not supported\n");
@@ -1245,7 +1257,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 #endif
 	}
 
-
+#ifdef WITH_OPENSSL
 	/* Create BIO, connect and set to already connected */
 	if( (dgram_conn->io_ctx.bio = BIO_new_dgram(dgram_conn->io_ctx.sockfd, BIO_CLOSE)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "BIO_new_dgram()\n");
@@ -1267,6 +1279,9 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		dgram_conn->io_ctx.mtu = DEFAULT_MTU;
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Default MTU: %d\n", dgram_conn->io_ctx.mtu);
 	}
+#else
+	dgram_conn->io_ctx.mtu = DEFAULT_MTU;
+#endif
 
 	/* Set up necessary flag for V_CTX (client will be able to send and receive packets only to/from server) */
 	dgram_conn->io_ctx.flags |= SOCKET_CONNECTED;
@@ -1304,7 +1319,7 @@ void* vc_main_dgram_loop(void *arg)
 	CTX_current_dgram_conn_set(C, dgram_conn);
 	CTX_io_ctx_set(C, &dgram_conn->io_ctx);
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	/* If negotiated security is DTLS, then try to do DTLS handshake */
 	if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 		if(vc_create_dtls_connection(C) == 0) {
@@ -1389,7 +1404,7 @@ end:
 	free(r_packet);
 	free(s_packet);
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 		vc_destroy_dtls_connection(C);
 	}

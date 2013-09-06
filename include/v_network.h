@@ -37,7 +37,9 @@
 #if !defined V_NETWORK_H
 #define V_NETWORK_H
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
+#endif
 
 #include <netinet/in.h>
 #include <limits.h>
@@ -224,9 +226,11 @@ typedef struct IO_CTX {
 	int						sockfd;			/* UDP/TCP/WebSocket socket */
 	unsigned char			flags;			/* Flags for sending and receiving context */
 	unsigned short			mtu;			/* MTU of connection discovered with PMTU */
+#ifdef WITH_OPENSSL
 	/* Security */
 	SSL						*ssl;
 	BIO						*bio;
+#endif
 } IO_CTX;
 
 /* Structure for storing data from parsed URL */
@@ -245,8 +249,8 @@ void v_clear_url(struct VURL *url);
 
 int v_exponential_backoff(const int steps);
 
-int v_SSL_read(struct IO_CTX *io_ctx, int *error_num);
-int v_SSL_write(struct IO_CTX *io_ctx, int *error_num);
+int v_tcp_read(struct IO_CTX *io_ctx, int *error_num);
+int v_tcp_write(struct IO_CTX *io_ctx, int *error_num);
 
 int v_receive_packet(struct IO_CTX *io_ctx, int *error_num);
 int v_send_packet(struct IO_CTX *io_ctx, int *error_num);
