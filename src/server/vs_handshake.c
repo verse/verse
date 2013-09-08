@@ -321,7 +321,7 @@ int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 /**
  * \brief This function is called, when server is in NEGOTIATE_cookie_ded state
  *
- * This function can create new thread for datagrame connection
+ * This function can create new thread for datagram connection
  */
 int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 {
@@ -786,6 +786,10 @@ int vs_RESPOND_methods_loop(struct vContext *C)
 	return 0;
 }
 
+/**
+ * \brief This function handles messages received during verse handshake
+ * and it can create new thread for datagram connection.
+ */
 int vs_handle_handshake(struct vContext *C)
 {
 	struct VSession *vsession = CTX_current_session(C);
@@ -850,7 +854,7 @@ int vs_handle_handshake(struct vContext *C)
 	case TCP_SERVER_STATE_NEGOTIATE_NEWHOST:
 		/* Wait VERSE_TIMEOT seconds to confirming proposed URL */
 		ret = vs_NEGOTIATE_newhost_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			if(vsession->flags & VRS_TP_UDP) {
 				/* When URL was confirmed, then go to the end state */
 				return -1;

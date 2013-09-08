@@ -134,16 +134,17 @@ void *vs_tcp_conn_loop(void *arg)
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
-			/* Try to receive data through SSL connection */
+			/* Try to receive data through TCP connection */
 			if( v_tcp_read(io_ctx, &error) <= 0 ) {
 				goto end;
 			}
 
+			/* Handle verse handshake at TCP connection */
 			if( (ret = vs_handle_handshake(C)) == -1) {
 				goto end;
 			}
 
-			/* When these is something to send, then send it to peer */
+			/* When there is something to send, then send it to peer */
 			if( ret == 1 ) {
 				/* Send response message to the client */
 				if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
@@ -264,7 +265,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 		if(vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_LISTEN) {
 			/* TODO: lock mutex here */
 			current_session = vs_ctx->vsessions[i];
-			current_session->stream_conn->host_state=TCP_SERVER_STATE_RESPOND_METHODS;
+			current_session->stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
 			current_session->session_id = last_session_id++;
 			/* TODO: unlock mutex here */
 			break;

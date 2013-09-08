@@ -77,7 +77,7 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 	struct VSTagGroup *tg;
 	struct VSTag *tag;
 	struct VSLayer *layer;
-	struct VSNodeSubscriber *node_subscriber;
+	struct VSNodeSubscriber *node_subscriber, *next_node_subscriber;
 	struct VSEntitySubscriber *tg_subscriber, *layer_subscriber;
 	struct VSEntityFollower *node_follower, *tg_follower, *tag_follower, *layer_follower;
 	int was_locked;
@@ -93,6 +93,16 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 		/* Does client know about this node */
 		node_follower = node->node_folls.first;
 		while(node_follower != NULL) {
+			if(node->id == 65537) {
+			printf("Node ID: %d, Node Follower: (%p->%p->%p)session_id: %d ?= session: (%p)%d\n",
+					node->id,
+					(void*)node_follower,
+					(void*)node_follower->node_sub,
+					(void*)node_follower->node_sub->session,
+					node_follower->node_sub->session->session_id,
+					(void*)session,
+					session->session_id);
+			}
 			if(node_follower->node_sub->session->session_id == session->session_id) {
 				/* Remove client from list of clients, that knows about this node */
 				v_list_free_item(&node->node_folls, node_follower);
@@ -113,10 +123,13 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 		/* Is client subscribed to this node? */
 		node_subscriber = node->node_subs.first;
 		while(node_subscriber != NULL) {
+			next_node_subscriber = node_subscriber->next;
 			if(node_subscriber->session->session_id == session->session_id) {
 				v_list_free_item(&node->node_subs, node_subscriber);
 				if(was_locked == 0) {
-					/* No need to go through other subscribers */
+					/* No need to go through other subscribers,
+					 * because it send_unlock isn't send in this
+					 * case */
 					break;
 				}
 			} else {
@@ -124,7 +137,7 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 					vs_node_send_unlock(node_subscriber, session, node);
 				}
 			}
-			node_subscriber = node_subscriber->next;
+			node_subscriber = next_node_subscriber;
 		}
 
 		/* Remove client from list of tag_group subscribers */

@@ -94,7 +94,7 @@ static int vs_node_unsubscribe(struct VSNode *node,
 	struct VBucket *tg_bucket, *layer_bucket;
 	struct VSTagGroup *tg;
 	struct VSLayer *layer;
-	struct VSNodeSubscriber *_node_subscriber;
+	struct VSNodeSubscriber *_node_subscriber, *_next_node_subscriber;
 	struct VSEntityFollower *node_follower;
 	struct VSEntityFollower	*taggroup_follower;
 	struct VSEntityFollower	*layer_follower;
@@ -106,12 +106,13 @@ static int vs_node_unsubscribe(struct VSNode *node,
 
 		_node_subscriber = child_node->node_subs.first;
 		while(_node_subscriber != NULL) {
+			_next_node_subscriber = _node_subscriber->next;
 			if(_node_subscriber->session == node_subscriber->session) {
 				/* Unsubscribe from child node */
 				vs_node_unsubscribe(child_node, _node_subscriber, level+1);
 				break;
 			}
-			_node_subscriber = _node_subscriber->next;
+			_node_subscriber = _next_node_subscriber;
 		}
 
 		link = link->next;
@@ -207,9 +208,9 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	v_list_add_tail(&node->node_subs, node_subscriber);
 
 	/* TODO: send node_subscribe with version and commands with difference
-	 * between this version and current state, when versioning will be supported */
+	 * between this version and current state, when versing will be supported */
 	if(version != 0) {
-		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versioning is not supported yet\n", version);
+		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versing is not supported yet\n", version);
 	}
 
 	/* Send node_perm commands to the new subscriber */
@@ -746,11 +747,11 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* TODO: when versioning will be supported, then compute crc32, save data to
+	/* TODO: when versing will be supported, then compute crc32, save data to
 	 * the disk and send node_unsubscribe command to the client with version number
 	 * and crc32 */
 	if(version != 0) {
-		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versioning is not supported yet\n", version);
+		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versing is not supported yet\n", version);
 	}
 
 	/* Node has to be created */
