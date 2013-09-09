@@ -58,7 +58,7 @@ static int vs_node_prio(struct VSession *vsession,
 	/* Is client subscribed to this node? */
 	node_subscriber = node->node_subs.first;
 	while(node_subscriber != NULL) {
-		if(node_subscriber->session == vsession) {
+		if(node_subscriber->session->session_id == vsession->session_id) {
 			break;
 		}
 		node_subscriber = node_subscriber->next;
@@ -107,7 +107,7 @@ static int vs_node_unsubscribe(struct VSNode *node,
 		_node_subscriber = child_node->node_subs.first;
 		while(_node_subscriber != NULL) {
 			_next_node_subscriber = _node_subscriber->next;
-			if(_node_subscriber->session == node_subscriber->session) {
+			if(_node_subscriber->session->session_id == node_subscriber->session->session_id) {
 				/* Unsubscribe from child node */
 				vs_node_unsubscribe(child_node, _node_subscriber, level+1);
 				break;
@@ -128,7 +128,7 @@ static int vs_node_unsubscribe(struct VSNode *node,
 
 		/* Remove client from the list of TagGroup followers */
 		taggroup_follower = tg->tg_folls.first;
-		while(taggroup_follower!=NULL) {
+		while(taggroup_follower != NULL) {
 			if(taggroup_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
 				v_list_free_item(&tg->tg_folls, taggroup_follower);
 				break;
@@ -149,7 +149,7 @@ static int vs_node_unsubscribe(struct VSNode *node,
 
 		/* Remove client from the list of Layer followers */
 		layer_follower = layer->layer_folls.first;
-		while(layer_follower!=NULL) {
+		while(layer_follower != NULL) {
 			if(layer_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
 				v_list_free_item(&layer->layer_folls, layer_follower);
 				break;
@@ -163,9 +163,10 @@ static int vs_node_unsubscribe(struct VSNode *node,
 		/* Remove this session from list of followers too */
 		node_follower = node->node_folls.first;
 		while(node_follower != NULL) {
-			if(node_follower->node_sub->session == node_subscriber->session) {
+			if(node_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
 				/* Remove client from list of clients, that knows about this node */
-				printf("\t>>>Removing session: %d from list of node: %d followers<<<\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Removing session: %d from the list of node: %d followers\n",
 						node_subscriber->session->session_id, node->id);
 				v_list_free_item(&node->node_folls, node_follower);
 				break;
@@ -286,8 +287,8 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 	node_follower = node->node_folls.first;
 	while(node_follower!=NULL) {
 		if(node_follower->node_sub->session->session_id == node_subscriber->session->session_id &&
-				(node_follower->state==ENTITY_CREATING ||
-				 node_follower->state==ENTITY_CREATED))
+				(node_follower->state == ENTITY_CREATING ||
+				 node_follower->state == ENTITY_CREATED))
 		{
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Client already knows about node: %d\n", node->id);
 			return 0;
@@ -546,7 +547,7 @@ int vs_node_destroy_branch(struct VS_CTX *vs_ctx,
 
 	node_follower = node->node_folls.first;
 	if(node_follower != NULL && send == 1) {
-		/* Send node_destroy command to all subscribers of this node */
+		/* Send node_destroy command to all clients that knows about this node */
 		ret = vs_node_send_destroy(node);
 
 		/* Own node will be destroyed, when verse server receive confirmation
@@ -597,11 +598,13 @@ static int vs_node_send_destroy(struct VSNode *node)
 				node_follower->state = ENTITY_DELETING;
 				ret = 1;
 			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "node_destroy (id: %d) wasn't added to the queue\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"node_destroy (id: %d) wasn't added to the queue\n",
 						node->id);
 			}
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Can't delete node %d, because it isn't in CREATED state\n");
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Can't delete node %d, because it isn't in CREATED state\n");
 		}
 		node_follower = node_follower->next;
 	}
@@ -707,7 +710,7 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 	/* Is client subscribed to this node? */
 	node_subscriber = node->node_subs.first;
 	while(node_subscriber != NULL) {
-		if(node_subscriber->session == vsession) {
+		if(node_subscriber->session->session_id == vsession->session_id) {
 			break;
 		}
 		node_subscriber = node_subscriber->next;
@@ -759,7 +762,7 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		/* Is client subscribed to this node? */
 		node_subscriber = node->node_subs.first;
 		while(node_subscriber != NULL) {
-			if(node_subscriber->session == vsession) {
+			if(node_subscriber->session->session_id == vsession->session_id) {
 				break;
 			}
 			node_subscriber = node_subscriber->next;
@@ -936,7 +939,7 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 	while(node_follower != NULL) {
 		if(node_follower->node_sub->session->session_id == vsession->session_id) {
 
-			if(node_follower->state==ENTITY_CREATING) {
+			if(node_follower->state == ENTITY_CREATING) {
 				node_follower->state = ENTITY_CREATED;
 
 				/* If the node is in state DELETING, then send to the client command
@@ -947,21 +950,24 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 					struct Generic_Cmd *node_destroy_cmd = v_node_destroy_create(node->id);
 
 					/* Push this command to the outgoing queue */
-					if ( node_destroy_cmd!= NULL &&
+					if ( node_destroy_cmd != NULL &&
 							v_out_queue_push_tail(node_follower->node_sub->session->out_queue,
 									node_follower->node_sub->prio,
-									node_destroy_cmd) == 1) {
+									node_destroy_cmd) == 1)
+					{
 						node_follower->state = ENTITY_DELETING;
 					} else {
-						v_print_log(VRS_PRINT_DEBUG_MSG, "node_destroy (id: %d) wasn't added to the queue\n",
+						v_print_log(VRS_PRINT_DEBUG_MSG,
+								"node_destroy (id: %d) wasn't added to the queue\n",
 								node->id);
 					}
 				}
 			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "node %d isn't in CREATING state\n");
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"node %d isn't in CREATING state\n");
 			}
 		} else {
-			if(node_follower->state!=ENTITY_CREATED) {
+			if(node_follower->state != ENTITY_CREATED) {
 				all_created = 0;
 			}
 		}

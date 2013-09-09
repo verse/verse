@@ -93,29 +93,19 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 		/* Does client know about this node */
 		node_follower = node->node_folls.first;
 		while(node_follower != NULL) {
-			if(node->id == 65537) {
-			printf("Node ID: %d, Node Follower: (%p->%p->%p)session_id: %d ?= session: (%p)%d\n",
-					node->id,
-					(void*)node_follower,
-					(void*)node_follower->node_sub,
-					(void*)node_follower->node_sub->session,
-					node_follower->node_sub->session->session_id,
-					(void*)session,
-					session->session_id);
-			}
 			if(node_follower->node_sub->session->session_id == session->session_id) {
 				/* Remove client from list of clients, that knows about this node */
 				v_list_free_item(&node->node_folls, node_follower);
 
 				/* Continue with next node */
 				break;
-
 			}
 			node_follower = node_follower->next;
 		}
 
 		/* Was node locked by this client? */
-		if(node->lock.session == session) {
+		if(node->lock.session != NULL &&
+				node->lock.session->session_id == session->session_id) {
 			was_locked = 1;
 			node->lock.session = NULL;
 		}

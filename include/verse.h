@@ -54,6 +54,11 @@ extern "C" {
  * for more then 30 seconds */
 #define VRS_TIMEOUT	30
 
+/* Default ports */
+#define VRS_DEFAULT_TCP_PORT	12344
+#define VRS_DEFAULT_TLS_PORT	12345
+#define VRS_DEFAULT_WEB_PORT	23456
+
 /* Return codes */
 #define VRS_SUCCESS				0
 #define VRS_FAILURE				1

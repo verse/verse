@@ -894,7 +894,7 @@ int main(int argc, char *argv[])
 					if(strcmp(optarg, "none") == 0) {
 						flags |= VRS_SEC_DATA_NONE;
 						flags &= ~VRS_SEC_DATA_TLS;
-					}else if(strcmp(optarg, "tls") == 0) {
+					} else if(strcmp(optarg, "tls") == 0) {
 						flags &= ~VRS_SEC_DATA_NONE;
 						flags |= VRS_SEC_DATA_TLS;
 					} else {
@@ -996,7 +996,14 @@ int main(int argc, char *argv[])
 	vrs_set_client_info("Example Verse Client", "0.1");
 
 	/* Send connect request to the server (it will also create independent thread for connection) */
+#ifdef WITH_OPENSSL
+	/* 12345 is secured port */
 	error_num = vrs_send_connect_request(argv[optind], "12345", flags, &session_id);
+#else
+	/* 12344 is unsecured port */
+	error_num = vrs_send_connect_request(argv[optind], "12344", flags, &session_id);
+#endif
+
 	if(error_num != VRS_SUCCESS) {
 		printf("ERROR: %s\n", vrs_strerror(error_num));
 		return EXIT_FAILURE;

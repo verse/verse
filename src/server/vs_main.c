@@ -140,15 +140,21 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->flag = SERVER_DEBUG_MODE;		/* SERVER_MULTI_SOCKET_MODE | SERVER_REQUIRE_SECURE_CONNECTION */
 	vs_ctx->stream_protocol = TCP;			/* For new connection attempts is used TCP protocol */
 	vs_ctx->dgram_protocol = VRS_TP_UDP;	/* For data exchange UDP protocol could be used */
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if ( defined WITH_OPENSSL ) && OPENSSL_VERSION_NUMBER>=0x10000000
 	vs_ctx->security_protocol = VRS_SEC_DATA_NONE | VRS_SEC_DATA_TLS;
 #else
 	vs_ctx->security_protocol = VRS_SEC_DATA_NONE;
 #endif
-	vs_ctx->tcp_port = 12345;			/* TCP port number for listening */
-	vs_ctx->ws_port = 23456;			/* WebSocket TCP port for listening */
 
-	vs_ctx->port_low = 20000;			/* The lowest port number for client-server connection */
+#ifdef WITH_OPENSSL
+	vs_ctx->tcp_port = VRS_DEFAULT_TLS_PORT;	/* Secured TCP port number for listening */
+#else
+	vs_ctx->tcp_port = VRS_DEFAULT_TCP_PORT;	/* UnSecured TCP port number for listening */
+#endif
+
+	vs_ctx->ws_port = VRS_DEFAULT_WEB_PORT;		/* WebSocket TCP port for listening */
+
+	vs_ctx->port_low = 20000;					/* The lowest port number for client-server connection */
 	vs_ctx->port_high = vs_ctx->port_low + vs_ctx->max_sockets;
 	/* Initialize list of free ports */
 	vs_ctx->port_list = (struct VS_Port*)calloc(vs_ctx->max_sockets, sizeof(struct VS_Port));
