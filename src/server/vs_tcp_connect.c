@@ -290,7 +290,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			}
 
 			/* Save the IPv4 of the client as string in verse session */
-			inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
+			inet_ntop(AF_INET, &client_addr4->sin_addr, current_session->peer_hostname, INET_ADDRSTRLEN);
 		} else if(io_ctx->host_addr.ip_ver==IPV6) {
 			/* Prepare IPv6 variables for TCP handshake */
 			struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
@@ -304,7 +304,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			}
 
 			/* Save the IPv6 of the client as string in verse session */
-			inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
+			inet_ntop(AF_INET6, &client_addr6->sin6_addr, current_session->peer_hostname, INET6_ADDRSTRLEN);
 		}
 
 		/* Set to this socket flag "no delay" */

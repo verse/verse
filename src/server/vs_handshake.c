@@ -510,7 +510,7 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			trans_proto[3] = '\0';
 		}
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 		if(url.security_protocol==VRS_SEC_DATA_NONE ||
 				!(vs_ctx->security_protocol & VRS_SEC_DATA_TLS))
 		{
@@ -531,7 +531,7 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			sec_proto[4] = '\0';
 		}
 #else
-		strncmp(sec_proto, "none", 4);
+		strncpy(sec_proto, "none", 4);
 		sec_proto[4] = '\0';
 #endif
 
@@ -731,9 +731,12 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 int vs_RESPOND_methods_loop(struct vContext *C)
 {
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct VSession *vsession = CTX_current_session(C);
 	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i;
+	int i, auth_req = 0,
+			client_name_proposed = 0,
+			client_version_proposed = 0;
 	unsigned short buffer_pos = 0;
 
 	/* Reset content of received message */
@@ -748,39 +751,87 @@ int vs_RESPOND_methods_loop(struct vContext *C)
 	v_print_receive_message(C);
 
 	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-		if(r_message->sys_cmd[i].cmd.id == CMD_USER_AUTH_REQUEST) {
+		switch(r_message->sys_cmd[i].cmd.id) {
+		case CMD_USER_AUTH_REQUEST:
 			if(r_message->sys_cmd[i].ua_req.method_type == VRS_UA_METHOD_NONE) {
-				/* This is not supported method. Send list of
-				 * supported methods. Current implementation supports
-				 * only PASSWORD method now. */
-
-				buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-				s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
-				s_message->sys_cmd[0].ua_fail.count = 1;
-				s_message->sys_cmd[0].ua_fail.method[0] = VRS_UA_METHOD_PASSWORD;
-				s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
-
-				/* Pack USER_AUTH_FAILURE command to the buffer */
-				buffer_pos += v_pack_stream_system_commands(s_message,&io_ctx->buf[buffer_pos]);
-
-				s_message->header.len = io_ctx->buf_size = buffer_pos;
-				s_message->header.version = VRS_VERSION;
-				/* Pack header to the beginning of the buffer */
-				v_pack_message_header(s_message, io_ctx->buf);
-
-				/* Debug print of command to be send */
-				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-					v_print_send_message(C);
-				}
-
-				return 1;
+				auth_req = 1;
 			} else {
-				v_print_log(VRS_PRINT_WARNING, "This method id: %d is not supported in this state\n", r_message->sys_cmd[i].ua_req.method_type);
+				v_print_log(VRS_PRINT_WARNING,
+						"This auth method id: %d is not supported in this state\n",
+						r_message->sys_cmd[i].ua_req.method_type);
 			}
-		} else {
-			v_print_log(VRS_PRINT_WARNING, "This command id: %d is not supported in this state\n", r_message->sys_cmd[i].cmd.id);
+			break;
+		case CMD_CHANGE_L_ID:
+			/* Client could propose client name and version */
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_name_proposed = 1;
+				}
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_version_proposed = 1;
+				}
+			}
+			break;
+		default:
+			v_print_log(VRS_PRINT_WARNING,
+					"This command id: %d is not supported in this state\n",
+					r_message->sys_cmd[i].cmd.id);
+			break;
 		}
+	}
+
+	if(auth_req == 1) {
+		int cmd_rank = 0;
+		/* VRS_UA_METHOD_NONE is not supported method. Send list of
+		 * supported methods. Current implementation supports
+		 * only PASSWORD method now. */
+
+		s_message->sys_cmd[cmd_rank].ua_fail.id = CMD_USER_AUTH_FAILURE;
+		/* List of supported methods */
+		s_message->sys_cmd[cmd_rank].ua_fail.count = 1;
+		s_message->sys_cmd[cmd_rank].ua_fail.method[0] = VRS_UA_METHOD_PASSWORD;
+		cmd_rank++;
+
+		/* Send confirmation about client name */
+		if(client_name_proposed == 1) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_NAME,
+					vsession->client_name, NULL);
+		}
+
+		/* Send confirmation about client version only in situation, when
+		 * client proposed client name too */
+		if(client_version_proposed == 1) {
+			if(client_name_proposed == 1) {
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						vsession->client_version, NULL);
+			} else {
+				/* Client version without client name is not allowed */
+				v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+						NULL);
+			}
+		}
+
+		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+		/* Pack system commands to the buffer */
+		buffer_pos += v_pack_stream_system_commands(s_message,&io_ctx->buf[buffer_pos]);
+
+		s_message->header.len = io_ctx->buf_size = buffer_pos;
+		s_message->header.version = VRS_VERSION;
+		/* Pack header to the beginning of the buffer */
+		v_pack_message_header(s_message, io_ctx->buf);
+
+		/* Debug print of command to be send */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			v_print_send_message(C);
+		}
+
+		return 1;
 	}
 
 	return 0;
