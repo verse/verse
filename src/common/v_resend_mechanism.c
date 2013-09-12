@@ -355,7 +355,11 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 		/* Add ACK and NAK commands from the list of ACK and NAK commands to the
 		 * packet (only max count of ACK and NAK commands could be added to
 		 * the packet) */
-		for(cmd_rank = 0; cmd_rank<vconn->ack_nak.count && cmd_rank<MAX_SYSTEM_COMMAND_COUNT; cmd_rank++) {
+		for(cmd_rank = 0;
+				cmd_rank < vconn->ack_nak.count &&
+				cmd_rank < MAX_SYSTEM_COMMAND_COUNT;
+				cmd_rank++)
+		{
 			s_packet->sys_cmd[cmd_rank].ack_cmd.id = vconn->ack_nak.cmds[cmd_rank].id;
 			s_packet->sys_cmd[cmd_rank].ack_cmd.pay_id = vconn->ack_nak.cmds[cmd_rank].pay_id;
 		}
@@ -617,9 +621,12 @@ static int handle_ack_nak_commands(struct vContext *C)
 	/* Process all ACK and NAK commands. ACK and NAK commands should be first
 	 * and there should not be other system commands between ACK and NAK
 	 * commands. */
-	for(i=0; r_packet->sys_cmd[i].cmd.id==CMD_NAK_ID || r_packet->sys_cmd[i].cmd.id==CMD_ACK_ID; i++) {
+	for(i=0;
+			r_packet->sys_cmd[i].cmd.id == CMD_NAK_ID ||
+					r_packet->sys_cmd[i].cmd.id == CMD_ACK_ID;
+			i++) {
 
-		if(r_packet->sys_cmd[i].cmd.id==CMD_ACK_ID) {
+		if(r_packet->sys_cmd[i].cmd.id == CMD_ACK_ID) {
 			/* Check if ACK and NAK commands are the first system commands */
 			if(ret!=-2 && ret==i-1) {
 				ret = i;
@@ -630,7 +637,9 @@ static int handle_ack_nak_commands(struct vContext *C)
 			 * ACK/NAK commands, then remove all packets from history of
 			 * sent packet, that are in following sub-sequence of ACK
 			 * commands */
-			if(r_packet->sys_cmd[i+1].cmd.id==CMD_NAK_ID || r_packet->sys_cmd[i+1].cmd.id==CMD_ACK_ID) {
+			if(r_packet->sys_cmd[i+1].cmd.id == CMD_NAK_ID ||
+					r_packet->sys_cmd[i+1].cmd.id == CMD_ACK_ID)
+			{
 				/* Remove all acknowledged payload packets from the history
 				 * of sent payload packets */
 				for(ack_id = r_packet->sys_cmd[i].ack_cmd.pay_id;
@@ -647,7 +656,7 @@ static int handle_ack_nak_commands(struct vContext *C)
 				 * commands. Update ANK ID. */
 				vconn->ank_id = r_packet->sys_cmd[i].ack_cmd.pay_id;
 			}
-		} else if(r_packet->sys_cmd[i].cmd.id==CMD_NAK_ID) {
+		} else if(r_packet->sys_cmd[i].cmd.id == CMD_NAK_ID) {
 			/* Check if ACK and NAK commands are the first system commands */
 			if(ret!=-2 && ret==i-1) {
 				ret = i;

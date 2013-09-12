@@ -82,6 +82,7 @@ void vs_init_dgram_conn(struct VDgramConn *dgram_conn)
 void vs_clear_vconn(struct VDgramConn *dgram_conn)
 {
 	v_packet_history_destroy(&dgram_conn->packet_history);
+	v_ack_nak_history_clear(&dgram_conn->ack_nak);
 	v_conn_dgram_clear(dgram_conn);
 	dgram_conn->host_state = UDP_SERVER_STATE_CLOSED;	/* Server is in closed state */
 }
