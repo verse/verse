@@ -90,49 +90,6 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 		node = (struct VSNode*)node_bucket->data;
 		was_locked = 0;
 
-		/* Does client know about this node */
-		node_follower = node->node_folls.first;
-		while(node_follower != NULL) {
-			if(node_follower->node_sub->session->session_id == session->session_id) {
-				/* Remove client from list of clients, that knows about this node */
-				v_list_free_item(&node->node_folls, node_follower);
-
-				/* Continue with next node */
-				break;
-			}
-			node_follower = node_follower->next;
-		}
-
-		/* Was node locked by this client? */
-		if(node->lock.session != NULL &&
-				node->lock.session->session_id == session->session_id) {
-			was_locked = 1;
-			node->lock.session = NULL;
-		}
-
-		/* Is client subscribed to this node? */
-		node_subscriber = node->node_subs.first;
-		while(node_subscriber != NULL) {
-			next_node_subscriber = node_subscriber->next;
-			if(node_subscriber->session->session_id == session->session_id) {
-				v_print_log(VRS_PRINT_DEBUG_MSG,
-						"Unsubscribing Avatar %d from node %d\n",
-						session->avatar_id, node->id);
-				v_list_free_item(&node->node_subs, node_subscriber);
-				if(was_locked == 0) {
-					/* No need to go through other subscribers,
-					 * because it send_unlock isn't send in this
-					 * case */
-					break;
-				}
-			} else {
-				if(was_locked == 1) {
-					vs_node_send_unlock(node_subscriber, session, node);
-				}
-			}
-			node_subscriber = next_node_subscriber;
-		}
-
 		/* Remove client from list of tag_group subscribers */
 		tg_bucket = node->tag_groups.lb.first;
 		while(tg_bucket != NULL) {
@@ -208,6 +165,48 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 			layer_bucket = layer_bucket->next;
 		}
 
+		/* Does client know about this node */
+		node_follower = node->node_folls.first;
+		while(node_follower != NULL) {
+			if(node_follower->node_sub->session->session_id == session->session_id) {
+				/* Remove client from list of clients, that knows about this node */
+				v_list_free_item(&node->node_folls, node_follower);
+
+				/* Continue with next node */
+				break;
+			}
+			node_follower = node_follower->next;
+		}
+
+		/* Was node locked by this client? */
+		if(node->lock.session != NULL &&
+				node->lock.session->session_id == session->session_id) {
+			was_locked = 1;
+			node->lock.session = NULL;
+		}
+
+		/* Is client subscribed to this node? */
+		node_subscriber = node->node_subs.first;
+		while(node_subscriber != NULL) {
+			next_node_subscriber = node_subscriber->next;
+			if(node_subscriber->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Unsubscribing Avatar %d from node %d\n",
+						session->avatar_id, node->id);
+				v_list_free_item(&node->node_subs, node_subscriber);
+				if(was_locked == 0) {
+					/* No need to go through other subscribers,
+					 * because it send_unlock isn't send in this
+					 * case */
+					break;
+				}
+			} else {
+				if(was_locked == 1) {
+					vs_node_send_unlock(node_subscriber, session, node);
+				}
+			}
+			node_subscriber = next_node_subscriber;
+		}
 
 		node_bucket = node_bucket->next;
 	}
