@@ -31,20 +31,12 @@ int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
 int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 		struct VSession *session);
 
-long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx,
+long int vs_create_avatar_node(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		uint16 user_id);
 
-struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx);
-
 struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 		struct VSUser *user);
-
-struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx);
-
-struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx);
-
-struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx);
 
 int vs_nodes_init(struct VS_CTX *vs_ctx);
 

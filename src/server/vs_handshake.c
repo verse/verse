@@ -647,7 +647,7 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 					long int avatar_id;
 
 					pthread_mutex_lock(&vs_ctx->data.mutex);
-					avatar_id = vs_node_new_avatar_node(vs_ctx, vsession, user_id);
+					avatar_id = vs_create_avatar_node(vs_ctx, vsession, user_id);
 					pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 					if(avatar_id == -1) {

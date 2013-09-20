@@ -115,6 +115,9 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 		while(node_subscriber != NULL) {
 			next_node_subscriber = node_subscriber->next;
 			if(node_subscriber->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Unsubscribing Avatar %d from node %d\n",
+						session->avatar_id, node->id);
 				v_list_free_item(&node->node_subs, node_subscriber);
 				if(was_locked == 0) {
 					/* No need to go through other subscribers,
@@ -212,61 +215,35 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 	return 1;
 }
 
-
 /**
- * \brief This function creates new node representing avatar.
+ * \brief This function creates node with information about connected
+ * verse client
  */
-long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx,
+static void vs_create_client_info_node(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
-		uint16 user_id)
+		struct VSNode *avatar_node)
 {
-	struct VSNode *avatar_parent, *node, *client_info;
-	struct VSUser *user;
-	struct VSNodeSubscriber *node_subscriber;
+	struct VSNode *client_info_node = NULL;
 	struct VSTagGroup *tg;
 	struct VSTag *tag;
 	struct timeval tv;
 
-	/* Try to find parent of avatar nodes */
-	if((avatar_parent = vs_ctx->data.avatar_node) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Parent of node avatars: %d does not exist\n", VRS_AVATAR_PARENT_NODE_ID);
-		return -1;
-	}
-
-	/* Try to find user connected with this avatar */
-	if((user = vs_user_find(vs_ctx, user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "User with this ID: %d not found\n", user_id);
-		return -1;
-	}
-
-	/* Try to create new node representing avatar */
-	if( (node = vs_node_create(vs_ctx, avatar_parent, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_NODE_CT)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar node for user: %d\n", user_id);
-		return -1;
-	}
-
-	/* Set access permissions for user connected with this avatar. User can write data to its own
-	 * avatar node */
-	vs_node_set_perm(node, user, VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
-	/* Set access permissions for other users */
-	vs_node_set_perm(node, vs_ctx->other_users, VRS_PERM_NODE_READ);
-
 	/* Try to create child node of avatar node with information about connected verse client */
-	if( (client_info = vs_node_create(vs_ctx, node, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_INFO_NODE_CT)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar node for user: %d\n", user_id);
-		return -1;
+	if( (client_info_node = vs_node_create(vs_ctx, avatar_node, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_INFO_NODE_CT)) == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar info node for user: %d\n", vsession->user_id);
+		return;
 	}
 
 	/* Set access permissions only for other users. Every loged user can only read this
 	 * node (including user binded with avatar node) */
-	vs_node_set_perm(client_info, vs_ctx->other_users, VRS_PERM_NODE_READ);
+	vs_node_set_perm(client_info_node, vs_ctx->other_users, VRS_PERM_NODE_READ);
 
-	/* About avatar node doesn't know anybody, then we can set state
+	/* About avatar info node doesn't know anybody, then we can set state
 	 * of node to created */
-	client_info->state = ENTITY_CREATED;
+	client_info_node->state = ENTITY_CREATED;
 
 	/* Create tag group with client information */
-	tg = vs_taggroup_create(client_info, 0);
+	tg = vs_taggroup_create(client_info_node, 0);
 	if(tg != NULL) {
 		tg->state = ENTITY_CREATED;
 
@@ -308,6 +285,46 @@ long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx,
 			}
 		}
 	}
+}
+
+
+/**
+ * \brief This function creates new node representing avatar.
+ */
+long int vs_create_avatar_node(struct VS_CTX *vs_ctx,
+		struct VSession *vsession,
+		uint16 user_id)
+{
+	struct VSNode *avatar_parent, *avatar_node;
+	struct VSUser *user;
+	struct VSNodeSubscriber *node_subscriber;
+
+	/* Try to find parent of avatar nodes */
+	if((avatar_parent = vs_ctx->data.avatar_node) == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Parent of node avatars: %d does not exist\n", VRS_AVATAR_PARENT_NODE_ID);
+		return -1;
+	}
+
+	/* Try to find user connected with this avatar */
+	if((user = vs_user_find(vs_ctx, user_id)) == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "User with this ID: %d not found\n", user_id);
+		return -1;
+	}
+
+	/* Try to create new node representing avatar */
+	if( (avatar_node = vs_node_create(vs_ctx, avatar_parent, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_NODE_CT)) == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar node for user: %d\n", user_id);
+		return -1;
+	}
+
+	/* Set access permissions for user connected with this avatar. User can write data to its own
+	 * avatar node */
+	vs_node_set_perm(avatar_node, user, VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
+	/* Set access permissions for other users */
+	vs_node_set_perm(avatar_node, vs_ctx->other_users, VRS_PERM_NODE_READ);
+
+	/* Create client info node */
+	vs_create_client_info_node(vs_ctx, vsession, avatar_node);
 
 	/* Send node_create to all subscribers of parent of avatar nodes */
 	node_subscriber = avatar_parent->node_subs.first;
@@ -316,27 +333,27 @@ long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx,
 		/* When there is at least one client subscribed, then we have
 		 * to mark this node as 'creating' and wait for confirmation
 		 * of receiving node_create command from all clients */
-		node->state = ENTITY_CREATING;
+		avatar_node->state = ENTITY_CREATING;
 	} else {
 		/* When there is no client subscribed, then this node could be
 		 * marked as created directly */
-		node->state = ENTITY_CREATED;
+		avatar_node->state = ENTITY_CREATED;
 	}
 
 	/* Send node_create to all subscribers of parent node */
-	while(node_subscriber) {
-		vs_node_send_create(node_subscriber, node, NULL);
+	while(node_subscriber != NULL) {
+		vs_node_send_create(node_subscriber, avatar_node, NULL);
 		node_subscriber = node_subscriber->next;
 	}
 
-	return node->id;
+	return avatar_node->id;
 }
 
 
 /**
  * \brief This function create node that is parent of all avatar nodes
  */
-struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
+static struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node = NULL;
 
@@ -360,7 +377,7 @@ struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
 /**
  * \brief This function create parent node for all scenes
  */
-struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx)
+static struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node = NULL;
 
@@ -426,7 +443,7 @@ struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 /**
  * \brief This function creates parent node for all user nodes
  */
-struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
+static struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node = NULL;
 
@@ -450,7 +467,7 @@ struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
 /**
  * \brief This function creates root node of node tree
  */
-struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx)
+static struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node = NULL;
 

@@ -432,6 +432,7 @@ struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
 		node->id = node_id;
 	}
 
+	/* Create link to the parent node */
 	if(parent_node != NULL) {
 		link = vs_link_create(parent_node, node);
 		if(link == NULL) {
@@ -447,6 +448,7 @@ struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
 		node->level = 0;
 	}
 
+	/* Add node to the hashed array of all verse nodes */
 	bucket = v_hash_array_add_item(&vs_ctx->data.nodes, node, sizeof(struct VSNode));
 	if(bucket == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "node %d could not be added to the hashed list of nodes\n",
@@ -542,8 +544,6 @@ int vs_node_destroy_branch(struct VS_CTX *vs_ctx,
 		vs_node_destroy_branch(vs_ctx, child_node, send);
 		link = next_link;
 	}
-
-	v_list_free(&node->children_links);
 
 	node_follower = node->node_folls.first;
 	if(node_follower != NULL && send == 1) {
@@ -717,7 +717,7 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 	}
 
 	/* When client is subscribed to this node, then change node priority */
-	if(node_subscriber!= NULL) {
+	if(node_subscriber != NULL) {
 		node_subscriber->prio = prio;
 		/* Change priority for this node and all child nodes */
 		vs_node_prio(vsession, node, prio);
@@ -850,6 +850,7 @@ int vs_handle_node_destroy_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	/* Remove corresponding follower from the list of followers */
 	node_follower = node->node_folls.first;
 	while(node_follower != NULL) {
 		next_node_follower = node_follower->next;
