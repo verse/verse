@@ -37,7 +37,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#ifndef __APPLE__
 #include <linux/sockios.h>
+#endif
 
 #include "verse.h"
 #include "v_stream.h"
@@ -129,7 +131,7 @@ int v_STREAM_pack_message(struct vContext *C)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
 	struct Generic_Cmd *cmd;
-	int ret = -1, error, queue_size, buffer_pos = 0, prio_cmd_count, cmd_rank=0;
+	int ret = -1, queue_size = 0, buffer_pos = 0, prio_cmd_count, cmd_rank=0;
 	int8 cmd_share;
 	int16 prio, max_prio, min_prio;
 	uint16 cmd_count, cmd_len, prio_win, swin, sent_size, tot_cmd_size;
@@ -141,10 +143,12 @@ int v_STREAM_pack_message(struct vContext *C)
 	{
 
 		/* Get current size of data in TCP outgoing buffer */
-		if( (error = ioctl(io_ctx->sockfd, SIOCOUTQ, &queue_size)) == -1 ) {
+#ifndef __APPLE__
+		if( ioctl(io_ctx->sockfd, SIOCOUTQ, &queue_size) == -1 ) {
 			perror("ioctl()");
 			return 0;
 		}
+#endif
 
 		/* Compute, how many data could be added to the TCP stack? */
 		swin = conn->socket_buffer_size - queue_size;

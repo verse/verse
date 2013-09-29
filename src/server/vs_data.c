@@ -293,7 +293,12 @@ void *vs_data_loop(void *arg)
 	ts.tv_nsec = 1000*tv.tv_usec;
 
 	while(vs_ctx->state != SERVER_STATE_CLOSED) {
+#ifndef __APPLE__
 		ret = sem_timedwait(&vs_ctx->data.sem, &ts);
+#else
+        /* Fast fix */
+        ret = sem_wait(&vs_ctx->data.sem);
+#endif
 		if(ret == 0) {
 			for(i=0; i<vs_ctx->max_sessions; i++) {
 				if(vs_ctx->vsessions[i]->dgram_conn->host_state == UDP_SERVER_STATE_OPEN ||
