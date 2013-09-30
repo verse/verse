@@ -678,7 +678,7 @@ static void vs_RESPOND_init(struct vContext *C)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	int ret;
+	int ret = 0;
 	struct timeval tv;
 
 	/* Switch to RESPOND state */

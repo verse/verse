@@ -319,7 +319,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	struct timeval tv;
 	int ret, keep_alive_packet = -1, full_packet = 0;
 	int error_num;
-	uint16 swin, prio_win, sent_size;
+	uint16 swin, prio_win, sent_size = 0;
 	uint32 rwin;
 	int cmd_rank = 0;
 
