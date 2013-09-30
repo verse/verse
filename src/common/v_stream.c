@@ -37,7 +37,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/ioctl.h>
-#ifndef __APPLE__
+#ifdef __linux__
 #include <linux/sockios.h>
 #endif
 
@@ -143,7 +143,7 @@ int v_STREAM_pack_message(struct vContext *C)
 	{
 
 		/* Get current size of data in TCP outgoing buffer */
-#ifndef __APPLE__
+#ifdef __linux__
 		if( ioctl(io_ctx->sockfd, SIOCOUTQ, &queue_size) == -1 ) {
 			perror("ioctl()");
 			return 0;

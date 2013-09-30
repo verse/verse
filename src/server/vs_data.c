@@ -293,9 +293,9 @@ void *vs_data_loop(void *arg)
 	ts.tv_nsec = 1000*tv.tv_usec;
 
 	while(vs_ctx->state != SERVER_STATE_CLOSED) {
-#ifndef __APPLE__
+#ifdef __linux__
 		ret = sem_timedwait(&vs_ctx->data.sem, &ts);
-#else
+#elif __APPLE__
         /* Fast fix */
         ret = sem_wait(&vs_ctx->data.sem);
 #endif
