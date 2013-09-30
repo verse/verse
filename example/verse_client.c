@@ -167,7 +167,7 @@ static void cb_receive_layer_set_value(const uint8_t session_id,
 		break;
 	case VRS_VALUE_TYPE_UINT64:
 		for(i=0; i<count; i++) {
-			printf("%ld, ", ((uint64_t*)value)[i]);
+			printf("%llu, ", ((uint64_t*)value)[i]);
 		}
 		break;
 	case VRS_VALUE_TYPE_REAL16:
@@ -316,7 +316,7 @@ static void cb_receive_tag_set_value(const uint8_t session_id,
 		break;
 	case VRS_VALUE_TYPE_UINT64:
 		for(i=0; i<count; i++) {
-			printf("%ld, ", ((uint64_t*)value)[i]);
+			printf("%llu, ", ((uint64_t*)value)[i]);
 		}
 		break;
 	case VRS_VALUE_TYPE_REAL16:
