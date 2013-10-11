@@ -27,7 +27,8 @@ set (${PROJECT_NAME}_VERSION
 # Build options
 option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
-option(VERSE_PYTHON_MODULE "Verse Module" ON)
+option(VERSE_PYTHON3_MODULE "Verse Python3 Module" ON)
+option(VERSE_PYTHON2_MODULE "Verse Python2 Module" OFF)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
 option(VERSE_WEBSOCKET "Support for WebSocket" ON)
@@ -38,10 +39,6 @@ if (VERSE_CLANG)
 	set (CMAKE_C_COMPILER "/usr/bin/clang")
 	set (CMAKE_CC_COMPILER "/usr/bin/clang++")
 endif (VERSE_CLANG)
-
-# Set up directory with 3rd party cmake modules
-set (CMAKE_MODULE_PATH
-	${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build_files/cmake/modules/")
 
 # Pthread is *prefered* (only supported) thread library
 set (CMAKE_THREAD_PREFER_PTHREAD)
@@ -54,6 +51,10 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 
 # Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
+
+# Set up directory with 3rd party cmake modules
+set (CMAKE_MODULE_PATH
+	${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build_files/cmake/modules/")
 
 
 # Check OpenSSL library
@@ -91,8 +92,18 @@ if (VERSE_CHECK)
 endif (VERSE_CHECK)
 
 
-# Python module
-if (VERSE_PYTHON_MODULE)
+# Try to fing Python 2.x module, when Python 2.x is selected
+if (VERSE_PYTHON2_MODULE)
+
+    find_package (PythonLibs 2)
+
+	# Set up optional subdirectory for Python 2
+	if (PYTHONLIBS_FOUND)
+		add_subdirectory (python)
+    endif (PYTHONLIBS_FOUND)
+
+# Otherwise try to find Python 3.x module
+elseif (VERSE_PYTHON3_MODULE)
 
 	# Try to find optional package Python
 	if (UNIX AND NOT APPLE)
@@ -109,12 +120,7 @@ if (VERSE_PYTHON_MODULE)
 		add_subdirectory (python)
 	endif ()
 	
-	# Use only this, when CMake module for Python is fixed for Linux platform
-	#if (PYTHONLIBS_FOUND)
-	#	add_subdirectory (python)
-	#endif (PYTHONLIBS_FOUND)
-	
-endif (VERSE_PYTHON_MODULE)
+endif ()
 
 
 # Support for WebSocket
@@ -189,14 +195,31 @@ if (INIPARSER_FOUND)
 else ()
 	message (" * IniParser:     OFF")
 endif (INIPARSER_FOUND)
-	
+
+if (VERSE_PYTHON3_MODULE)
+
 if (PYTHON_LIBRARY)
-	message (" * Python:        ON")
+	message (" * Python 3:      ON")
+	message (" * Python 2:      OFF")
 elseif (PYTHONLIBS_FOUND)
-	message (" * Python:        ON")
+	message (" * Python 3:      ON")
+	message (" * Python 2:      OFF")
 else ()
-	message (" * Python:        OFF")
+	message (" * Python 3:      OFF")
+	message (" * Python 2:      OFF")
 endif ()
+
+endif(VERSE_PYTHON3_MODULE)
+
+if(VERSE_PYTHON2_MODULE)
+if (PYTHON_LIBRARY)
+	message (" * Python 3:      OFF")
+	message (" * Python 2:      ON")
+else ()
+	message (" * Python 3:      OFF")
+	message (" * Python 2:      OFF")
+endif()
+endif(VERSE_PYTHON2_MODULE)
 
 if (CHECK_FOUND)
 	message (" * Check:         ON")

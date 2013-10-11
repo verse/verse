@@ -38,6 +38,10 @@
 #include <structmember.h>
 #include <assert.h>
 
+#if PY_MAJOR_VERSION >= 3
+#include <bytesobject.h>
+#endif
+
 #include "verse.h"
 #include "verse_types.h"
 
@@ -46,9 +50,11 @@
 static PyObject *VerseError;
 
 
+#if PY_MAJOR_VERSION >= 3
 /* The module doc string */
 PyDoc_STRVAR(verse__doc__,
 "Python Verse module that enables communication with Verse server");
+#endif
 
 /* Object for session */
 typedef struct session_SessionObject {
@@ -703,7 +709,11 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
 					char err_message[256];
 					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
@@ -729,7 +739,11 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
 					char err_message[256];
 					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
@@ -755,7 +769,11 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
 					char err_message[256];
 					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
@@ -781,7 +799,11 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
 					char err_message[256];
 					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
@@ -869,7 +891,11 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		}
 		py_value = PyTuple_GetItem(tuple_values, 0);
 		if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 			if(!PyUnicode_Check(py_value)) {
+#else
+			if(!PyString_Check(py_value) && !PyUnicode_Check(py_value)) {
+#endif
 				char err_message[256];
 				sprintf(err_message, "Tuple item type is not str. Item type is: %s",
 						py_value->ob_type->tp_name);
@@ -877,8 +903,13 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				return NULL;
 			}
 		}
+#if PY_MAJOR_VERSION >= 3
 		tmp = PyUnicode_AsEncodedString(py_value, "utf-8", "Error: encoding string");
 		values = PyBytes_AsString(tmp);
+#else
+		(void)tmp;
+		values = PyString_AsString(py_value);
+#endif
 		break;
 	default:
 		PyErr_SetString(VerseError, "Unsupported value type");
@@ -902,134 +933,6 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 
 	Py_RETURN_NONE;
 }
-
-#if 0
-
-static PyObject *_send_tag_set_int(session_SessionObject *session,
-		uint8_t prio,
-		uint32_t node_id,
-		uint16_t taggroup_id,
-		uint16_t tag_id,
-		uint8_t data_type,
-		PyObject *int_value)
-{
-	int ret;
-	long l = PyLong_AsLong(int_value);
-
-	switch(data_type) {
-	case VRS_VALUE_TYPE_UINT8:
-		if(!(l>=0 && l<=UINT8_MAX)) {
-			PyErr_SetString(VerseError, "Long out of data_type range");
-			return NULL;
-		}
-		break;
-	case VRS_VALUE_TYPE_UINT16:
-		if(!(l>=0 && l<=UINT16_MAX)) {
-			PyErr_SetString(VerseError, "Long out of data_type range");
-			return NULL;
-		}
-		break;
-	case VRS_VALUE_TYPE_UINT32:
-		if(!(l>=0 && l<=UINT32_MAX)) {
-			PyErr_SetString(VerseError, "Long out of data_type range");
-			return NULL;
-		}
-		break;
-	case VRS_VALUE_TYPE_UINT64:
-		/* No need to compare ranges */
-		break;
-	default:
-		break;
-	}
-
-	/* Call C API function */
-	ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &l);
-
-	/* Check if calling function was successful */
-	if(ret != VRS_SUCCESS) {
-		PyErr_SetString(VerseError, "Unable to send tag_set_value command");
-		return NULL;
-	}
-
-	Py_RETURN_NONE;
-}
-
-static PyObject *_send_tag_set_float(session_SessionObject *session,
-		uint8_t prio,
-		uint32_t node_id,
-		uint16_t taggroup_id,
-		uint16_t tag_id,
-		uint8_t data_type,
-		PyObject *float_value)
-{
-	int ret;
-	real16 r16;
-	real32 r32;
-	double d = PyFloat_AsDouble(float_value);
-
-	switch(data_type) {
-	case VRS_VALUE_TYPE_REAL16:
-		/* TODO: check range */
-		r16 = (real16)d;
-		/* Call C API function */
-		ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &r16);
-		break;
-	case VRS_VALUE_TYPE_REAL32:
-		/* TODO: check range */
-		r32 = (real32)d;
-		/* Call C API function */
-		ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &r32);
-		break;
-	case VRS_VALUE_TYPE_REAL64:
-		/* No need to compare ranges */
-		ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, data_type, 1, &d);
-		break;
-	default:
-		PyErr_SetString(VerseError, "Unsupported float data type");
-		return NULL;
-	}
-
-	/* Check if calling function was successful */
-	if(ret != VRS_SUCCESS) {
-		PyErr_SetString(VerseError, "Unable to send tag_set_value command");
-		return NULL;
-	}
-
-	Py_RETURN_NONE;
-}
-
-static PyObject *_send_tag_set_string(session_SessionObject *session,
-		uint8_t prio,
-		uint32_t node_id,
-		uint16_t taggroup_id,
-		uint16_t tag_id,
-		PyObject *string_value)
-{
-	int ret;
-	void *values = NULL;
-	PyObject *tmp = PyUnicode_AsEncodedString(string_value, "utf-8", "Error: encoding string");
-
-	if(tmp != NULL) {
-		values = PyBytes_AsString(tmp);
-		printf(">>> %s\n", (char*)values);
-	} else {
-		PyErr_SetString(VerseError, "Unable to encode UTF-8 string");
-		return NULL;
-	}
-
-	/* Call C API function */
-	ret = vrs_send_tag_set_value(session->session_id, prio, node_id, taggroup_id, tag_id, VRS_VALUE_TYPE_STRING8, 1, values);
-
-	/* Check if calling function was successful */
-	if(ret != VRS_SUCCESS) {
-		PyErr_SetString(VerseError, "Unable to send tag_set_value command");
-		return NULL;
-	}
-
-	Py_RETURN_NONE;
-}
-
-#endif
 
 static PyObject *Session_send_tag_set_values(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -1055,46 +958,6 @@ static PyObject *Session_send_tag_set_values(PyObject *self, PyObject *args, PyO
 		PyErr_SetString(VerseError, "Value is not tuple");
 		return NULL;
 	}
-
-#if 0
-	/* When value is not tuple, then some simple data types are supported too */
-	} else {
-		switch(data_type) {
-		case VRS_VALUE_TYPE_UINT8:
-		case VRS_VALUE_TYPE_UINT16:
-		case VRS_VALUE_TYPE_UINT32:
-		case VRS_VALUE_TYPE_UINT64:
-			if(PyLong_Check(values)) {
-				return _send_tag_set_int(session, prio, node_id, taggroup_id, tag_id, data_type, values);
-			} else {
-				PyErr_SetString(VerseError, "Value is not int");
-				return NULL;
-			}
-			break;
-		case VRS_VALUE_TYPE_REAL16:
-		case VRS_VALUE_TYPE_REAL32:
-		case VRS_VALUE_TYPE_REAL64:
-			if(PyFloat_AsDouble(values)) {
-				return _send_tag_set_float(session, prio, node_id, taggroup_id, tag_id, data_type, values);
-			} else {
-				PyErr_SetString(VerseError, "Value is not float");
-				return NULL;
-			}
-			break;
-		case VRS_VALUE_TYPE_STRING8:
-			if(PyUnicode_Check(values)) {
-				return _send_tag_set_string(session, prio, node_id, taggroup_id, tag_id, values);
-			} else {
-				PyErr_SetString(VerseError, "Value is not UTF-8 string");
-				return NULL;
-			}
-			break;
-		default:
-			PyErr_SetString(VerseError, "Value is not int nor float nor string nor tuple");
-			return NULL;
-		}
-	}
-#endif
 
 	Py_RETURN_NONE;
 }
@@ -2023,7 +1886,7 @@ static PyObject *Session_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	session_SessionObject *self;
 
-	if(0) {
+	if(1) {
 		printf("Session_new(): type: %p, args: %p, kwds: %p\n",
 			(void*)type, (void*)args, (void*)kwds);
 	}
@@ -2064,8 +1927,7 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 	static char *kwlist[] = {"hostname", "service", "flags", NULL};
 
 	if (! PyArg_ParseTupleAndKeywords(args, kwds, "|OOB", kwlist,
-			&_hostname, &_service,
-			&flags))
+			&_hostname, &_service, &flags))
 	{
 		return -1;
 	}
@@ -2105,16 +1967,24 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 	vrs_register_receive_layer_set_value(cb_c_receive_layer_set_value);
 	vrs_register_receive_layer_unset_value(cb_c_receive_layer_unset_value);
 
+#if PY_MAJOR_VERSION >= 3
 	tmp1 = PyUnicode_AsEncodedString(_hostname, "utf-8", "Error: encoding string");
 	hostname = PyBytes_AsString(tmp1);
 	tmp2 = PyUnicode_AsEncodedString(_service, "utf-8", "Error: encoding string");
 	service = PyBytes_AsString(tmp2);
+#else
+	hostname = PyString_AsString(_hostname);
+	service = PyString_AsString(_service);
+#endif
+
 
 	/* Send user connect request to the server */
 	if(hostname != NULL && service != NULL) {
 		ret = vrs_send_connect_request(hostname, service, flags, &session_id);
+#if PY_MAJOR_VERSION >= 3
 		Py_XDECREF(tmp1);
 		Py_XDECREF(tmp2);
+#endif
 
 		if(ret != VRS_SUCCESS) {
 			PyErr_SetString(VerseError, "Unable to send connect request");
@@ -2136,12 +2006,11 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 	}
 
 	if(_service != NULL) {
-		tmp1 = self->service;
+		tmp2 = self->service;
 		Py_INCREF(_service);
 		self->service = _service;
-		Py_XDECREF(tmp1);
+		Py_XDECREF(tmp2);
 	}
-
 
 	return 0;
 }
@@ -2572,6 +2441,7 @@ static PyMethodDef VerseMethods[] = {
 	{NULL, NULL, 0, NULL}
 };
 
+#if PY_MAJOR_VERSION >= 3
 
 /* Module definition */
 static struct PyModuleDef verse_module = {
@@ -2586,19 +2456,36 @@ static struct PyModuleDef verse_module = {
 	NULL			/* Not needed */
 };
 
+#endif
 
 /* Initialization of module */
+#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC PyInit_verse(void)
+#else
+void initverse(void)
+#endif
 {
 	PyObject *module;
 
 	if (PyType_Ready(&session_SessionType) < 0)
+#if PY_MAJOR_VERSION >= 3
 		return NULL;
+#else
+		return;
+#endif
 
+#if PY_MAJOR_VERSION >= 3
 	module = PyModule_Create(&verse_module);
+#else
+	module = Py_InitModule("verse", VerseMethods);
+#endif
 
 	if(module == NULL) {
+#if PY_MAJOR_VERSION >= 3
 		return NULL;
+#else
+		return;
+#endif
 	}
 
 	/* Add error object to verse module */
@@ -2681,19 +2568,27 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "SUPER_USER_UID", VRS_SUPER_USER_UID);
 	PyModule_AddIntConstant(module, "OTHER_USERS_UID", VRS_OTHER_USERS_UID);
 
+#if PY_MAJOR_VERSION >= 3
 	return module;
+#endif
 }
 
 /* Main function of verse module */
 int main(int argc, char *argv[])
 {
+#if PY_MAJOR_VERSION >= 3
 	PyImport_AppendInittab("verse", PyInit_verse);
+#else
+	PyImport_AppendInittab("verse", initverse);
+#endif
 
-	if(argc==0) {
-		Py_SetProgramName((wchar_t*)argv[0]);
-	} else {
-		Py_SetProgramName((wchar_t*)argv[0]);
-	}
+	(void)argc;
+
+#if PY_MAJOR_VERSION >= 3
+	Py_SetProgramName((wchar_t*)argv[0]);
+#else
+	Py_SetProgramName(argv[0]);
+#endif
 
 	Py_Initialize();
 
