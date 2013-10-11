@@ -28,7 +28,7 @@ set (${PROJECT_NAME}_VERSION
 option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
 option(VERSE_PYTHON3_MODULE "Verse Python3 Module" ON)
-option(VERSE_PYTHON2_MODULE "Verse Python2 Module" OFF)
+option(VERSE_PYTHON2_MODULE "Verse Python2 Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
 option(VERSE_WEBSOCKET "Support for WebSocket" ON)
@@ -99,11 +99,12 @@ if (VERSE_PYTHON2_MODULE)
 
 	# Set up optional subdirectory for Python 2
 	if (PYTHONLIBS_FOUND)
-		add_subdirectory (python)
+		add_subdirectory ("python/2.x")
     endif (PYTHONLIBS_FOUND)
+endif (VERSE_PYTHON2_MODULE)
 
 # Otherwise try to find Python 3.x module
-elseif (VERSE_PYTHON3_MODULE)
+if (VERSE_PYTHON3_MODULE)
 
 	# Try to find optional package Python
 	if (UNIX AND NOT APPLE)
@@ -115,12 +116,12 @@ elseif (VERSE_PYTHON3_MODULE)
 	
 	# Set up optional subdirectory for Python 3
 	if (PYTHON_LIBRARY)
-		add_subdirectory (python)
+		add_subdirectory ("python/3.x")
 	elseif (PYTHONLIBS_FOUND)
-		add_subdirectory (python)
+		add_subdirectory ("python/3.x")
 	endif ()
 	
-endif ()
+endif (VERSE_PYTHON3_MODULE)
 
 
 # Support for WebSocket
@@ -196,30 +197,23 @@ else ()
 	message (" * IniParser:     OFF")
 endif (INIPARSER_FOUND)
 
-if (VERSE_PYTHON3_MODULE)
-
-if (PYTHON_LIBRARY)
-	message (" * Python 3:      ON")
-	message (" * Python 2:      OFF")
-elseif (PYTHONLIBS_FOUND)
-	message (" * Python 3:      ON")
-	message (" * Python 2:      OFF")
-else ()
-	message (" * Python 3:      OFF")
-	message (" * Python 2:      OFF")
-endif ()
-
-endif(VERSE_PYTHON3_MODULE)
-
 if(VERSE_PYTHON2_MODULE)
 if (PYTHON_LIBRARY)
-	message (" * Python 3:      OFF")
 	message (" * Python 2:      ON")
 else ()
-	message (" * Python 3:      OFF")
 	message (" * Python 2:      OFF")
 endif()
 endif(VERSE_PYTHON2_MODULE)
+
+if (VERSE_PYTHON3_MODULE)
+if (PYTHON_LIBRARY)
+	message (" * Python 3:      ON")
+elseif (PYTHONLIBS_FOUND)
+	message (" * Python 3:      ON")
+else ()
+	message (" * Python 3:      OFF")
+endif ()
+endif(VERSE_PYTHON3_MODULE)
 
 if (CHECK_FOUND)
 	message (" * Check:         ON")
