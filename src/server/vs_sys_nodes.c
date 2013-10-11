@@ -65,127 +65,167 @@ int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
 
 
 /**
- * \brief This function "unsubscribe" avatar from all nodes (node subscription
- * and node data subscription). It removes avatar from all lists of followers.
- * It also remove all node locks.
+ * Remove client from all tag followers in specific tag group
  */
-int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
+static void vs_tag_free_avatar_reference(struct VSTagGroup *tg,
 		struct VSession *session)
 {
-	struct VBucket *node_bucket, *tg_bucket, *tag_bucket, *layer_bucket;
-	struct VSNode *node;
-	struct VSTagGroup *tg;
 	struct VSTag *tag;
+	struct VBucket *tag_bucket;
+	struct VSEntityFollower *tag_follower;
+
+	/* When client was subscribed to tag group, then
+	 * it was following all tags in this tag group.
+	 * Go through all Tags and remove client from list of tag followers */
+	tag_bucket = tg->tags.lb.first;
+	while(tag_bucket != NULL) {
+		tag = (struct VSTag*)tag_bucket->data;
+
+		tag_follower = tag->tag_folls.first;
+		while(tag_follower != NULL) {
+			if(tag_follower->node_sub->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from tag: %d\n",
+						session->avatar_id, tag->id);
+				v_list_free_item(&tag->tag_folls, tag_follower);
+				break;
+			}
+			tag_follower = tag_follower->next;
+		}
+		tag_bucket = tag_bucket->next;
+	}
+}
+
+
+/**
+ * \brief Remove client from subscribers and followers to tag groups and its
+ * tags
+ */
+static void vs_tg_free_avatar_reference(struct VSNode *node,
+		struct VSession *session)
+{
+	struct VSTagGroup *tg;
+	struct VBucket *tg_bucket;
+	struct VSEntitySubscriber *tg_subscriber;
+	struct VSEntityFollower *tg_follower;
+
+	/* Remove client from list of tag_group subscribers */
+	tg_bucket = node->tag_groups.lb.first;
+	while(tg_bucket != NULL) {
+		tg = (struct VSTagGroup*)tg_bucket->data;
+
+		tg_follower = tg->tg_folls.first;
+		while(tg_follower != NULL) {
+			if(tg_follower->node_sub->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from tag group: %d\n",
+						session->avatar_id, tg->id);
+				/* Remove client from list of clients, that knows about this node */
+				v_list_free_item(&tg->tg_folls, tg_follower);
+
+				/* No need to go through other tag group followers*/
+				break;
+			}
+			tg_follower = tg_follower->next;
+		}
+
+		/* Try to remove client from subscribers */
+		tg_subscriber = tg->tg_subs.first;
+		while(tg_subscriber != NULL) {
+			if(tg_subscriber->node_sub->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Free subscriber: %d from tag group: %d\n",
+						session->avatar_id, tg->id);
+				/* Remove client from list of clients, that are subscribed to this tag_group */
+				v_list_free_item(&tg->tg_subs, tg_subscriber);
+
+				vs_tag_free_avatar_reference(tg, session);
+
+				/* No need to go through other tag groups subscribers */
+				break;
+			}
+			tg_subscriber = tg_subscriber->next;
+		}
+
+		tg_bucket = tg_bucket->next;
+	}
+}
+
+
+/**
+ * \brief Remove client from layer followers and subscribers
+ */
+static void vs_layer_free_avatar_reference(struct VSNode *node,
+		struct VSession *session)
+{
 	struct VSLayer *layer;
+	struct VBucket *layer_bucket;
+	struct VSEntitySubscriber *layer_subscriber;
+	struct VSEntityFollower *layer_follower;
+
+	layer_bucket = node->layers.lb.first;
+	while(layer_bucket != NULL) {
+		layer = (struct VSLayer*)layer_bucket->data;
+
+		/* Remove client from layer followers */
+		layer_follower = layer->layer_folls.first;
+		while(layer_follower != NULL) {
+			if(layer_follower->node_sub->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from layer: %d\n",
+						session->avatar_id, layer->id);
+				v_list_free_item(&layer->layer_folls, layer_follower);
+				break;
+			}
+			layer_follower = layer_follower->next;
+		}
+
+		/* Remove client from layer subscribers */
+		layer_subscriber = layer->layer_subs.first;
+		while(layer_subscriber != NULL) {
+			if(layer_subscriber->node_sub->session->session_id == session->session_id) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Free subscriber: %d from layer: %d\n",
+						session->avatar_id, layer->id);
+				v_list_free_item(&layer->layer_subs, layer_subscriber);
+				break;
+			}
+			layer_subscriber = layer_subscriber->next;
+		}
+
+		layer_bucket = layer_bucket->next;
+	}
+}
+
+/**
+ * Remove client from subscribers and followers of all entities
+ */
+static void vs_free_avatar_reference(struct VSNode *node,
+		struct VSession *session)
+{
 	struct VSNodeSubscriber *node_subscriber, *next_node_subscriber;
-	struct VSEntitySubscriber *tg_subscriber, *layer_subscriber;
-	struct VSEntityFollower *node_follower, *tg_follower, *tag_follower, *layer_follower;
-	int was_locked;
+	struct VSEntityFollower *node_follower;
+	struct VSLink *link;
+	int was_locked = 0;
 
-	/* TODO: It is necessary to go through all nodes now. :-/
-	 * Do this more efficient; e.g.: every session could have list of
-	 * subscribed nodes. */
-	node_bucket = vs_ctx->data.nodes.lb.first;
-	while(node_bucket != NULL) {
-		node = (struct VSNode*)node_bucket->data;
-		was_locked = 0;
+	/* Remove client from subscribers and followers of tag groups and its tags */
+	vs_tg_free_avatar_reference(node, session);
 
-		/* Remove client from list of tag_group subscribers */
-		tg_bucket = node->tag_groups.lb.first;
-		while(tg_bucket != NULL) {
-			tg = (struct VSTagGroup*)tg_bucket->data;
-			tg_follower = tg->tg_folls.first;
-			while(tg_follower != NULL) {
-				if(tg_follower->node_sub->session->session_id == session->session_id) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from tag group: %d\n",
-							session->avatar_id, tg->id);
-					/* Remove client from list of clients, that knows about this node */
-					v_list_free_item(&tg->tg_folls, tg_follower);
+	/* Remove client from subscribers and followers of layer */
+	vs_layer_free_avatar_reference(node, session);
 
-					/* When client knows to this tag_group, then it's possibly
-					 * subscribed to this tag_group */
-					tg_subscriber = tg->tg_subs.first;
-					while(tg_subscriber != NULL) {
-						if(tg_subscriber->node_sub->session->session_id == session->session_id) {
-							v_print_log(VRS_PRINT_DEBUG_MSG, "Free subscriber: %d from tag group: %d\n",
-									session->avatar_id, tg->id);
-							/* Remove client from list of clients, that are subscribed to this tag_group */
-							v_list_free_item(&tg->tg_subs, tg_subscriber);
+	/* Remove client from followers of child nodes. When it is done, then
+	 * it is possible and safe to remove client from node subscribers, because
+	 * node follower relay on node subscriber of parent node. */
+	link = node->children_links.first;
+	while(link != NULL) {
 
-							/* When client was subscribed to tag group, then
-							 * it was following all tags in this tag group.
-							 * Go through all Tags and remove client from list of tag followers */
-							tag_bucket = tg->tags.lb.first;
-							while(tag_bucket != NULL) {
-								tag = (struct VSTag*)tag_bucket->data;
+		/* I say: recursive tree traversal */
+		vs_free_avatar_reference(link->child, session);
 
-								tag_follower = tag->tag_folls.first;
-								while(tag_follower != NULL) {
-									if(tag_follower->node_sub->session->session_id == session->session_id) {
-										v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from tag: %d\n",
-												session->avatar_id, tag->id);
-										v_list_free_item(&tag->tag_folls, tag_follower);
-										break;
-									}
-									tag_follower = tag_follower->next;
-								}
-								tag_bucket = tag_bucket->next;
-							}
-
-							/* No need to go through other tag_groups */
-							break;
-						}
-						tg_subscriber = tg_subscriber->next;
-					}
-					/* Continue with next tag_group */
-					break;
-				}
-				tg_follower = tg_follower->next;
-			}
-
-			tg_bucket = tg_bucket->next;
-		}
-
-		/* Remove client from layer followers and subscribers */
-		layer_bucket = node->layers.lb.first;
-		while(layer_bucket != NULL) {
-			layer = (struct VSLayer*)layer_bucket->data;
-
-			/* Remove client from layer follower */
-			layer_follower = layer->layer_folls.first;
-			while(layer_follower != NULL) {
-				if(layer_follower->node_sub->session->session_id == session->session_id) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from layer: %d\n",
-							session->avatar_id, layer->id);
-					v_list_free_item(&layer->layer_folls, layer_follower);
-					break;
-				}
-				layer_follower = layer_follower->next;
-			}
-
-			/* Remove client from layer subscriber */
-			layer_subscriber = layer->layer_subs.first;
-			while(layer_subscriber != NULL) {
-				if(layer_subscriber->node_sub->session->session_id == session->session_id) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Free subscriber: %d from layer: %d\n",
-							session->avatar_id, layer->id);
-					v_list_free_item(&layer->layer_subs, layer_subscriber);
-					break;
-				}
-				layer_subscriber = layer_subscriber->next;
-			}
-
-			layer_bucket = layer_bucket->next;
-		}
-
-		/* Does client know about this node */
-		node_follower = node->node_folls.first;
+		/* Remove client from followers of this node */
+		node_follower = link->child->node_folls.first;
 		while(node_follower != NULL) {
 			if(node_follower->node_sub->session->session_id == session->session_id) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Free follower: %d from node: %d\n",
-						session->avatar_id, node->id);
+						session->avatar_id, link->child->id);
 				/* Remove client from list of clients, that knows about this node */
-				v_list_free_item(&node->node_folls, node_follower);
+				v_list_free_item(&link->child->node_folls, node_follower);
 
 				/* Continue with next node */
 				break;
@@ -193,47 +233,56 @@ int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
 			node_follower = node_follower->next;
 		}
 
-		node_bucket = node_bucket->next;
+		link = link->next;
 	}
 
-	/* Fast fix: go through all nodes twice. Node followers are removed first
-	 * and then it is possible to remove subscribers.
-	 * TODO: use recursive parsing of node tree */
-	node_bucket = vs_ctx->data.nodes.lb.first;
-	while(node_bucket != NULL) {
-		node = (struct VSNode*)node_bucket->data;
+	/* Was node locked by this client? */
+	if(node->lock.session != NULL &&
+			node->lock.session->session_id == session->session_id) {
+		was_locked = 1;
+		node->lock.session = NULL;
+	}
 
-		/* Was node locked by this client? */
-		if(node->lock.session != NULL &&
-				node->lock.session->session_id == session->session_id) {
-			was_locked = 1;
-			node->lock.session = NULL;
-		}
-
-		/* Is client subscribed to this node? */
-		node_subscriber = node->node_subs.first;
-		while(node_subscriber != NULL) {
-			next_node_subscriber = node_subscriber->next;
-			if(node_subscriber->session->session_id == session->session_id) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Free subscriber: %d from node: %d\n",
-						session->avatar_id, node->id);
-				v_list_free_item(&node->node_subs, node_subscriber);
-				if(was_locked == 0) {
-					/* No need to go through other subscribers,
-					 * because send_unlock needn't to be sent in this
-					 * case */
-					break;
-				}
-			} else {
-				if(was_locked == 1) {
-					vs_node_send_unlock(node_subscriber, session, node);
-				}
+	/* Is client subscribed to this node? */
+	node_subscriber = node->node_subs.first;
+	while(node_subscriber != NULL) {
+		next_node_subscriber = node_subscriber->next;
+		if(node_subscriber->session->session_id == session->session_id) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Free subscriber: %d from node: %d\n",
+					session->avatar_id, node->id);
+			v_list_free_item(&node->node_subs, node_subscriber);
+			if(was_locked == 0) {
+				/* No need to go through other subscribers,
+				 * because send_unlock needn't to be sent in this
+				 * case */
+				break;
 			}
-			node_subscriber = next_node_subscriber;
+		} else {
+			if(was_locked == 1) {
+				vs_node_send_unlock(node_subscriber, session, node);
+			}
 		}
-
-		node_bucket = node_bucket->next;
+		node_subscriber = next_node_subscriber;
 	}
+}
+
+
+/**
+ * \brief This function "unsubscribe" avatar from all nodes (node subscription
+ * and node data subscription). It removes avatar from all lists of followers.
+ * It also remove all node locks.
+ */
+int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
+		struct VSession *session)
+{
+	struct VSNode *root_node;
+
+	root_node = vs_node_find(vs_ctx, VRS_ROOT_NODE_ID);
+
+	if(root_node != NULL) {
+		vs_free_avatar_reference(root_node, session);
+	}
+
 	return 1;
 }
 
