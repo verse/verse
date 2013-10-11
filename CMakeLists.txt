@@ -27,8 +27,8 @@ set (${PROJECT_NAME}_VERSION
 # Build options
 option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
+option(VERSE_PYTHON2_MODULE "Verse Python2 Module" OFF)
 option(VERSE_PYTHON3_MODULE "Verse Python3 Module" ON)
-option(VERSE_PYTHON2_MODULE "Verse Python2 Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
 option(VERSE_WEBSOCKET "Support for WebSocket" ON)
