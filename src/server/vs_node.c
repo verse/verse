@@ -285,7 +285,7 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 
 	/* Check if this command, has not been already sent */
 	node_follower = node->node_folls.first;
-	while(node_follower!=NULL) {
+	while(node_follower != NULL) {
 		if(node_follower->node_sub->session->session_id == node_subscriber->session->session_id &&
 				(node_follower->state == ENTITY_CREATING ||
 				 node_follower->state == ENTITY_CREATED))
