@@ -252,21 +252,28 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	int i;
 
 	/* Free all data shared at verse server */
-	vs_node_destroy_branch(vs_ctx, vs_ctx->data.root_node, 0);
+	if (vs_ctx->data.root_node != NULL) {
+		vs_node_destroy_branch(vs_ctx, vs_ctx->data.root_node, 0);
+	}
 
 	/* Destroy hashed array of nodes */
 	v_hash_array_destroy(&vs_ctx->data.nodes);
 
 	/* Destroy list of connections */
-	for (i=0; i<vs_ctx->max_sessions; i++) {
-		if(vs_ctx->vsessions[i] != NULL) {
-			v_destroy_session(vs_ctx->vsessions[i]);
-			free(vs_ctx->vsessions[i]);
-			vs_ctx->vsessions[i] = NULL;
+	if(vs_ctx->vsessions != NULL) {
+		for (i=0; i<vs_ctx->max_sessions; i++) {
+			if(vs_ctx->vsessions[i] != NULL) {
+				v_destroy_session(vs_ctx->vsessions[i]);
+				free(vs_ctx->vsessions[i]);
+				vs_ctx->vsessions[i] = NULL;
+			}
 		}
 	}
 
-	free(vs_ctx->vsessions); vs_ctx->vsessions = NULL;
+	if(vs_ctx->vsessions != NULL) {
+		free(vs_ctx->vsessions);
+		vs_ctx->vsessions = NULL;
+	}
 
 	free(vs_ctx->port_list); vs_ctx->port_list = NULL;
 

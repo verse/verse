@@ -152,11 +152,14 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 			}
 			ret = 1;
 			fclose(file);
+
+			v_print_log(VRS_PRINT_DEBUG_MSG, "%d user account loaded from file: %s\n",
+						raw-1, vs_ctx->csv_user_file);
+		} else {
+			v_print_log(VRS_PRINT_ERROR, "Could not open file: %s\n",
+						vs_ctx->csv_user_file);
 		}
 	}
-
-	v_print_log(VRS_PRINT_DEBUG_MSG, "%d user account loaded from file: %s\n",
-			raw-1, vs_ctx->csv_user_file);
 
 	return ret;
 }
