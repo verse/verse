@@ -100,6 +100,7 @@ endif (CMAKE_COMPILER_IS_GNUCC)
 # When OpenSSL is enabled
 if (OPENSSL_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
+    include_directories (${OPENSSL_INCLUDE_DIR})
 endif (OPENSSL_FOUND)
 
 # Set up shared verse library (libverse.so)
@@ -109,6 +110,9 @@ set_target_properties (verse_shared_lib PROPERTIES
 		SOVERSION "${${PROJECT_NAME}_VERSION}.${${PROJECT_NAME}_PATCH_LEVEL}"
 		OUTPUT_NAME "verse"
 		clean_direct_output 1)
+if (OPENSSL_FOUND)
+	target_link_libraries (verse_shared_lib ${OPENSSL_LIBRARIES} )
+endif (OPENSSL_FOUND)
 
 
 # Make build flags compiler specific for verse_server
@@ -128,8 +132,8 @@ set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
 
 # When OpenSSL is enabled
 if (OPENSSL_FOUND)
+    message('OpenSSL Found')
     set (verse_server_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
-    include_directories (${OPENSSL_INCLUDE_DIR})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
 endif (OPENSSL_FOUND)
 
@@ -155,7 +159,6 @@ endif (INIPARSER_FOUND)
 # Set up verse server executable
 add_executable (verse_server ${server_src})
 add_dependencies (verse_server verse_shared_lib)
-
 target_link_libraries (verse_server
 	verse_shared_lib
 	${verse_server_libs} )

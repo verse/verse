@@ -26,6 +26,9 @@
 #ifdef WITH_OPENSSL
 #include <openssl/rand.h>
 #include <openssl/ssl.h>
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 #endif
 
 #include <sys/types.h>

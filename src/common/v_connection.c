@@ -40,6 +40,11 @@
 #include <time.h>
 #include <pthread.h>
 #include <unistd.h>
+#ifdef WITH_OPENSSL
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
 
 #include "v_connection.h"
 #include "v_out_queue.h"
@@ -245,8 +250,10 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 	}
 
 #ifdef WITH_OPENSSL
-	BIO_vfree(dgram_conn->io_ctx.bio);
-	dgram_conn->io_ctx.bio = NULL;
+	if(dgram_conn->io_ctx.bio != NULL) {
+		BIO_vfree(dgram_conn->io_ctx.bio);
+		dgram_conn->io_ctx.bio = NULL;
+	}
 #endif
 
 	close(dgram_conn->io_ctx.sockfd);
