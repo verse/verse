@@ -427,7 +427,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 		sent_packet = v_packet_history_add_packet(&vconn->packet_history, s_packet->header.payload_id);
 
-		assert(sent_packet!=NULL);
+		assert(sent_packet != NULL);
 
 		if(keep_alive_packet != 1) {
 			real32 prio_sum_high, prio_sum_low, r_prio;
