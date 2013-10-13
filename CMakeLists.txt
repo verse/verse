@@ -26,7 +26,7 @@ set (${PROJECT_NAME}_VERSION
 # Build options
 option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
-option(VERSE_PYTHON2_MODULE "Verse Python2 Module" OFF)
+option(VERSE_PYTHON2_MODULE "Verse Python2 Module" ON)
 option(VERSE_PYTHON3_MODULE "Verse Python3 Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
@@ -106,6 +106,20 @@ endif (VERSE_PYTHON2_MODULE)
 # Otherwise try to find Python 3.x module
 if (VERSE_PYTHON3_MODULE)
 
+    # Clear variables from previous find module
+    if (PYTHONLIBS_FOUND)
+        unset(PYTHONLIBS_FOUND)
+        unset(PYTHONLIBS_FOUND CACHE)
+        unset(PYTHON_LIBRARY)
+        unset(PYTHON_LIBRARY CACHE)        
+        unset(PYTHON_LIBRARIES)
+        unset(PYTHON_LIBRARIES CACHE)
+        unset(PYTHON_INCLUDE_PATH)
+        unset(PYTHON_INCLUDE_PATH CACHE)
+        unset(PYTHON_INCLUDE_DIRS)
+        unset(PYTHON_INCLUDE_DIRS CACHE)
+    endif (PYTHONLIBS_FOUND)
+    
 	# Try to find optional package Python
 	if (UNIX AND NOT APPLE)
 		# find_package (PythonLibs 3) # Does not work at Linux for Python 3

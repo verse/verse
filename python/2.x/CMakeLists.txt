@@ -18,7 +18,7 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/python2.x)
 set (verse_module_src ../verse_module.c)
 
 # Basic libraries used by verse Python module
-set ( verse_python_libs ${CMAKE_THREAD_LIBS_INIT} )
+set ( verse_python_libs ${CMAKE_THREAD_LIBS_INIT} ${PYTHON_LIBRARIES})
 
 # When OpenSSL is enabled
 if (OPENSSL_FOUND)

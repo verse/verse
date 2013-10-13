@@ -132,7 +132,6 @@ set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
 
 # When OpenSSL is enabled
 if (OPENSSL_FOUND)
-    message('OpenSSL Found')
     set (verse_server_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
 endif (OPENSSL_FOUND)

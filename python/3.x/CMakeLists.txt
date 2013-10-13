@@ -10,7 +10,7 @@ if (CMAKE_COMPILER_IS_GNUCC)
 endif (CMAKE_COMPILER_IS_GNUCC)
 
 include_directories (../../include)
-include_directories (${PYTHON_INCLUDE_DIRS})
+include_directories (BEFORE ${PYTHON_INCLUDE_DIRS})
 
 # Modify output directory of library
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/python3.x)
@@ -18,7 +18,7 @@ set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/python3.x)
 set (verse_module_src ../verse_module.c)
 
 # Basic libraries used by verse Python module
-set ( verse_python_libs ${CMAKE_THREAD_LIBS_INIT} )
+set ( verse_python_libs ${CMAKE_THREAD_LIBS_INIT} ${PYTHON_LIBRARIES})
 
 # When OpenSSL is enabled
 if (OPENSSL_FOUND)
