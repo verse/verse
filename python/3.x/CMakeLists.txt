@@ -28,6 +28,9 @@ endif (OPENSSL_FOUND)
 
 add_library (py3_verse SHARED ${verse_module_src})
 set_target_properties (py3_verse PROPERTIES PREFIX "")
+if(APPLE)
+	set_target_properties (py3_verse PROPERTIES SUFFIX ".so")
+endif()
 set_target_properties (py3_verse PROPERTIES 
 		OUTPUT_NAME "verse"
 		clean_direct_output 1)
