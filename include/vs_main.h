@@ -88,7 +88,7 @@ typedef struct VSData {
 	struct VSNode		*scene_node;				/* Pointer at parent of all scene nodes (node_id=3) */
 	/* Thread staff */
 	pthread_mutex_t		mutex;						/* Connection threads needs create avatar nodes occasionally */
-	sem_t				sem;						/* Semaphore used for notification data thread (some data were added to the queue) */
+	sem_t				*sem;						/* Semaphore used for notification data thread (some data were added to the queue) */
 } VSData;
 
 /* Verse Server Context */

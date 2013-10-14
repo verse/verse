@@ -411,7 +411,7 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 	/* When pure ack packet caused adding some fake commands to the queue, then
 	 * poke server data thread */
 	if( (vs_ctx != NULL) && (is_fake_cmd_received == 1) && (r_packet->data == NULL)) {
-		sem_post(&vs_ctx->data.sem);
+		sem_post(vs_ctx->data.sem);
 	}
 
 	return ret;

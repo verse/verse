@@ -192,6 +192,13 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 
 	vs_ctx->tls_ctx = NULL;
 	vs_ctx->dtls_ctx = NULL;
+	
+	vs_ctx->data.root_node = NULL;
+	vs_ctx->data.scene_node = NULL;
+	vs_ctx->data.user_node = NULL;
+	vs_ctx->data.avatar_node = NULL;
+
+	vs_ctx->data.sem = NULL;
 }
 
 /**
@@ -258,6 +265,16 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 
 	/* Destroy hashed array of nodes */
 	v_hash_array_destroy(&vs_ctx->data.nodes);
+	
+	/* Try to close named semaphore s*/
+	if(sem_close(vs_ctx->data.sem) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
+	}
+	
+	/* Try to unlink named semphore */
+	if(sem_unlink("/sem_data") == -1) {
+		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
+	}
 
 	/* Destroy list of connections */
 	if(vs_ctx->vsessions != NULL) {
@@ -435,6 +452,7 @@ int main(int argc, char *argv[])
 	switch (vs_ctx.auth_type) {
 		case AUTH_METHOD_CSV_FILE:
 			if(vs_load_user_accounts(&vs_ctx) != 1) {
+				v_print_log(VRS_PRINT_ERROR, "vs_load_user_accounts(): failed\n");
 				vs_destroy_ctx(&vs_ctx);
 				exit(EXIT_FAILURE);
 			}
@@ -447,6 +465,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		default:
 			/* Not supported method */
+			v_print_log(VRS_PRINT_ERROR, "unsupported auth method: %d\n", vs_ctx.auth_type);
 			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 	}
@@ -459,11 +478,14 @@ int main(int argc, char *argv[])
 
 	/* Initialize data mutex */
 	if( pthread_mutex_init(&vs_ctx.data.mutex, NULL) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): failed\n");
+		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
 
 	/* Create basic node structure of node tree */
 	if(vs_nodes_init(&vs_ctx) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "vs_nodes_init(): failed\n");
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
@@ -471,6 +493,7 @@ int main(int argc, char *argv[])
 	if(vs_ctx.stream_protocol == TCP) {
 		/* Initialize Verse server context */
 		if(vs_init_stream_ctx(&vs_ctx) == -1) {
+			v_print_log(VRS_PRINT_ERROR, "vs_init_stream_ctx(): failed\n");
 			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 		}
@@ -497,7 +520,8 @@ int main(int argc, char *argv[])
 	}
 
 	/* Initialize data semaphore */
-	if( sem_init(&vs_ctx.data.sem, 0, 0) != 0) {
+	if( (vs_ctx.data.sem = sem_open("/data_sem", O_CREAT, 0644, 1)) == SEM_FAILED) {
+		v_print_log(VRS_PRINT_ERROR, "sem_init(): %s\n", strerror(errno));
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
@@ -524,10 +548,12 @@ int main(int argc, char *argv[])
 
 	if(vs_ctx.stream_protocol == TCP) {
 		if(vs_main_listen_loop(&vs_ctx) == -1) {
+			v_print_log(VRS_PRINT_ERROR, "vs_main_listen_loop(): failed\n");
 			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 		}
 	} else {
+		v_print_log(VRS_PRINT_ERROR, "unsupported stream protocol: %d\n", vs_ctx.stream_protocol);
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}

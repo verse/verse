@@ -254,7 +254,7 @@ int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 			}
 
 			/* When some payload data were received, then poke data thread */
-			sem_post(&vs_ctx->data.sem);
+			sem_post(vs_ctx->data.sem);
 		}
 
 		if( (ret = v_STREAM_pack_message(C)) == 0 ) {

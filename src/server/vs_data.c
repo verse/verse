@@ -294,10 +294,10 @@ void *vs_data_loop(void *arg)
 
 	while(vs_ctx->state != SERVER_STATE_CLOSED) {
 #ifdef __linux__
-		ret = sem_timedwait(&vs_ctx->data.sem, &ts);
+		ret = sem_timedwait(vs_ctx->data.sem, &ts);
 #elif __APPLE__
         /* Fast fix */
-        ret = sem_wait(&vs_ctx->data.sem);
+        ret = sem_wait(vs_ctx->data.sem);
 #endif
 		if(ret == 0) {
 			for(i=0; i<vs_ctx->max_sessions; i++) {

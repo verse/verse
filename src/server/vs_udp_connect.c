@@ -947,7 +947,7 @@ static int vs_OPEN_CLOSEREQ_handle_packet(struct vContext *C)
 
 		/* When some payload data were received, then poke data thread */
 		if( (vs_ctx != NULL) && (r_packet->data != NULL)) {
-			sem_post(&vs_ctx->data.sem);
+			sem_post(vs_ctx->data.sem);
 		}
 
 		/* Call callback functions for system commands */
