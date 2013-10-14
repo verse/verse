@@ -266,16 +266,18 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	/* Destroy hashed array of nodes */
 	v_hash_array_destroy(&vs_ctx->data.nodes);
 	
+#ifndef __APPLE__	
 	/* Try to close named semaphore s*/
 	if(sem_close(vs_ctx->data.sem) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
 	}
+#endif
 	
 	/* Try to unlink named semphore */
-	if(sem_unlink("/sem_data") == -1) {
+	if(vs_ctx->data.sem != NULL && sem_unlink("/data_sem") == -1) {
 		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
 	}
-
+	
 	/* Destroy list of connections */
 	if(vs_ctx->vsessions != NULL) {
 		for (i=0; i<vs_ctx->max_sessions; i++) {
@@ -569,6 +571,8 @@ int main(int argc, char *argv[])
 		if(res != PTHREAD_CANCELED && res != NULL) free(res);
 	}
 
+	/* TODO: replace following ifdef */
+#ifndef __APPLE__
 	/* Join data thread */
 	if(pthread_join(vs_ctx.data_thread, &res) != 0) {
 		v_print_log(VRS_PRINT_ERROR, "pthread_join(): %s\n", strerror(errno));
@@ -576,6 +580,7 @@ int main(int argc, char *argv[])
 	} else {
 		if(res != PTHREAD_CANCELED && res != NULL) free(res);
 	}
+#endif
 
 	return EXIT_SUCCESS;
 }
