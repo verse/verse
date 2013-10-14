@@ -27,6 +27,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <semaphore.h>
 
 #include "verse_types.h"
 
@@ -266,7 +269,8 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	/* Destroy hashed array of nodes */
 	v_hash_array_destroy(&vs_ctx->data.nodes);
 	
-#ifndef __APPLE__	
+	/* TODO: remove following ifdef */
+#ifndef __APPLE__
 	/* Try to close named semaphore s*/
 	if(sem_close(vs_ctx->data.sem) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
