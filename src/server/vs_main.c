@@ -269,19 +269,6 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	/* Destroy hashed array of nodes */
 	v_hash_array_destroy(&vs_ctx->data.nodes);
 	
-	/* TODO: remove following ifdef */
-#ifndef __APPLE__
-	/* Try to close named semaphore s*/
-	if(sem_close(vs_ctx->data.sem) == -1) {
-		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
-	}
-#endif
-	
-	/* Try to unlink named semphore */
-	if(vs_ctx->data.sem != NULL && sem_unlink("/data_sem") == -1) {
-		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
-	}
-	
 	/* Destroy list of connections */
 	if(vs_ctx->vsessions != NULL) {
 		for (i=0; i<vs_ctx->max_sessions; i++) {
@@ -526,7 +513,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Initialize data semaphore */
-	if( (vs_ctx.data.sem = sem_open("/data_sem", O_CREAT, 0644, 1)) == SEM_FAILED) {
+	if( (vs_ctx.data.sem = sem_open(DATA_SEMAPHORE_NAME, O_CREAT, 0644, 1)) == SEM_FAILED) {
 		v_print_log(VRS_PRINT_ERROR, "sem_init(): %s\n", strerror(errno));
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
@@ -584,7 +571,17 @@ int main(int argc, char *argv[])
 	} else {
 		if(res != PTHREAD_CANCELED && res != NULL) free(res);
 	}
+
+	/* Try to close named semaphore s*/
+	if(sem_close(vs_ctx.data.sem) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
+	}
 #endif
+
+	/* Try to unlink named semphore */
+	if(vs_ctx.data.sem != NULL && sem_unlink(DATA_SEMAPHORE_NAME) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
+	}
 
 	return EXIT_SUCCESS;
 }

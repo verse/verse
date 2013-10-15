@@ -59,6 +59,8 @@
 #define AUTH_METHOD_PAM						2
 #define AUTH_METHOD_LDAP					3
 
+#define DATA_SEMAPHORE_NAME					"/data_sem"
+
 /**
  * States of Verse server
  */
