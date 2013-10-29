@@ -1,9 +1,8 @@
 /*
- * $Id: verse_client.c 1343 2012-09-18 12:44:50Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
- * Copyright (c) 2009-2012, Jiri Hnidek
+ * Copyright (c) 2009-2013, Jiri Hnidek
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

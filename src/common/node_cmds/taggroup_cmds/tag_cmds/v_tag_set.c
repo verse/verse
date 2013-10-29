@@ -1,5 +1,4 @@
 /*
- * $Id: v_tag_set.c 1276 2012-07-27 19:53:27Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

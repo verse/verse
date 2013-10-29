@@ -1,5 +1,4 @@
 /*
- * $Id: v_pack.c 1274 2012-07-27 14:20:52Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

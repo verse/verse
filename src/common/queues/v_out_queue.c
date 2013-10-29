@@ -1,5 +1,4 @@
 /*
- * $Id: v_out_queue.c 1360 2012-10-18 20:25:04Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

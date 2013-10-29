@@ -1,5 +1,4 @@
 /*
- * $Id: v_resend_mechanism.c 1324 2012-09-11 18:27:14Z jiri $
  * 
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

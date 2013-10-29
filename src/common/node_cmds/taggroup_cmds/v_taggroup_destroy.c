@@ -1,5 +1,4 @@
 /*
- * $Id: v_taggroup_destroy.c 984 2011-09-09 13:28:25Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

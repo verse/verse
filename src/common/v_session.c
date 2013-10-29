@@ -1,5 +1,4 @@
 /*
- * $Id: v_session.c 1128 2012-03-16 12:24:02Z jiri $
  * 
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

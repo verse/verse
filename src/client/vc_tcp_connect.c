@@ -1,5 +1,4 @@
 /*
- * $Id: vc_tcp_connect.c 1323 2012-09-11 18:16:18Z jiri $
  * 
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

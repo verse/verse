@@ -1,5 +1,4 @@
 /*
- * $Id: v_layer_subscribe.c 1335 2012-09-15 11:37:26Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
