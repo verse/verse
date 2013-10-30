@@ -1,5 +1,4 @@
 /*
- * $Id: vs_node.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *

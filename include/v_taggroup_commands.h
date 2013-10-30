@@ -1,5 +1,4 @@
 /*
- * $Id: v_taggroup_commands.h 1336 2012-09-15 14:35:23Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

@@ -1,5 +1,4 @@
 /*
- * $Id: v_layer_commands.h 1331 2012-09-14 07:21:35Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

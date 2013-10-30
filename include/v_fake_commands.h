@@ -1,5 +1,4 @@
 /*
- * $Id: v_fake_commands.h 1288 2012-08-05 20:34:43Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

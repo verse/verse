@@ -1,5 +1,4 @@
 /*
- * $Id: v_connection.h 1039 2011-10-23 20:27:33Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

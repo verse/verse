@@ -1,5 +1,4 @@
 /*
- * $Id: v_sys_commands.h 1268 2012-07-24 08:14:52Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

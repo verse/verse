@@ -1,5 +1,4 @@
 /*
- * $Id: vc_main.h 1293 2012-08-09 09:02:01Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

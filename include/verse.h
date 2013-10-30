@@ -1,5 +1,4 @@
 /*
- * $Id: verse.h 1338 2012-09-16 20:51:04Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

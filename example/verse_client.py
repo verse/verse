@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 #
-# $Id: verse_client.py 1359 2012-10-18 14:25:10Z jiri $
-#
 # ***** BEGIN BSD LICENSE BLOCK *****
 #
 # Copyright (c) 2009-2012, Jiri Hnidek
@@ -33,6 +31,8 @@
 #
 # Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
 #
+
+
 """
 Example of Verse client implemented in Python language
 """
