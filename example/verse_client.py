@@ -146,7 +146,7 @@ class MySession(vrs.Session):
         # Subscribe to the root of node tree
         self.send_node_subscribe(prio=vrs.DEFAULT_PRIORITY, node_id=0, version=0, crc32=0)
         # Create my new node
-        self.send_node_create(prio=vrs.DEFAULT_PRIORITY, custom_type=10)
+        self.send_node_create(prio=vrs.DEFAULT_PRIORITY, custom_type=32)
 
     def _receive_user_authenticate(self, username, methods):
         """Callback function for user authenticate"""
