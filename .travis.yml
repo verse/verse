@@ -1,6 +1,8 @@
 branches:
   only:
     - master
+before_install:
+  - sudo apt-get install -qq check 
 language: c
 compiler:
   - gcc
