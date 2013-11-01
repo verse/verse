@@ -993,7 +993,7 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	uint16 user_id = UINT16(node_create->data[0]);
 	uint32 parent_id = UINT32(node_create->data[UINT16_SIZE]);
 	uint32 node_id = UINT32(node_create->data[UINT16_SIZE+UINT32_SIZE]);
-	uint16 type = UINT16(node_create->data[UINT16_SIZE+UINT32_SIZE+UINT32_SIZE]);
+	uint16 custom_type = UINT16(node_create->data[UINT16_SIZE+UINT32_SIZE+UINT32_SIZE]);
 
 	/* Client has to send node_create command with node_id equal to
 	 * the value 0xFFFFFFFF */
@@ -1017,7 +1017,15 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	if(vs_node_new(vs_ctx, vsession, type) != NULL) {
+	/* Client has to send node_create command with custom_type bigger or
+	 * equal 32, because lower values are reserved for special nodes */
+	if( custom_type < 32 ) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() custom_type: %d is smaller then 32\n",
+				__FUNCTION__, custom_type);
+		return 0;
+	}
+
+	if(vs_node_new(vs_ctx, vsession, custom_type) != NULL) {
 		return 1;
 	} else {
 		return 0;
