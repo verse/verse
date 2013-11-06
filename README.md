@@ -183,4 +183,3 @@ Contacts
   * Phone: +420 485 35 3695
   * Address: Studentska 2, 461 17, Liberec 1, Czech Republic
 
-
