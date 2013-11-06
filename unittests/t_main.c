@@ -87,7 +87,7 @@ static int set_debug_level(char *debug_level)
 		return ret;
 	} else {
 		printf("Unsupported debug level: %s\n", debug_level);
-		return 0;
+		return VRS_FAILURE;
 	}
 
 	return 0;
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 			switch(opt) {
 				case 'd':
 					ret = set_debug_level(optarg);
-					if(ret != 1) {
+					if(ret != VRS_SUCCESS) {
 						print_help(argv[0]);
 						exit(EXIT_FAILURE);
 					}
