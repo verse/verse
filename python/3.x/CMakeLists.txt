@@ -44,8 +44,6 @@ unset(PYTHON_PREFIX CACHE)
 execute_process(COMMAND python3 -c "import sys; sys.stdout.write(sys.prefix)"
     OUTPUT_VARIABLE PYTHON_PREFIX)
 
-message( "Python 3.x install prefix: ${PYTHON_PREFIX}/lib/python${PYTHON_VERSION}/site-packages" )
-
 install (TARGETS py3_verse
 	LIBRARY
 	DESTINATION ${PYTHON_PREFIX}/lib/python${PYTHON_VERSION}/site-packages)

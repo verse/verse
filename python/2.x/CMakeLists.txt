@@ -46,8 +46,6 @@ execute_process(COMMAND python2 -c "import sys; sys.stdout.write(sys.prefix)"
 execute_process(COMMAND python2 -c "import sys; sys.stdout.write(sys.version[0:3])"
     OUTPUT_VARIABLE PYTHON_VERSION)
 
-message( "Python 2.x install prefix: ${PYTHON_PREFIX}/lib${LIBSUFFIX}/python${PYTHON_VERSION}/site-packages" )
-
 install (TARGETS py2_verse
 	LIBRARY
 	DESTINATION ${PYTHON_PREFIX}/lib${LIBSUFFIX}/python${PYTHON_VERSION}/site-packages)
