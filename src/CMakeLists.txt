@@ -171,7 +171,7 @@ install (TARGETS verse_server
 # The rule to install shared library used by Verse server and Verse clients
 install (TARGETS verse_shared_lib
 	LIBRARY
-	DESTINATION lib)
+	DESTINATION lib${LIBSUFFIX})
 
 # TODO: Make building static verse library (libverse.a) optional
 #add_library (verse_static STATIC ${libverse_src})
