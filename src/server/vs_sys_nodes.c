@@ -570,11 +570,6 @@ int vs_nodes_init(struct VS_CTX *vs_ctx)
 	struct VSUser *user;
 	int ret = -1;
 
-	v_hash_array_init(&vs_ctx->data.nodes,
-			HASH_MOD_65536,
-			offsetof(VSNode, id),
-			sizeof(uint32));
-
 	vs_ctx->data.last_common_node_id = VRS_FIRST_COMMON_NODE_ID;
 
 	node = vs_create_root_node(vs_ctx);
