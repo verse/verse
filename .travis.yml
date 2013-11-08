@@ -2,7 +2,8 @@ branches:
   only:
     - master
 before_install:
-  - sudo apt-get install -qq check 
+  - sudo apt-get install -qq check
+  - sudo pip install cpp-coveralls --use-mirrors
 language: c
 compiler:
   - gcc
@@ -15,3 +16,6 @@ script:
   - make
 after_script:
   - make test
+after_success:
+  - cd ../
+  - coverals --build-root "./build" --repo_token bo22n7hMuiuN2gDuqVwCNkwHMAPhBk9pe --exclude python --exclude stub --exclude doc --exclude unittest
