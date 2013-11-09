@@ -87,6 +87,16 @@ static int32_t my_test_taggroup_id = -1;
 static int64_t my_test_layer_id = -1;
 
 /**
+ * Username passed from command line
+ */
+static char *my_username = NULL;
+
+/**
+ * Password passed from command line
+ */
+static char *my_password = NULL;
+
+/**
  * My test custom types for node, tag group and tag
  */
 #define MY_TEST_TAG_CT			1
@@ -791,15 +801,15 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 		const uint8_t auth_methods_count,
 		const uint8_t *methods)
 {
-	static int attempts=0;	/* Store number of authentication attempt for this session. */
+	static int attempts = 0;	/* Store number of authentication attempt for this session. */
 	char name[64];
 	char *password;
-	int i, is_passwd_supported=0;
+	int i, is_passwd_supported = 0;
 
 	/* Debug print */
 	printf("%s() username: %s, auth_methods_count: %d, methods: ",
 			__FUNCTION__, username, auth_methods_count);
-	for(i=0; i<auth_methods_count; i++) {
+	for(i = 0; i < auth_methods_count; i++) {
 		printf("%d, ", methods[i]);
 		if(methods[i] == VRS_UA_METHOD_PASSWORD)
 			is_passwd_supported = 1;
@@ -808,20 +818,28 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 
 	/* Get username, when it is requested */
 	if(username == NULL) {
-		printf("Username: ");
-		scanf("%s", name);
 		attempts = 0;	/* Reset counter of auth. attempt. */
-		vrs_send_user_authenticate(session_id, name, 0, NULL);
+		if(my_username != NULL) {
+			vrs_send_user_authenticate(session_id, my_username, 0, NULL);
+		} else {
+			printf("Username: ");
+			scanf("%s", name);
+			vrs_send_user_authenticate(session_id, name, 0, NULL);
+		}
 	} else {
-		if(is_passwd_supported==1) {
-			strcpy(name, username);
-			/* Print this warning, when previous authentication attempt failed. */
-			if(attempts>0)
-				printf("Permission denied, please try again.\n");
-			/* Get password from user */
-			password = getpass("Password: ");
+		if(is_passwd_supported == 1) {
 			attempts++;
-			vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, password);
+			strcpy(name, username);
+			if(my_password != NULL && attempts == 1) {
+				vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, my_password);
+			} else {
+				/* Print this warning, when previous authentication attempt failed. */
+				if(attempts > 1)
+					printf("Permission denied, please try again.\n");
+				/* Get password from user */
+				password = getpass("Password: ");
+				vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, password);
+			}
 		} else {
 			printf("ERROR: Verse server does not support password authentication method\n");
 		}
@@ -867,6 +885,8 @@ static void print_help(char *prog_name)
 	printf("  This program is example of Verse client\n\n");
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
+	printf("   -u username      username used for login at Verse server\n");
+	printf("   -p password      password used for login at Verse server\n");
 	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
 	printf("   -s security      security of data exchange [none|tls]\n");
 	printf("   -c compresion    compression used for data exchange [none|addrshare]\n");
@@ -895,7 +915,7 @@ int main(int argc, char *argv[])
 	/* When client was started with some arguments */
 	if(argc>1) {
 		/* Parse all options */
-		while( (opt = getopt(argc, argv, "hs:t:d:")) != -1) {
+		while( (opt = getopt(argc, argv, "hu:p:s:t:d:")) != -1) {
 			switch(opt) {
 				case 's':
 					if(strcmp(optarg, "none") == 0) {
@@ -922,6 +942,12 @@ int main(int argc, char *argv[])
 						print_help(argv[0]);
 						exit(EXIT_FAILURE);
 					}
+					break;
+				case 'u':
+					my_username = optarg;
+					break;
+				case 'p':
+					my_password = optarg;
 					break;
 				case 'c':
 					if(strcmp(optarg, "none") == 0) {
