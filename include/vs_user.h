@@ -29,6 +29,9 @@
 
 struct VS_CTX;
 
+#define MIN_USER_ID		1000
+#define MAX_USER_ID		(VRS_OTHER_USERS_UID - 1)
+
 typedef struct VSUser {
 	struct VSUser	*prev, *next;
 	uint16			user_id;
