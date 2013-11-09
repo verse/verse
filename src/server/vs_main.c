@@ -474,6 +474,12 @@ int main(int argc, char *argv[])
 		v_init_print_log(vs_ctx.print_log_level, vs_ctx.log_file);
 	}
 
+	/* Add superuser account to the list of users */
+	vs_add_superuser_account(&vs_ctx);
+
+	/* Add fake account for other users to the list of users*/
+	vs_add_other_users_account(&vs_ctx);
+
 	/* Load user accounts and save them in the linked list of verse server
 	 * context */
 	switch (vs_ctx.auth_type) {
@@ -496,12 +502,6 @@ int main(int argc, char *argv[])
 			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 	}
-
-	/* Add superuser account to the list of users */
-	vs_add_superuser_account(&vs_ctx);
-
-	/* Add fake account for other users to the list of users*/
-	vs_add_other_users_account(&vs_ctx);
 
 	/* Initialize data mutex */
 	if( pthread_mutex_init(&vs_ctx.data.mutex, NULL) != 0) {
