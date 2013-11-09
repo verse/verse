@@ -157,7 +157,7 @@ static void vs_init(struct VS_CTX *vs_ctx)
 
 	vs_ctx->ws_port = VRS_DEFAULT_WEB_PORT;		/* WebSocket TCP port for listening */
 
-	vs_ctx->port_low = 20000;					/* The lowest port number for client-server connection */
+	vs_ctx->port_low = 50000;					/* The lowest port number for client-server connection */
 	vs_ctx->port_high = vs_ctx->port_low + vs_ctx->max_sockets;
 	/* Initialize list of free ports */
 	vs_ctx->port_list = (struct VS_Port*)calloc(vs_ctx->max_sockets, sizeof(struct VS_Port));

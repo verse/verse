@@ -51,6 +51,72 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		int fc_win_scale;
 		int in_queue_max_size;
 		int out_queue_max_size;
+		int tcp_port_number;
+		int ws_port_number;
+		int udp_low_port_number;
+		int udp_high_port_number;
+		int max_session_count;
+
+#ifdef WITH_OPENSSL
+		/* Try to get TLS port number */
+		tcp_port_number = iniparser_getint(ini_dict, "Global:TLS_port", -1);
+		if(tcp_port_number != -1) {
+			if(tcp_port_number >= 1024 && tcp_port_number <= 65535) {
+				vs_ctx->tcp_port = tcp_port_number;
+			} else {
+				v_print_log(VRS_PRINT_WARNING, "TLS port: %d out of range: 1024-65535\n",
+						tcp_port_number);
+			}
+		}
+#else
+		/* Try to get TCP port number */
+		tcp_port_number = iniparser_getint(ini_dict, "Global:TCP_port", -1);
+		if(tcp_port_number != -1) {
+			if(tcp_port_number >= 1024 && tcp_port_number <= 65535) {
+				vs_ctx->tcp_port = tcp_port_number;
+			} else {
+				v_print_log(VRS_PRINT_WARNING, "TCP port: %d out of range: 1024-65535\n",
+						tcp_port_number);
+			}
+		}
+#endif
+
+		/* Try to get WebSocket port number */
+		ws_port_number = iniparser_getint(ini_dict, "Global:WS_port", -1);
+		if(ws_port_number != -1) {
+			if(ws_port_number >= 1024 && ws_port_number <= 65535) {
+				vs_ctx->ws_port = ws_port_number;
+			} else {
+				v_print_log(VRS_PRINT_WARNING, "WebSocket port: %d out of range: 1024-65535\n",
+						ws_port_number);
+			}
+		}
+
+		/* Try to get lowest UDP port */
+		udp_low_port_number = iniparser_getint(ini_dict, "Global:UDP_port_low", -1);
+		if(udp_low_port_number != -1) {
+			if(udp_low_port_number >= 49152 && udp_low_port_number <= 65535) {
+				vs_ctx->port_low = udp_low_port_number;
+			} else {
+				v_print_log(VRS_PRINT_WARNING, "UDP port: %d out of range: 49152-65535\n",
+						udp_low_port_number);
+			}
+		}
+
+		udp_high_port_number = iniparser_getint(ini_dict, "Global:UDP_port_high", -1);
+		if(udp_high_port_number != -1) {
+			if(udp_high_port_number >= 49152 && udp_high_port_number <= 65535) {
+				vs_ctx->port_high = udp_high_port_number;
+			} else {
+				v_print_log(VRS_PRINT_WARNING, "UDP port: %d out of range: 49152-65535\n",
+						udp_high_port_number);
+			}
+		}
+
+		max_session_count = iniparser_getint(ini_dict, "Global:MaxSessionCount", -1);
+		if(max_session_count != -1) {
+			vs_ctx->max_sessions = max_session_count;
+		}
 
 		/* Try to load section [Users] */
 		user_auth_method = iniparser_getstring(ini_dict, "Users:Method", NULL);
