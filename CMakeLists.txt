@@ -6,8 +6,8 @@ cmake_minimum_required (VERSION 2.6)
 
 # Build type
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-	message(STATUS "Setting build type to 'Debug' as none was specified.")
-	set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+	message(STATUS "Setting build type to 'Release' as none was specified.")
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 	# Set the possible values of build type for cmake-gui
 	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif ()
@@ -194,12 +194,11 @@ configure_file ("${PROJECT_SOURCE_DIR}/config/users.csv.example"
 
 # Install verse.h file used for development of Verse clients
 install (FILES "${PROJECT_SOURCE_DIR}/include/verse.h"
-	CONFIGURATIONS "Debug"
 	DESTINATION include)
 
 # Install configuration file
 install (FILES "${PROJECT_SOURCE_DIR}/config/server.ini"
-	DESTINATION etc)
+	DESTINATION /etc)
 
 
 message ("")

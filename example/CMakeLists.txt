@@ -5,7 +5,7 @@
 if (CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_C_FLAGS "-D_REETRANT -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0 --coverage")
+   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
 	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3")
 	endif ()
