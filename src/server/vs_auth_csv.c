@@ -78,9 +78,6 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 			struct VSUser *new_user, *user;
 			char line[LINE_LEN], *tmp;
 
-			vs_ctx->users.first = NULL;
-			vs_ctx->users.last = NULL;
-
 			raw = 0;
 			while( fgets(line, LINE_LEN-2, file) != NULL) {
 				/* First line has to have following structure:
