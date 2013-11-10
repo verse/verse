@@ -291,7 +291,8 @@ static int pack_prio_queue(struct vContext *C,
 
 				/* Add command to the packet history */
 				ret = v_packet_history_add_cmd(&vconn->packet_history, sent_packet, cmd, prio);
-				assert(ret==1);
+				assert(ret == 1);
+				(void)ret;
 
 				/* Update last command id */
 				last_cmd_id = cmd->id;

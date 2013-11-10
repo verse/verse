@@ -2,7 +2,7 @@
 # CMakeFile.txt for unit tests
 
 if(CMAKE_COMPILER_IS_GNUCC)
-	set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -Wall -Wextra -pedantic -O0 --coverage")
+	set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -Wall -Wextra -pedantic -O0 --coverage -fno-strict-aliasing")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
 include_directories (./include)
