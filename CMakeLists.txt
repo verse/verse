@@ -197,10 +197,10 @@ install (FILES "${PROJECT_SOURCE_DIR}/include/verse.h"
 	DESTINATION include)
 
 # Create .cvs file without any valid user
-file(WRITE /tmp/users.csv "username,password,UID,real name")
+file(WRITE ${PROJECT_BINARY_DIR}/tmp/users.csv "username,password,UID,real name")
 
 # Install "empty" users.csv file
-install (FILES /tmp/users.csv
+install (FILES ${PROJECT_BINARY_DIR}/tmp/users.csv
     DESTINATION /etc/verse) 
 
 # Install configuration file
