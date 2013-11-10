@@ -196,9 +196,16 @@ configure_file ("${PROJECT_SOURCE_DIR}/config/users.csv.example"
 install (FILES "${PROJECT_SOURCE_DIR}/include/verse.h"
 	DESTINATION include)
 
+# Create .cvs file without any valid user
+file(WRITE /tmp/users.csv "username,password,UID,real name")
+
+# Install "empty" users.csv file
+install (FILES /tmp/users.csv
+    DESTINATION /etc/verse) 
+
 # Install configuration file
 install (FILES "${PROJECT_SOURCE_DIR}/config/server.ini"
-	DESTINATION /etc)
+	DESTINATION /etc/verse)
 
 
 message ("")
