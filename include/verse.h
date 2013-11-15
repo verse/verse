@@ -80,8 +80,14 @@ extern "C" {
 #define VRS_CONN_TERM_SERVER		8	/* Connection terminated by server */
 
 /* Access permissions */
-#define VRS_PERM_NODE_READ			1
-#define VRS_PERM_NODE_WRITE			2
+#define VRS_PERM_NODE_READ			1	/* User can read content of the node */
+#define VRS_PERM_NODE_WRITE			2	/* User can do anything with content of the node */
+#if 0
+/* Proposal */
+#define VRS_PERM_NODE_APPEND		4	/* User can add new entities to node */
+#define VRS_PERM_NODE_CHANGE		8	/* User can change content of the node */
+#define VRS_PERM_NODE_CLEAR			16	/* User can delete any entity in the node */
+#endif
 
 /* Methods of user authentication */
 #define VRS_UA_METHOD_RESERVED		0
