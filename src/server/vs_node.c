@@ -211,7 +211,8 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	/* TODO: send node_subscribe with version and commands with difference
 	 * between this version and current state, when versing will be supported */
 	if(version != 0) {
-		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versing is not supported yet\n", version);
+		v_print_log(VRS_PRINT_WARNING,
+				"Version: %d != 0, versing is not supported yet\n", version);
 	}
 
 	/* Send node_perm commands to the new subscriber */
@@ -230,7 +231,9 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	 * only node_perm command explaining, why user can't rest of this
 	 * node */
 	if(user_can_read == 0) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Insufficient permission to read content of the node: %d\n", node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Insufficient permission to read content of the node: %d\n",
+				node->id);
 		return 0;
 	}
 
@@ -279,7 +282,8 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 
 	/* Check if this node is in created/creating state */
 	if(!(node->state == ENTITY_CREATING || node->state == ENTITY_CREATED)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "This node: %d is in %d state\n", node->id, node->state);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"This node: %d is in %d state\n", node->id, node->state);
 		return 0;
 	}
 
@@ -290,7 +294,8 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 				(node_follower->state == ENTITY_CREATING ||
 				 node_follower->state == ENTITY_CREATED))
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Client already knows about node: %d\n", node->id);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Client already knows about node: %d\n", node->id);
 			return 0;
 		}
 		node_follower = node_follower->next;
@@ -436,7 +441,8 @@ struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
 	if(parent_node != NULL) {
 		link = vs_link_create(parent_node, node);
 		if(link == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "link between nodes %d %d could not be created\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"link between nodes %d %d could not be created\n",
 					parent_node->id, node->id);
 			free(node);
 			return NULL;
@@ -451,7 +457,8 @@ struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
 	/* Add node to the hashed array of all verse nodes */
 	bucket = v_hash_array_add_item(&vs_ctx->data.nodes, node, sizeof(struct VSNode));
 	if(bucket == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "node %d could not be added to the hashed list of nodes\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"node %d could not be added to the hashed list of nodes\n",
 				node->id);
 		if(node->parent_link != NULL) {
 			v_list_free_item(&parent_node->children_links, node->parent_link);
@@ -510,13 +517,15 @@ static int vs_node_destroy(struct VS_CTX *vs_ctx, struct VSNode *node)
 			return 1;
 		} else {
 			/* This should never happen */
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): node (id: %d) with child nodes can't be destroyed\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s(): node (id: %d) with child nodes can't be destroyed\n",
 					__FUNCTION__, node->id);
 			return 0;
 		}
 	} else {
 		/* This should never happen */
-		v_print_log(VRS_PRINT_WARNING, "%(): node (id: %d) with followers can't be destroyed\n",
+		v_print_log(VRS_PRINT_WARNING,
+				"%(): node (id: %d) with followers can't be destroyed\n",
 				__FUNCTION__, node->id);
 		return 0;
 	}
@@ -637,13 +646,15 @@ static struct VSNode *vs_node_new(struct VS_CTX *vs_ctx,
 	if(bucket != NULL) {
 		avatar_node = (struct VSNode*)bucket->data;
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->avatar_id: %d not found\n", vsession->avatar_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"vsession->avatar_id: %d not found\n", vsession->avatar_id);
 		goto end;
 	}
 
 	/* Try to find owner of the new node */
 	if((owner = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->user_id: %d not found\n", vsession->user_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"vsession->user_id: %d not found\n", vsession->user_id);
 		goto end;
 	}
 
@@ -702,7 +713,8 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -722,8 +734,9 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 		/* Change priority for this node and all child nodes */
 		vs_node_prio(vsession, node, prio);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to this node (id: %d)\n",
-						__FUNCTION__, node_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() client not subscribed to this node (id: %d)\n",
+				__FUNCTION__, node_id);
 		return 0;
 	}
 
@@ -754,7 +767,8 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 	 * the disk and send node_unsubscribe command to the client with version number
 	 * and crc32 */
 	if(version != 0) {
-		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versing is not supported yet\n", version);
+		v_print_log(VRS_PRINT_WARNING,
+				"Version: %d != 0, versing is not supported yet\n", version);
 	}
 
 	/* Node has to be created */
@@ -770,12 +784,14 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		if(node_subscriber!= NULL) {
 			return vs_node_unsubscribe(node, node_subscriber, 0);
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to this node (id: %d)\n",
-							__FUNCTION__, node_id);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() client not subscribed to this node (id: %d)\n",
+					__FUNCTION__, node_id);
 			return 0;
 		}
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -810,7 +826,8 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 		node_subscriber = node->node_subs.first;
 		while(node_subscriber != NULL) {
 			if(node_subscriber->session->session_id == vsession->session_id) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client %d is already subscribed to the node (id: %d)\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"%s() client %d is already subscribed to the node (id: %d)\n",
 						__FUNCTION__, vsession->session_id, node->id);
 				return 0;
 			}
@@ -819,7 +836,8 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 
 		return vs_node_subscribe(vs_ctx, vsession, node, version);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -891,7 +909,8 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -904,7 +923,8 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 
 	/* Is this user owner of this node? */
 	if(user != node->owner) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
 				vsession->user_id, node->id);
 		return 0;
 	}
