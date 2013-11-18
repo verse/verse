@@ -185,6 +185,10 @@ typedef struct VC_CTX {
 	/* SSL context */
 	SSL_CTX					*tls_ctx;					/**< SSL context for main secured TCP TLS socket */
 	SSL_CTX					*dtls_ctx;					/**< SSL context for secured UDP DTLS connections (shared with all connections) */
+	/* Kerberos */
+	unsigned short			use_kerberos;				/** Will be kerberos use? O no 1 yes */
+	krb5_context			krb5_ctx;					/* Kerberos library context */
+	/*krb5_principal			krb5_principal;				 Kerberos principal */
 } VC_CTX;
 
 /* Function prototypes */

@@ -119,6 +119,11 @@ typedef struct VS_CTX {
 	/* SSL context */
 	SSL_CTX				*tls_ctx;					/* SSL context for main secured TCP TLS socket */
 	SSL_CTX				*dtls_ctx;					/* SSL context for secured UDP DTLS connections (shared with all connections) */
+	/* Kerberos context */
+	unsigned short		use_krb5;					/* Will be kerebos used? O no 1 yes */
+	krb5_keytab			krb5_keytab;				/* Kerberos keytab table */
+	krb5_principal		krb5_principal;				/* Kerberos principal */
+	krb5_context		krb5_ctx;					/* Kerberos library context */
 	/* Path to files with certificates */
 	char				*public_cert_file;			/* Path to the certificate file with public key */
 	char				*ca_cert_file;				/* Path to the certificate file with CA certificate */

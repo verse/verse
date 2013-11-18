@@ -28,6 +28,8 @@
 #include <time.h>
 #include <assert.h>
 
+#include "verse.h"
+
 #include "verse_types.h"
 
 #include "vs_main.h"

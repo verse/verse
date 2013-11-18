@@ -44,6 +44,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include "verse.h"
+
 #include "vs_main.h"
 #include "vs_udp_connect.h"
 

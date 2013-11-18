@@ -26,6 +26,7 @@
 #include <string.h>
 #include <ldap.h>
 
+#include "verse.h"
 #include "vs_main.h"
 #include "v_context.h"
 #include "v_common.h"

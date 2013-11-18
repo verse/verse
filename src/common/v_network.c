@@ -37,6 +37,8 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include <krb5.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -46,6 +48,8 @@
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
+
+#include "verse.h"
 
 #include "verse_types.h"
 #include "v_network.h"
@@ -516,6 +520,29 @@ void v_print_addr(const unsigned char level, const struct VNetworkAddress *addr)
 		inet_ntop(AF_INET6, &(addr->addr.ipv6.sin6_addr), str_addr, sizeof(str_addr));
 		v_print_log_simple(level, "%s ", str_addr);
 	}
+}
+/* Read data form kerberos connection to the IO_CTX. Return number of bytes read
+ * from the kerberos connection. When some error occurs, then error code is stored
+ * in error_num */
+int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num){
+	/*io_ctx->buf_size = recvfrom(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0,
+			NULL, NULL);
+	error_num = krb5_rd_priv();*/
+	/**
+	 * TODO: implementation of this
+	 */
+
+	return 0;
+}
+
+/* Write data form IO_CTX into kerberos connection. Return number of bytes written
+ * to the kerberos connection. When some error occurs, then error code is stored
+ * in error_num */
+int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num){
+	/**
+	 * TODO: implementation of this
+	 */
+	return 0;
 }
 
 /* Read data form SSL connection to the IO_CTX. Return number of bytes read

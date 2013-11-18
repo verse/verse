@@ -263,6 +263,9 @@ typedef struct IO_CTX {
 	unsigned char			flags;			/* Flags for sending and receiving context */
 	unsigned short			mtu;			/* MTU of connection discovered with PMTU */
 	/* Security */
+	krb5_ccache				krb5_cc;		/* Kerberos credentials cache */
+	krb5_auth_context		krb5_auth_ctx;	/* Kerberos authentication contex */
+	krb5_ticket				*krb5_ticket;	/* Kerberos ticket */
 	SSL						*ssl;
 	BIO						*bio;
 } IO_CTX;
@@ -281,6 +284,9 @@ int v_parse_url(const char *str, struct VURL *url);
 void v_print_url(const int level, struct VURL *url);
 
 int v_exponential_backoff(const int steps);
+
+int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num);
+int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num);
 
 int v_SSL_read(struct IO_CTX *io_ctx, int *error_num);
 int v_SSL_write(struct IO_CTX *io_ctx, int *error_num);

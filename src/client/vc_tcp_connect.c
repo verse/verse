@@ -48,7 +48,9 @@
 #include <string.h>
 #include <fcntl.h>
 
+#include "verse.h"
 #include "verse_types.h"
+
 
 #include "vc_main.h"
 #include "vc_tcp_connect.h"
@@ -628,6 +630,111 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 	return 0;
 }
 
+static int vc_USRAUTH_krb_loop(struct vContext *C, struct User_Authenticate_Cmd *ua_data)
+{
+	struct VSession *vsession = CTX_current_session(C);
+	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
+	struct VMessage *r_message = CTX_r_message(C);
+	struct timeval tv;
+	fd_set set;
+	int i, ret, error, buffer_pos=0, auth_succ=0;
+
+	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: USRAUTH_krb\n");
+		printf("%c[%dm", 27, 0);
+	}
+
+	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+	/* Wait VERSE_TIMEOUT seconds for the respond from the server */
+	FD_ZERO(&set);
+	FD_SET(stream_conn->io_ctx.sockfd, &set);
+
+	tv.tv_sec = VRS_TIMEOUT;
+	tv.tv_usec = 0;
+
+	/* Wait for the event on the socket */
+	if( (ret = select(stream_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+		return 0;
+	/* Was event on the TCP socket of this session */
+	} else if(ret>0 && FD_ISSET(stream_conn->io_ctx.sockfd, &set)) {
+		buffer_pos = 0;
+
+		/* Try to receive data through kerberos connection */
+		if( v_krb5_read(&stream_conn->io_ctx, &error) <= 0 ) {
+			/* TODO: try to read more data */
+			return 0;
+		}
+
+		/* Make sure, that buffer contains at verse message header.
+		 * If this condition is not reached, then somebody tries
+		 * to do some bad things! .. Close this connection. */
+		if(stream_conn->io_ctx.buf_size < VERSE_MESSAGE_HEADER_SIZE) {
+			v_print_log(VRS_PRINT_ERROR, "Small received buffer: %d\n", stream_conn->io_ctx.buf_size);
+			/* TODO: try to read more data */
+			return 0;
+		}
+
+		/* Unpack Verse message header */
+		buffer_pos += v_unpack_message_header(&stream_conn->io_ctx.buf[buffer_pos],
+				(stream_conn->io_ctx.buf_size - buffer_pos),
+				r_message);
+
+		/* Unpack all system commands */
+		buffer_pos += v_unpack_message_system_commands(&stream_conn->io_ctx.buf[buffer_pos],
+				stream_conn->io_ctx.buf_size - buffer_pos,
+				r_message);
+
+		/* Print received message */
+		v_print_receive_message(C);
+
+		/* Process all system commands in this state */
+		for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id != CMD_RESERVED_ID; i++) {
+			switch(r_message->sys_cmd[i].cmd.id) {
+			case CMD_USER_AUTH_FAILURE:
+				v_print_log(VRS_PRINT_DEBUG_MSG, "User authentication of user: %s failed.\n", ua_data->username);
+				return 0;
+			case CMD_USER_AUTH_SUCCESS:
+				vsession->avatar_id = r_message->sys_cmd[i].ua_succ.avatar_id;
+				vsession->user_id = r_message->sys_cmd[i].ua_succ.user_id;
+				v_print_log(VRS_PRINT_DEBUG_MSG, "avatar_id: %d, user_id: %d\n",
+						vsession->avatar_id, vsession->user_id);
+				auth_succ = 1;
+				break;
+			case CMD_CHANGE_R_ID:
+				if(r_message->sys_cmd[i].change_l_cmd.feature == FTR_COOKIE) {
+					if(vsession->host_cookie.str!=NULL) {
+						free(vsession->host_cookie.str);
+						vsession->host_cookie.str = NULL;
+					}
+					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
+				}
+				break;
+			case CMD_CHANGE_L_ID:
+				if(r_message->sys_cmd[i].change_l_cmd.feature == FTR_DED) {
+					if(vsession->ded.str!=NULL) {
+						free(vsession->ded.str);
+						vsession->ded.str = NULL;
+					}
+					vsession->ded.str = strdup((char*)r_message->sys_cmd[i].change_l_cmd.value[0].string8.str);
+				}
+				break;
+			}
+		}
+
+		if(auth_succ==1)
+			return CMD_USER_AUTH_SUCCESS;
+		else
+			return 0;
+	} else {
+		return 0;
+	}
+
+	return 0;
+}
+
 /**
  * \brief Destroy Verse client TCP connection and SSL context
  * \param[in]	*stream_conn	The pointer at TCP connection
@@ -912,6 +1019,13 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	struct VStreamConn *stream_conn = NULL;
 	struct addrinfo hints, *result, *rp;
 	int sockfd, ret, flag;
+	krb5_error_code krb5err;
+	krb5_data packet, inbuf;
+
+	/*krb5_context krb5_ctx;
+	krb5_auth_context krb5_auth_ctx = NULL;
+	krb5_ccache krb5_cc;*/
+	char *s_name, *h_name;
 #ifndef __APPLE__
 	struct timeval tv;
 #endif
@@ -1018,42 +1132,85 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		return NULL;
 	}
 
-	/* Set up SSL */
-	if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
-		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
-		ERR_print_errors_fp(v_log_file());
-		free(stream_conn);
-		*error = VRS_CONN_TERM_ERROR;
-		return NULL;
-	}
+	/* Will be kerberos used? */
+	if (ctx->use_kerberos==USE_KERBEROS) {
+		s_name = malloc(64*sizeof(char));
+		h_name = malloc(64*sizeof(char));
+		strcpy(s_name, "verse");
+		strcpy(h_name, "localhost");
+		/* Get credentials for server */
+		if ((krb5err = krb5_cc_default(ctx->krb5_ctx,
+				&stream_conn->io_ctx.krb5_cc))) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_cc_default: %d: %s\n", krb5err,
+					krb5_get_error_message(ctx->krb5_ctx, krb5err));
+			return NULL;
+		}
 
-	/* Bind socket and SSL */
-	if (SSL_set_fd(stream_conn->io_ctx.ssl, stream_conn->io_ctx.sockfd) == 0) {
-		v_print_log(VRS_PRINT_ERROR, "Failed binding socket descriptor and SSL.\n");
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		free(stream_conn);
-		*error = VRS_CONN_TERM_ERROR;
-		return NULL;
-	}
+		/**
+		 * TODO: use any hostname and any service
+		 */
+		inbuf.data = h_name;
+		inbuf.length = strlen(h_name);
+		if ((krb5err = krb5_mk_req(ctx->krb5_ctx,
+				&stream_conn->io_ctx.krb5_auth_ctx, 0, s_name, h_name, &inbuf,
+				stream_conn->io_ctx.krb5_cc, &packet))) {
+			printf("Error making request\n");
+			v_print_log(VRS_PRINT_ERROR,
+					"krb5_mk_req: %d: %s\t service name: %s\n", krb5err,
+					krb5_get_error_message(ctx->krb5_ctx, krb5err), service);
+			return NULL;
+		}
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Got credentials for %s.\n", service);
 
-	SSL_set_mode(stream_conn->io_ctx.ssl, SSL_MODE_AUTO_RETRY);
+		/* Send authentication info to server */
+		if (send(stream_conn->io_ctx.sockfd, (char *) packet.data,
+				(unsigned) packet.length, 0) < 0) {
+			v_print_log(VRS_PRINT_ERROR, "Error sending message\n");
+		}
 
-	/* Do TLS handshake and negotiation */
-	if( SSL_connect(stream_conn->io_ctx.ssl) == -1) {
-		v_print_log(VRS_PRINT_ERROR, "SSL connection failed\n");
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		free(stream_conn);
-		*error = VRS_CONN_TERM_ERROR;
-		return NULL;
+		krb5_free_data_contents(ctx->krb5_ctx, &packet);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection established.\n");
-	}
+		/* Set up SSL */
+		if ((stream_conn->io_ctx.ssl = SSL_new(ctx->tls_ctx)) == NULL) {
+			v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
+			ERR_print_errors_fp(v_log_file());
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
 
-	/* Debug print: ciphers, certificates, etc. */
-	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection uses: %s cipher.\n", SSL_get_cipher(stream_conn->io_ctx.ssl));
+		/* Bind socket and SSL */
+		if (SSL_set_fd(stream_conn->io_ctx.ssl, stream_conn->io_ctx.sockfd)
+				== 0) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Failed binding socket descriptor and SSL.\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
+
+		SSL_set_mode(stream_conn->io_ctx.ssl, SSL_MODE_AUTO_RETRY);
+
+		/* Do TLS handshake and negotiation */
+		if (SSL_connect(stream_conn->io_ctx.ssl) == -1) {
+			v_print_log(VRS_PRINT_ERROR, "SSL connection failed\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection established.\n");
+		}
+
+		/* Debug print: ciphers, certificates, etc. */
+		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"SSL connection uses: %s cipher.\n",
+					SSL_get_cipher(stream_conn->io_ctx.ssl));
+		}
 	}
 
 	return stream_conn;
@@ -1074,8 +1231,18 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	int ret;
 	uint8 error = 0;
 	uint8 *udp_thread_result;
+	krb5_error_code krb5err;
 
 	struct Connect_Terminate_Cmd *conn_term;
+
+	if(vc_ctx->use_kerberos == USE_KERBEROS){
+		krb5err = krb5_init_context(&vc_ctx->krb5_ctx);
+		if (krb5err) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n", krb5err,
+					krb5_get_error_message(vc_ctx->krb5_ctx, krb5err));
+			goto closed;
+		}
+	}
 
 	/* Initialize new TCP connection to the server. */
 	if( (stream_conn = vc_create_client_stream_conn(vc_ctx, vsession->peer_hostname, vsession->service, &error)) == NULL ) {
@@ -1098,11 +1265,25 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	CTX_s_message_set(C, s_message);
 	vsession->stream_conn = stream_conn;
 
+	if(vc_ctx->use_kerberos == USE_KERBEROS){
+		/* Update client and server states */
+		stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_KRB;
+		ret = vc_USRAUTH_krb_loop(C, &ua_data);
+		switch(ret) {
+		case 0:
+			error = VRS_CONN_TERM_AUTH_FAILED;
+			goto closing;
+		case CMD_USER_AUTH_SUCCESS:
+			goto cookie_ded;
+		default:
+		break;
+		}
+	}
 	/* Verify server certificate */
 	vc_verify_certificate(C);
 
 	/* Update client and server states */
-	stream_conn->host_state=TCP_CLIENT_STATE_USRAUTH_NONE;
+	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_NONE;
 
 	/* Get list of supported authentication methods */
 	ret = vc_USRAUTH_none_loop(C, &ua_data);

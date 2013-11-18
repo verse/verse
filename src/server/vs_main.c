@@ -28,6 +28,8 @@
 #include <signal.h>
 #include <unistd.h>
 
+#include "verse.h"
+
 #include "verse_types.h"
 
 #include "vs_main.h"
@@ -154,6 +156,8 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->fc_meth = FC_NONE;		/* "List" of allowed methods of Flow Control */
 
 	vs_ctx->rwin_scale = 7;			/*  Default scale of Flow Control Window */
+	vs_ctx->use_krb5 = NO_KERBEROS; /* Not using kerberos as default */
+	vs_ctx->krb5_keytab = NULL;		/* Will use defaul keytab */
 }
 
 /**

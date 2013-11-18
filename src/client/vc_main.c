@@ -56,6 +56,8 @@
 
 #include <fcntl.h>
 
+#include "verse.h"
+
 #include "verse_types.h"
 
 #include "v_network.h"
@@ -212,6 +214,8 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 #else
 	vc_ctx->dtls_ctx = NULL;
 #endif
+
+	vc_ctx->use_kerberos = USE_KERBEROS;
 
 	return 1;
 }

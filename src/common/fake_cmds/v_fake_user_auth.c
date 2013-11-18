@@ -37,6 +37,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "verse.h"
+
 #include "v_common.h"
 #include "v_fake_commands.h"
 
@@ -63,6 +65,9 @@ void v_fake_user_auth_print(const unsigned char level, struct User_Authenticate_
 			case VRS_UA_METHOD_RESERVED:
 				v_print_log_simple(level, "RESERVED, ");
 				break;
+			/*case VRS_UA_METHOD_KERBEROS:
+				v_print_log_simple(level, "KERBEROS, ");
+				break;*/
 			default:
 				v_print_log_simple(level, "Unknown, ");
 				break;

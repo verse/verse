@@ -46,6 +46,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		char *certificate_file_name;
 		char *ca_certificate_file_name;
 		char *private_key;
+		char *use_kerberos;
 
 		/* Try to load section [Users] */
 		user_auth_method = iniparser_getstring(ini_dict, "Users:Method", NULL);
@@ -81,9 +82,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 
 			printf("user_auth_method: %s\n", user_auth_method);
 
-			ldap_version = iniparser_getint(ini_dict, "Users:Version", NULL );
+			ldap_version = iniparser_getint(ini_dict, "Users:Version", 0 );
 
-			if (ldap_version != NULL && ldap_version > 0 && ldap_version <= 3) {
+			if (ldap_version > 0 && ldap_version <= 3) {
 				char *ldap_hostname, *ldap_DN, *ldap_pass, *ldap_base,
 						*ldap_LOS;
 
@@ -130,6 +131,12 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		}
 
 		/* Try to load section [Security] */
+		use_kerberos = iniparser_getstring(ini_dict, "Security:UseKerberos", NULL);
+		if(use_kerberos != NULL && strcmp(use_kerberos, "yes") == 0){
+			vs_ctx->use_krb5 = USE_KERBEROS;
+			printf("Kerberos will be used\n");
+		}
+
 		certificate_file_name = iniparser_getstring(ini_dict, "Security:Certificate", NULL);
 		if(certificate_file_name != NULL) {
 			printf("certificate_file_name: %s\n", certificate_file_name);

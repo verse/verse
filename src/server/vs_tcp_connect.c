@@ -27,6 +27,8 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 
+#include <krb5.h>
+
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -37,6 +39,8 @@
 #include <fcntl.h>
 #include <string.h>
 #include <pthread.h>
+
+#include "verse.h"
 
 #include "verse_types.h"
 
@@ -94,6 +98,84 @@ int vs_user_auth(struct vContext *C, const char *username, const char *data)
 	}
 
 	return uid;
+}
+static int vs_krb_make_user(struct vContext *C, const char *username){
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct VSUser *vsuser;
+	int uid = -1;
+
+	vsuser = vs_ctx->users.first;
+
+	while (vsuser) {
+		/* Try to find record with this username. (the username has to be
+		 * unique). The user could not be fake user (super user and other users) */
+		if (vsuser->fake_user != 1) {
+			if (strcmp(vsuser->username, username) == 0) {
+				/* When record with username return uid */
+				uid = vsuser->user_id;
+				break;
+			}
+		}
+		vsuser = vsuser->next;
+	}
+	return uid;
+}
+
+static int vs_kerberos_auth(struct vContext *C, char *u_name){
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+	/*struct IO_CTX *io_ctx = CTX_io_ctx(C);*/
+	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
+	int flags = 0;
+	int len = MAX_PACKET_SIZE;
+	unsigned char buffer[MAX_PACKET_SIZE];
+	char *client_principal;
+	krb5_data packet;
+	krb5_error_code krb5err;
+	int flag;
+
+	/* Make sure socket is blocking */
+	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
+	if ((fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK))
+			== -1) {
+		if (is_log_level(VRS_PRINT_ERROR))
+			v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return 0;
+	}
+
+	/* GET KRB_AP_REQ MESSAGE */
+
+	/* use "recvfrom" so we know client's address */
+	if ((len = recvfrom(stream_conn->io_ctx.sockfd, (char *) buffer, sizeof(buffer), flags,
+			NULL, NULL)) < 0) {
+		v_print_log(VRS_PRINT_ERROR, "recvfrom failed.\n");
+		return 0;
+	}
+	packet.length = len;
+	packet.data = (krb5_pointer) buffer;
+
+	vs_ctx->io_ctx.krb5_auth_ctx = NULL;
+	vs_ctx->io_ctx.krb5_ticket = NULL;
+
+	/* Check authentication info */
+	if ((krb5err = krb5_rd_req(vs_ctx->krb5_ctx,
+			(krb5_auth_context *) &vs_ctx->io_ctx.krb5_auth_ctx, &packet,
+			vs_ctx->krb5_principal, vs_ctx->krb5_keytab,
+			NULL, (krb5_ticket **) &vs_ctx->io_ctx.krb5_ticket))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_rd_req %d: %s\n", (int) krb5err,
+				krb5_get_error_message(vs_ctx->krb5_ctx, krb5err));
+		return 0;
+	}
+	if ((krb5err = krb5_unparse_name(vs_ctx->krb5_ctx,
+			vs_ctx->io_ctx.krb5_ticket->enc_part2->client, &client_principal))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_unparse_name %d: %s\n",
+				(int) krb5err,
+				krb5_get_error_message(vs_ctx->krb5_ctx, krb5err));
+		return 0;
+	}
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Got authentication info from %s\n", client_principal);
+	u_name = client_principal;
+	/*free(client_principal);*/
+	return 1;
 }
 
 /**
@@ -667,6 +749,114 @@ static int vs_RESPOND_methods_loop(struct vContext *C)
 	return 0;
 }
 
+static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name){
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+		struct IO_CTX *io_ctx = CTX_io_ctx(C);
+		struct VSession *vsession = CTX_current_session(C);
+		struct VMessage *s_message = CTX_s_message(C);
+		int i, ret, error;
+		unsigned short buffer_pos = 0;
+
+		int user_id;
+
+		/* Do user authentication */
+		if ((user_id = vs_krb_make_user(C, u_name)) != -1) {
+			long int avatar_id;
+
+			pthread_mutex_lock(&vs_ctx->data.mutex);
+			avatar_id = vs_node_new_avatar_node(vs_ctx, user_id);
+			pthread_mutex_unlock(&vs_ctx->data.mutex);
+
+			if (avatar_id == -1) {
+				v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
+				return 0;
+			}
+
+			buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+			s_message->sys_cmd[0].ua_succ.id = CMD_USER_AUTH_SUCCESS;
+			/* Save user_id to the session and send it in
+			 * connect_accept command */
+			vsession->user_id = user_id;
+			vsession->avatar_id = avatar_id;
+			s_message->sys_cmd[0].ua_succ.user_id = user_id;
+			s_message->sys_cmd[0].ua_succ.avatar_id = avatar_id;
+
+			/* Set up negotiate command of the host cookie */
+			s_message->sys_cmd[1].change_r_cmd.id = CMD_CHANGE_R_ID;
+			s_message->sys_cmd[1].change_r_cmd.feature = FTR_COOKIE;
+			s_message->sys_cmd[1].change_r_cmd.count = 1;
+			/* Generate random string */
+			vsession->peer_cookie.str = (char*) calloc((COOKIE_SIZE + 1), sizeof(char));
+			for (i = 0; i < COOKIE_SIZE; i++) {
+				/* Generate only printable characters (debug prints) */
+				vsession->peer_cookie.str[i] = 32
+						+ (char) ((float) rand() * 94.0 / RAND_MAX);
+			}
+			vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
+			s_message->sys_cmd[1].change_r_cmd.value[0].string8.length = strlen(
+					vsession->peer_cookie.str);
+			strcpy((char*) s_message->sys_cmd[1].change_r_cmd.value[0].string8.str,
+					vsession->peer_cookie.str);
+
+			s_message->sys_cmd[2].change_l_cmd.id = CMD_CHANGE_L_ID;
+			s_message->sys_cmd[2].change_l_cmd.feature = FTR_DED;
+			s_message->sys_cmd[2].change_l_cmd.count = 1;
+			/* Load DED from configuration and save it to the session */
+			vsession->ded.str = strdup(vs_ctx->ded);
+			s_message->sys_cmd[2].change_l_cmd.value[0].string8.length = strlen(
+					vsession->ded.str);
+			strcpy((char*) s_message->sys_cmd[2].change_l_cmd.value[0].string8.str,
+					vsession->ded.str);
+
+			/* Terminating command */
+			s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
+
+			buffer_pos += v_pack_stream_system_commands(s_message,
+					&io_ctx->buf[buffer_pos]);
+
+			s_message->header.len = io_ctx->buf_size = buffer_pos;
+			s_message->header.version = VRS_VERSION;
+			/* Pack header to the beginning of the buffer */
+			v_pack_message_header(s_message, io_ctx->buf);
+
+			v_print_send_message(C);
+
+			/* Send command to the client */
+			if ((ret = v_krb5_write(io_ctx, &error)) <= 0) {
+				return 0;
+			} else {
+				return 1;
+			}
+		} else {
+
+			buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+			s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
+			s_message->sys_cmd[0].ua_fail.count = 0;
+
+			s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
+
+			buffer_pos += v_pack_stream_system_commands(s_message,
+					&io_ctx->buf[buffer_pos]);
+
+			s_message->header.len = io_ctx->buf_size = buffer_pos;
+			s_message->header.version = VRS_VERSION;
+			/* Pack header to the beginning of the buffer */
+			v_pack_message_header(s_message, io_ctx->buf);
+
+			v_print_send_message(C);
+
+			/* Send command to the client */
+			if ((ret = v_krb5_write(io_ctx, &error)) <= 0) {
+				return 0;
+			} else {
+				return 0;
+			}
+		}
+		return 0;
+}
+
 /**
  * \brief Main function for new thread. This thread is created for new
  * connection with client. This thread will try to authenticate new user
@@ -682,11 +872,21 @@ void *vs_tcp_conn_loop(void *arg)
 	struct timeval tv;
 	fd_set set;
 	int error, ret, user_auth_attempts=0;
+	krb5_error_code k_error;
 	void *udp_thread_result;
+	char *u_name = NULL;
 
-	/* Try to do TLS handshake with client */
-	if(vs_TLS_handshake(C)!=1) {
-		goto end;
+	/* Is Kerberos used? */
+	if (vs_ctx->use_krb5 == USE_KERBEROS) {
+		/* Try to verify Kerberos */
+		if (vs_kerberos_auth(C, u_name) != 1){
+			goto end;
+		}
+	} else {
+		/* Try to do TLS handshake with client */
+		if (vs_TLS_handshake(C) != 1) {
+			goto end;
+		}
 	}
 
 	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
@@ -694,12 +894,24 @@ void *vs_tcp_conn_loop(void *arg)
 	CTX_r_message_set(C, r_message);
 	CTX_s_message_set(C, s_message);
 
-	stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+	if (vs_ctx->use_krb5 == USE_KERBEROS) {
+		stream_conn->host_state = TCP_SERVER_STATE_RESPOND_KRB_AUTH;
 
-	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
-		printf("%c[%dm", 27, 0);
+		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 31);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Server TCP state: RESPOND_krb\n");
+			printf("%c[%dm", 27, 0);
+		}
+	} else {
+		stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+
+		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 31);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Server TCP state: RESPOND_methods\n");
+			printf("%c[%dm", 27, 0);
+		}
 	}
 
 	user_auth_attempts = 0;
@@ -719,9 +931,11 @@ void *vs_tcp_conn_loop(void *arg)
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
-			/* Try to receive data through SSL connection */
-			if( v_SSL_read(io_ctx, &error) <= 0 ) {
-				goto end;
+			if (vs_ctx->use_krb5 != USE_KERBEROS) {
+				/* Try to receive data through SSL connection */
+				if (v_SSL_read(io_ctx, &error) <= 0) {
+					goto end;
+				}
 			}
 
 			/* Make sure, that buffer contains at least Verse message
@@ -759,6 +973,22 @@ void *vs_tcp_conn_loop(void *arg)
 				} else {
 					user_auth_attempts++;
 					if(user_auth_attempts >= MAX_USER_AUTH_ATTEMPTS) {
+						goto end;
+					}
+				}
+				break;
+			case TCP_SERVER_STATE_RESPOND_KRB_AUTH:
+				ret = vs_RESPOND_krb_auth_loop(C, u_name);
+				if(ret==1) {
+					stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
+
+					if(is_log_level(VRS_PRINT_DEBUG_MSG))
+					{
+						printf("%c[%d;%dm", 27, 1, 31);
+						v_print_log(VRS_PRINT_DEBUG_MSG,
+								"Server TCP state: NEGOTIATE_cookie_ded\n");
+						printf("%c[%dm", 27, 0);
+					} else {
 						goto end;
 					}
 				}
@@ -866,6 +1096,19 @@ end:
 	pthread_exit(NULL);
 	return NULL;
 }
+
+/*krb5_error_code vs_verify_krb5_credentials(VS_CTX *vs_ctx, krb5_creds *krb5_cerds)
+{
+	krb5_error_code ret;
+	krb5_verify_init_creds_opt options;
+
+	krb5_verify_init_creds_opt_init(&options);
+	krb5_verify_init_creds_opt_set_ap_req_nofail(&options, 1);
+
+	ret = krb5_verify_init_creds(vs_ctx->krb5_ctx, krb5_cerds, vs_ctx->krb5_principal, vs_ctx->krb5_keytab, NULL, &options);
+
+	return ret;
+}*/
 
 /* Main Verse server loop. Server waits for connect attempts, responds to attempts
  * and creates per connection threads */
@@ -1079,116 +1322,321 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 }
 
 /* Initialize verse server context */
+/*int vs_init_stream_ctx_krb5(VS_CTX *vs_ctx)
+{
+	int i, flag;
+	krb5_error_code krb5_err;
+	char *service;
+
+	service = strdup("Verse");
+
+	 Set up Kerberos context
+
+	if ((krb5_err = krb5_init_context(&vs_ctx->krb5_ctx))) {
+		v_print_log(VRS_PRINT_ERROR, "Setting up krb5_context failed.\n");
+		com_err("Error", krb5_err, "\n");
+		return -1;
+	}
+	printf("Kerberos context created\n");
+
+	 Generate kerberos principal
+
+	if ((krb5_err = krb5_sname_to_principal(vs_ctx->krb5_ctx, NULL, service,
+			KRB5_NT_SRV_HST, &vs_ctx->krb5_principal))) {
+		v_print_log(VRS_PRINT_ERROR, "Setting up krb5_principal failed.\n");
+		com_err("Error", krb5_err, "\n");
+		return -1;
+	}
+	printf("Kerberos principal created\n");
+
+	 Read keytab
+
+	if ((krb5_err = krb5_kt_resolve(&vs_ctx->krb5_ctx, "/home/ZDN/verse/default.keytab", &vs_ctx->krb5_keytab))){
+		v_print_log(VRS_PRINT_ERROR, "Resolving krb5_keytab failed.\n");
+				com_err("Error", krb5_err, "\n");
+				return -1;
+	}
+
+	vs_ctx->connected_clients = 0;
+
+	 Allocate buffer for incoming packets
+	if ( (vs_ctx->io_ctx.buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
+		return -1;
+	}
+
+	 "Address" of server
+	if(vs_ctx->io_ctx.host_addr.ip_ver == IPV4) {		 IPv4
+
+		 Create socket which server uses for listening for new connections
+		if ( (vs_ctx->io_ctx.sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
+			return -1;
+		}
+
+		 Set socket to reuse address
+		flag = 1;
+		if( setsockopt(vs_ctx->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
+			return -1;
+		}
+
+		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_family = AF_INET;
+		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
+		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_port = htons(vs_ctx->port);
+		vs_ctx->io_ctx.host_addr.port = vs_ctx->port;
+
+		 Bind address and socket
+		if( bind(vs_ctx->io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->io_ctx.host_addr.addr.ipv4), sizeof(vs_ctx->io_ctx.host_addr.addr.ipv4)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %s\n", strerror(errno));
+			return -1;
+		}
+
+		 Create queue for TCP connection attempts
+		if( listen(vs_ctx->io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
+			return -1;
+		}
+	}
+	else if(vs_ctx->io_ctx.host_addr.ip_ver == IPV6) {	 IPv6
+
+		 Create socket which server uses for listening for new connections
+		if ( (vs_ctx->io_ctx.sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
+			return -1;
+		}
+
+		 Set socket to reuse address
+		flag = 1;
+		if( setsockopt(vs_ctx->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
+			return -1;
+		}
+
+		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_family = AF_INET6;
+		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_addr = in6addr_any;
+		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_port = htons(vs_ctx->port);
+		vs_ctx->io_ctx.host_addr.port = vs_ctx->port;
+
+		 Bind address and socket
+		if( bind(vs_ctx->io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->io_ctx.host_addr.addr.ipv6), sizeof(vs_ctx->io_ctx.host_addr.addr.ipv6)) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %d\n", strerror(errno));
+			return -1;
+		}
+
+		 Create queue for TCP connection attempts, set maximum number of
+		 * attempts in listen queue
+		if( listen(vs_ctx->io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
+			return -1;
+		}
+	}
+
+	 Set up free ports for communication with clients
+	if( (vs_ctx->port_list = (struct VS_Port*)calloc((vs_ctx->port_high - vs_ctx->port_low), sizeof(struct VS_Port))) == NULL) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
+		return -1;
+	} else {
+		for(i=0; i<(vs_ctx->port_high-vs_ctx->port_low); i++) {
+			vs_ctx->port_list[i].port_number = i+vs_ctx->port_low;
+			vs_ctx->port_list[i].flag = 0;
+		}
+	}
+
+	 Set up flag for V_CTX of server
+	vs_ctx->io_ctx.flags = 0;
+
+	 Set all bytes of buffer for incoming packet to zero
+	memset(vs_ctx->io_ctx.buf, 0, MAX_PACKET_SIZE);
+
+	 Initialize list of connections
+	vs_ctx->vsessions = (struct VSession**)calloc(vs_ctx->max_sessions, sizeof(struct VSession*));
+	for (i=0; i<vs_ctx->max_sessions; i++) {
+		if( (vs_ctx->vsessions[i] = (struct VSession*)calloc(1, sizeof(struct VSession))) == NULL ) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
+			return -1;
+		}
+		 Set up input and output queues
+		vs_ctx->vsessions[i]->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
+		v_in_queue_init(vs_ctx->vsessions[i]->in_queue);
+		vs_ctx->vsessions[i]->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
+		v_out_queue_init(vs_ctx->vsessions[i]->out_queue);
+		 Allocate memory for TCP connection
+		vs_ctx->vsessions[i]->stream_conn = (struct VStreamConn*)calloc(1, sizeof(struct VStreamConn));
+		 Allocate memory for peer hostname
+		vs_ctx->vsessions[i]->peer_hostname = (char*)calloc(INET6_ADDRSTRLEN, sizeof(char));
+		 Initialize TCP connection
+		vs_init_stream_conn(vs_ctx->vsessions[i]->stream_conn);
+		 Allocate memory for UDP connection
+		vs_ctx->vsessions[i]->dgram_conn = (struct VDgramConn*)calloc(1, sizeof(struct VDgramConn));
+		 Initialize UDP connection
+		vs_init_dgram_conn(vs_ctx->vsessions[i]->dgram_conn);
+		 Initialize Avatar ID
+		vs_ctx->vsessions[i]->avatar_id = -1;
+#if defined WITH_PAM
+		 PAM authentication stuff
+		vs_ctx->vsessions[i]->conv.conv = vs_pam_conv;
+		vs_ctx->vsessions[i]->conv.appdata_ptr = NULL;
+		vs_ctx->vsessions[i]->pamh = NULL;
+#endif
+	}
+	return 1;
+}*/
+
+/* Initialize verse server context */
 int vs_init_stream_ctx(VS_CTX *vs_ctx)
 {
 	int i, flag;
+	char *name;
+	krb5_error_code krb5_err;
 
-	/* Set up the library */
-	SSL_library_init();
-	ERR_load_BIO_strings();
-	SSL_load_error_strings();
-	OpenSSL_add_all_algorithms();
+	/* Will be Kerberos used? */
+	if (vs_ctx->use_krb5 == USE_KERBEROS) {
+		/* Using Kerberos */
+		krb5_err = krb5_init_context(&vs_ctx->krb5_ctx);
+		if (krb5_err) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n",
+					krb5_err,
+					krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
+			return -1;
+		}
+		/** TODO
+		 * resolv service and domain names
+		 */
+		if ((krb5_err = krb5_sname_to_principal(vs_ctx->krb5_ctx, "localhost",
+				"verse",
+				KRB5_NT_SRV_HST, &vs_ctx->krb5_principal))) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_sname_to_principal: %d: %s\n",
+					krb5_err,
+					krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
+			return -1;
+		}
+		krb5_unparse_name(vs_ctx->krb5_ctx, vs_ctx->krb5_principal, &name);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Kerberos principal: %s\n", name);
+	} else {
+		/* Don't using Kerberos */
+		/* Set up the library */
+		SSL_library_init();
+		ERR_load_BIO_strings();
+		SSL_load_error_strings();
+		OpenSSL_add_all_algorithms();
 
-	/* Set up SSL context for TLS  */
-	if( (vs_ctx->tls_ctx = SSL_CTX_new(TLSv1_server_method())) == NULL ) {
-		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* TODO: use int SSL_CTX_use_certificate_chain_file(SSL_CTX *ctx, const char *file); */
-
-	/* Load certificate with public key for TLS */
-	if (SSL_CTX_use_certificate_file(vs_ctx->tls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
-		v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate file: %s failed.\n",
-				vs_ctx->public_cert_file);
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* Load private key for TLS */
-	if(SSL_CTX_use_PrivateKey_file(vs_ctx->tls_ctx, vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
-		v_print_log(VRS_PRINT_ERROR, "TLS: Loading private key file: %s failed.\n",
-				vs_ctx->private_cert_file);
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* Check the consistency of a private key with the corresponding
-	 * certificate loaded into ssl_ctx */
-	if(SSL_CTX_check_private_key(vs_ctx->tls_ctx) != 1) {
-		v_print_log(VRS_PRINT_ERROR, "TLS: Private key does not match the certificate public key\n");
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* When CA certificate file was set, then try to load it */
-	if(vs_ctx->ca_cert_file != NULL) {
-		if(SSL_CTX_load_verify_locations(vs_ctx->tls_ctx, vs_ctx->ca_cert_file, NULL) != 1) {
-			v_print_log(VRS_PRINT_ERROR, "TLS: Loading CA certificate file: %s failed.\n",
-					vs_ctx->ca_cert_file);
+		/* Set up SSL context for TLS  */
+		if ((vs_ctx->tls_ctx = SSL_CTX_new(TLSv1_server_method())) == NULL) {
+			v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
 			ERR_print_errors_fp(v_log_file());
 			return -1;
 		}
-	}
+
+		/* TODO: use int SSL_CTX_use_certificate_chain_file(SSL_CTX *ctx, const char *file); */
+
+		/* Load certificate with public key for TLS */
+		if (SSL_CTX_use_certificate_file(vs_ctx->tls_ctx,
+				vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"TLS: Loading certificate file: %s failed.\n",
+					vs_ctx->public_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+
+		/* Load private key for TLS */
+		if (SSL_CTX_use_PrivateKey_file(vs_ctx->tls_ctx,
+				vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"TLS: Loading private key file: %s failed.\n",
+					vs_ctx->private_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+
+		/* Check the consistency of a private key with the corresponding
+		 * certificate loaded into ssl_ctx */
+		if (SSL_CTX_check_private_key(vs_ctx->tls_ctx) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"TLS: Private key does not match the certificate public key\n");
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+
+		/* When CA certificate file was set, then try to load it */
+		if (vs_ctx->ca_cert_file != NULL) {
+			if (SSL_CTX_load_verify_locations(vs_ctx->tls_ctx,
+					vs_ctx->ca_cert_file, NULL) != 1) {
+				v_print_log(VRS_PRINT_ERROR,
+						"TLS: Loading CA certificate file: %s failed.\n",
+						vs_ctx->ca_cert_file);
+				ERR_print_errors_fp(v_log_file());
+				return -1;
+			}
+		}
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-	/* Set up SSL context for DTLS  */
-	if( (vs_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_server_method())) == NULL ) {
-		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* Load certificate with public key for DTLS */
-	if (SSL_CTX_use_certificate_file(vs_ctx->dtls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
-		v_print_log(VRS_PRINT_ERROR, "DTLS: Loading certificate file: %s failed.\n",
-						vs_ctx->public_cert_file);
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* Load private key for DTLS */
-	if(SSL_CTX_use_PrivateKey_file(vs_ctx->dtls_ctx, vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
-		v_print_log(VRS_PRINT_ERROR, "DTLS: Loading private key file: %s failed.\n",
-						vs_ctx->private_cert_file);
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* Check the consistency of a private key with the corresponding
-	 * certificate loaded into ssl_ctx */
-	if(SSL_CTX_check_private_key(vs_ctx->dtls_ctx) != 1) {
-		v_print_log(VRS_PRINT_ERROR, "DTLS: Private key does not match the certificate public key\n");
-		ERR_print_errors_fp(v_log_file());
-		return -1;
-	}
-
-	/* When CA certificate file was set, then try to load it */
-	if(vs_ctx->ca_cert_file != NULL) {
-		if(SSL_CTX_load_verify_locations(vs_ctx->dtls_ctx, vs_ctx->ca_cert_file, NULL) != 1) {
-			v_print_log(VRS_PRINT_ERROR, "DTLS: Loading CA certificate file: %s failed.\n",
-					vs_ctx->ca_cert_file);
+		/* Set up SSL context for DTLS  */
+		if ((vs_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_server_method())) == NULL) {
+			v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
 			ERR_print_errors_fp(v_log_file());
 			return -1;
 		}
-	}
 
-	/* Set up callback functions for DTLS cookie */
-	SSL_CTX_set_cookie_generate_cb(vs_ctx->dtls_ctx, vs_dtls_generate_cookie);
-	SSL_CTX_set_cookie_verify_cb(vs_ctx->dtls_ctx, vs_dtls_verify_cookie);
-	/* Accept all cipher including NULL cipher (testing) */
-	if( SSL_CTX_set_cipher_list(vs_ctx->dtls_ctx, "ALL:NULL:eNULL:aNULL") == 0) {
-		v_print_log(VRS_PRINT_ERROR, "Setting ciphers for DTLS failed.\n");
-		ERR_print_errors_fp(v_log_file());
-		return 0;
-	}
-	/* DTLS require this */
-	SSL_CTX_set_read_ahead(vs_ctx->dtls_ctx, 1);
+		/* Load certificate with public key for DTLS */
+		if (SSL_CTX_use_certificate_file(vs_ctx->dtls_ctx,
+				vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"DTLS: Loading certificate file: %s failed.\n",
+					vs_ctx->public_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+
+		/* Load private key for DTLS */
+		if (SSL_CTX_use_PrivateKey_file(vs_ctx->dtls_ctx,
+				vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"DTLS: Loading private key file: %s failed.\n",
+					vs_ctx->private_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+
+		/* Check the consistency of a private key with the corresponding
+		 * certificate loaded into ssl_ctx */
+		if (SSL_CTX_check_private_key(vs_ctx->dtls_ctx) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"DTLS: Private key does not match the certificate public key\n");
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+
+		/* When CA certificate file was set, then try to load it */
+		if (vs_ctx->ca_cert_file != NULL) {
+			if (SSL_CTX_load_verify_locations(vs_ctx->dtls_ctx,
+					vs_ctx->ca_cert_file, NULL) != 1) {
+				v_print_log(VRS_PRINT_ERROR,
+						"DTLS: Loading CA certificate file: %s failed.\n",
+						vs_ctx->ca_cert_file);
+				ERR_print_errors_fp(v_log_file());
+				return -1;
+			}
+		}
+
+		/* Set up callback functions for DTLS cookie */
+		SSL_CTX_set_cookie_generate_cb(vs_ctx->dtls_ctx,
+				vs_dtls_generate_cookie);
+		SSL_CTX_set_cookie_verify_cb(vs_ctx->dtls_ctx, vs_dtls_verify_cookie);
+		/* Accept all cipher including NULL cipher (testing) */
+		if (SSL_CTX_set_cipher_list(vs_ctx->dtls_ctx, "ALL:NULL:eNULL:aNULL")
+				== 0) {
+			v_print_log(VRS_PRINT_ERROR, "Setting ciphers for DTLS failed.\n");
+			ERR_print_errors_fp(v_log_file());
+			return 0;
+		}
+		/* DTLS require this */
+		SSL_CTX_set_read_ahead(vs_ctx->dtls_ctx, 1);
 #else
-	vs_ctx->dtls_ctx = NULL;
+		vs_ctx->dtls_ctx = NULL;
 #endif
-
+	}
 	vs_ctx->connected_clients = 0;
 
 	/* Allocate buffer for incoming packets */

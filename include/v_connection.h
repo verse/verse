@@ -46,6 +46,10 @@
 #include "v_history.h"
 #include "v_context.h"
 
+/* Kerberos using */
+#define NO_KERBEROS					0
+#define USE_KERBEROS				1
+
 /* Client states (UDP) */
 #define UDP_CLIENT_STATE_RESERVED	0
 #define	UDP_CLIENT_STATE_REQUEST	1	/* Has to be the first client state */
@@ -70,6 +74,7 @@
 #define TCP_CLIENT_STATE_NEGOTIATE_NEWHOST		4
 #define TCP_CLIENT_STATE_CLOSING				5
 #define TCP_CLIENT_STATE_CLOSED					6
+#define TCP_CLIENT_STATE_USRAUTH_KRB			7
 
 /* Server states (TCP) */
 #define TCP_SERVER_STATE_RESERVED				0
@@ -80,6 +85,7 @@
 #define TCP_SERVER_STATE_NEGOTIATE_NEWHOST		5
 #define TCP_SERVER_STATE_CLOSING				6
 #define TCP_SERVER_STATE_CLOSED					7
+#define TCP_SERVER_STATE_RESPOND_KRB_AUTH		8
 
 /* Maximal number of client or server state.  */
 #define STATE_COUNT				(((UDP_CLIENT_STATE_CLOSED > UDP_SERVER_STATE_CLOSED) ? UDP_CLIENT_STATE_CLOSED : UDP_SERVER_STATE_CLOSED)+1)
