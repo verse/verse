@@ -32,6 +32,11 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#ifdef WITH_MONGODB
+#include "vs_mongo.h"
+#include <mongo.h>
+#endif
+
 #include "verse_types.h"
 
 #include "vs_user.h"
@@ -150,6 +155,9 @@ typedef struct VS_CTX {
 	/* WebSocket thread */
 	pthread_t			websocket_thread;			/* WebSocket thread */
 	pthread_attr_t		websocket_thread_attr;		/* The attribute of WebSocket thread*/
+#ifdef WITH_MONGODB
+	mongo				*mongo_conn;				/* Connection to MongoDB server */
+#endif
 } VS_CTX;
 
 #endif

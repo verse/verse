@@ -211,6 +211,10 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->data.avatar_node = NULL;
 
 	vs_ctx->data.sem = NULL;
+
+#ifdef WITH_MONGODB
+	vs_ctx->mongo_conn = NULL;
+#endif
 }
 
 /**
@@ -474,6 +478,11 @@ int main(int argc, char *argv[])
 		v_init_print_log(vs_ctx.print_log_level, vs_ctx.log_file);
 	}
 
+#ifdef WITH_MONGODB
+	/* Try to connect to MongoDB server */
+	vs_init_mongo_conn(&vs_ctx);
+#endif
+
 	/* Add superuser account to the list of users */
 	vs_add_superuser_account(&vs_ctx);
 
@@ -584,6 +593,11 @@ int main(int argc, char *argv[])
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
+
+#ifdef WITH_MONGODB
+	/* Try to connect to MongoDB server */
+	vs_destroy_mongo_conn(&vs_ctx);
+#endif
 
 	/* Free Verse server context */
 	vs_destroy_ctx(&vs_ctx);

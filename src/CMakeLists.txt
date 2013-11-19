@@ -158,7 +158,8 @@ endif (INIPARSER_FOUND)
 # When MongoDB is enabled
 if (MongoDB_FOUND)
     set (verse_server_libs ${verse_server_libs} ${MongoDB_LIBRARIES})
-    include_directories (MongoDB_INCLUDE_DIR)
+    set (server_src ${server_src} server/vs_mongo.c)
+    include_directories (${MongoDB_INCLUDE_DIR})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_MONGODB")
 endif (MongoDB_FOUND)
 
