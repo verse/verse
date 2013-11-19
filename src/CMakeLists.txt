@@ -155,6 +155,14 @@ if (INIPARSER_FOUND)
 endif (INIPARSER_FOUND)
 
 
+# When MongoDB is enabled
+if (MongoDB_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${MongoDB_LIBRARIES})
+    include_directories (MongoDB_INCLUDE_DIR)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_MONGODB")
+endif (MongoDB_FOUND)
+
+
 # Set up verse server executable
 add_executable (verse_server ${server_src})
 add_dependencies (verse_server verse_shared_lib)
