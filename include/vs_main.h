@@ -33,7 +33,7 @@
 #include <semaphore.h>
 
 #ifdef WITH_MONGODB
-#include "vs_mongo.h"
+#define MONGO_HAVE_STDINT 1
 #include <mongo.h>
 #endif
 
@@ -157,6 +157,8 @@ typedef struct VS_CTX {
 	pthread_attr_t		websocket_thread_attr;		/* The attribute of WebSocket thread*/
 #ifdef WITH_MONGODB
 	mongo				*mongo_conn;				/* Connection to MongoDB server */
+	char				*mongodb_server;			/* Hostname of MongoDB server */
+	unsigned short		mongodb_port;				/* Port of MongoDB server is listening on */
 #endif
 } VS_CTX;
 

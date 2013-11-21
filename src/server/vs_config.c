@@ -48,6 +48,10 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		char *ca_certificate_file_name;
 		char *private_key;
 		char *fc_type;
+#ifdef WITH_MONGODB
+		char *mongodb_server_hostname;
+		int mongodb_server_port;
+#endif
 		int fc_win_scale;
 		int in_queue_max_size;
 		int out_queue_max_size;
@@ -56,6 +60,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		int udp_low_port_number;
 		int udp_high_port_number;
 		int max_session_count;
+
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Reading config file: %s\n",
+				ini_file_name);
 
 #ifdef WITH_OPENSSL
 		/* Try to get TLS port number */
@@ -141,7 +148,8 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 				if(csv_file_name !=NULL) {
 					vs_ctx->auth_type = AUTH_METHOD_CSV_FILE;
 					vs_ctx->csv_user_file = strdup(csv_file_name);
-					printf("csv_file_name: %s\n", csv_file_name);
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"csv_file_name: %s\n", csv_file_name);
 				}
 			}
 		}
@@ -213,6 +221,29 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 				vs_ctx->in_queue_max_size = out_queue_max_size;
 			}
 		}
+#ifdef WITH_MONGODB
+		/* Hostname of MongoDB server */
+		mongodb_server_hostname = iniparser_getstring(ini_dict,
+				"MongoDB:ServerHostname", NULL);
+		if(mongodb_server_hostname != NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"mongodb server hostname: %s\n", mongodb_server_hostname);
+			vs_ctx->mongodb_server = strdup(mongodb_server_hostname);
+		}
+
+		/* Port of MongoDB server */
+		mongodb_server_port = iniparser_getint(ini_dict,
+				"MongoDB:ServerPort", -1);
+		if(mongodb_server_port != -1) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"mongodb server port: %d\n", mongodb_server_port);
+			vs_ctx->mongodb_port = mongodb_server_port;
+		}
+#endif
+
 		iniparser_freedict(ini_dict);
+	} else {
+		v_print_log(VRS_PRINT_WARNING, "Unable to load config file: %s\n",
+				ini_file_name);
 	}
 }

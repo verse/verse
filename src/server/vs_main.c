@@ -41,6 +41,10 @@
 #include "vs_sys_nodes.h"
 #include "vs_user.h"
 
+#ifdef WITH_MONGODB
+#include "vs_mongo.h"
+#endif
+
 #if WITH_INIPARSER
 #include "vs_config.h"
 #endif
@@ -214,7 +218,10 @@ static void vs_init(struct VS_CTX *vs_ctx)
 
 #ifdef WITH_MONGODB
 	vs_ctx->mongo_conn = NULL;
+	vs_ctx->mongodb_server = strdup("localhost");
+	vs_ctx->mongodb_port = 27017;
 #endif
+
 }
 
 /**
@@ -231,7 +238,7 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 #if WITH_INIPARSER
 	/* When no configuration file is specified, then load values from
 	 * default path */
-	if(config_file==NULL) {
+	if(config_file == NULL) {
 		/* Try to open default configuration file */
 		vs_read_config_file(vs_ctx, DEFAULT_SERVER_CONFIG_FILE);
 	} else {
@@ -346,6 +353,13 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 		user = user->next;
 	}
 	v_list_free(&vs_ctx->users);
+
+#ifdef WITH_MONGODB
+	if(vs_ctx->mongodb_server != NULL) {
+		free(vs_ctx->mongodb_server);
+		vs_ctx->mongodb_server = NULL;
+	}
+#endif
 
 #ifdef WITH_OPENSSL
 	vs_destroy_stream_ctx(vs_ctx);
