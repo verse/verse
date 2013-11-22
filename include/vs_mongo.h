@@ -29,6 +29,8 @@
 
 struct VS_CTX;
 
+int vs_mongo_save_node(struct VS_CTX *vs_ctx, struct VSNode *node);
+
 int vs_init_mongo_conn(struct VS_CTX *vs_ctx);
 void vs_destroy_mongo_conn(struct VS_CTX *vs_ctx);
 
