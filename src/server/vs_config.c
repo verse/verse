@@ -51,6 +51,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 #ifdef WITH_MONGODB
 		char *mongodb_server_hostname;
 		int mongodb_server_port;
+		char *mongodb_server_ns;
 #endif
 		int fc_win_scale;
 		int in_queue_max_size;
@@ -239,6 +240,16 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 					"mongodb server port: %d\n", mongodb_server_port);
 			vs_ctx->mongodb_port = mongodb_server_port;
 		}
+
+		/* MongoDB namespace used by Verse server */
+		mongodb_server_ns = iniparser_getstring(ini_dict,
+				"MongoDB:NameSpace", NULL);
+		if(mongodb_server_ns != NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"mongodb server namespace: %s\n", mongodb_server_ns);
+			vs_ctx->mongodb_ns = mongodb_server_ns;
+		}
+
 #endif
 
 		iniparser_freedict(ini_dict);

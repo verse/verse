@@ -159,6 +159,7 @@ typedef struct VS_CTX {
 	mongo				*mongo_conn;				/* Connection to MongoDB server */
 	char				*mongodb_server;			/* Hostname of MongoDB server */
 	unsigned short		mongodb_port;				/* Port of MongoDB server is listening on */
+	char				*mongodb_ns;				/* MongoDB namespace */
 #endif
 } VS_CTX;
 

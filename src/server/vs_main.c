@@ -220,6 +220,7 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->mongo_conn = NULL;
 	vs_ctx->mongodb_server = strdup("localhost");
 	vs_ctx->mongodb_port = 27017;
+	vs_ctx->mongodb_ns = strdup("verse.server");
 #endif
 
 }
@@ -358,6 +359,11 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	if(vs_ctx->mongodb_server != NULL) {
 		free(vs_ctx->mongodb_server);
 		vs_ctx->mongodb_server = NULL;
+	}
+
+	if(vs_ctx->mongodb_ns != NULL) {
+		free(vs_ctx->mongodb_ns);
+		vs_ctx->mongodb_ns = NULL;
 	}
 #endif
 
