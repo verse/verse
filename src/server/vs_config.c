@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <iniparser.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "vs_main.h"
 #include "v_common.h"
@@ -206,7 +207,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		/* Maximal size of incoming queue */
 		in_queue_max_size = iniparser_getint(ini_dict, "InQueue:MaxSize", -1);
 		if(in_queue_max_size != -1) {
-			if(in_queue_max_size > 0 && in_queue_max_size <= INT_MAX) {
+			if(in_queue_max_size > 0 && in_queue_max_size <= UINT32_MAX) {
 				v_print_log(VRS_PRINT_DEBUG_MSG,
 						"in_queue max size: %d\n", in_queue_max_size);
 				vs_ctx->in_queue_max_size = in_queue_max_size;
@@ -216,7 +217,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		/* Maximal size of outgoing queue */
 		out_queue_max_size = iniparser_getint(ini_dict, "OutQueue:MaxSize", -1);
 		if(out_queue_max_size != -1) {
-			if(out_queue_max_size > 0 && out_queue_max_size <= INT_MAX) {
+			if(out_queue_max_size > 0 && out_queue_max_size <= UINT32_MAX) {
 				v_print_log(VRS_PRINT_DEBUG_MSG,
 						"in_queue max size: %d\n", out_queue_max_size);
 				vs_ctx->in_queue_max_size = out_queue_max_size;

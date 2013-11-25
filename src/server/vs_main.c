@@ -646,7 +646,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	/* Try to unlink named semphore */
+	/* Try to unlink named semaphore */
 	if(vs_ctx.data.sem != NULL && sem_unlink(DATA_SEMAPHORE_NAME) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
 	}
