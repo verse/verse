@@ -46,7 +46,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		char *certificate_file_name;
 		char *ca_certificate_file_name;
 		char *private_key;
+#ifdef WITH_KERBEROS
 		char *use_kerberos;
+#endif
 
 		/* Try to load section [Users] */
 		user_auth_method = iniparser_getstring(ini_dict, "Users:Method", NULL);
@@ -131,11 +133,13 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		}
 
 		/* Try to load section [Security] */
+#ifdef WITH_KERBEROS
 		use_kerberos = iniparser_getstring(ini_dict, "Security:UseKerberos", NULL);
 		if(use_kerberos != NULL && strcmp(use_kerberos, "yes") == 0){
 			vs_ctx->use_krb5 = USE_KERBEROS;
 			printf("Kerberos will be used\n");
 		}
+#endif
 
 		certificate_file_name = iniparser_getstring(ini_dict, "Security:Certificate", NULL);
 		if(certificate_file_name != NULL) {

@@ -629,7 +629,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 
 	return 0;
 }
-
+#ifdef WITH_KERBEROS
 static int vc_USRAUTH_krb_loop(struct vContext *C, struct User_Authenticate_Cmd *ua_data)
 {
 	struct VSession *vsession = CTX_current_session(C);
@@ -663,7 +663,7 @@ static int vc_USRAUTH_krb_loop(struct vContext *C, struct User_Authenticate_Cmd 
 		buffer_pos = 0;
 
 		/* Try to receive data through kerberos connection */
-		if( v_krb5_read(&stream_conn->io_ctx, &error) <= 0 ) {
+		if( v_krb5_read(&stream_conn->io_ctx, stream_conn->krb5_ctx, &error) <= 0 ) {
 			/* TODO: try to read more data */
 			return 0;
 		}
@@ -734,6 +734,7 @@ static int vc_USRAUTH_krb_loop(struct vContext *C, struct User_Authenticate_Cmd 
 
 	return 0;
 }
+#endif
 
 /**
  * \brief Destroy Verse client TCP connection and SSL context
@@ -1019,13 +1020,13 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	struct VStreamConn *stream_conn = NULL;
 	struct addrinfo hints, *result, *rp;
 	int sockfd, ret, flag;
+#ifdef WITH_KERBEROS
 	krb5_error_code krb5err;
 	krb5_data packet, inbuf;
-
-	/*krb5_context krb5_ctx;
-	krb5_auth_context krb5_auth_ctx = NULL;
-	krb5_ccache krb5_cc;*/
+	krb5_rcache krb5_rc;
 	char *s_name, *h_name;
+#endif
+
 #ifndef __APPLE__
 	struct timeval tv;
 #endif
@@ -1132,17 +1133,23 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		return NULL;
 	}
 
+#ifdef WITH_KERBEROS
 	/* Will be kerberos used? */
 	if (ctx->use_kerberos==USE_KERBEROS) {
+		krb5err = krb5_init_context(&stream_conn->krb5_ctx);
+		if (krb5err) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n", krb5err,
+					krb5_get_error_message(stream_conn->krb5_ctx, krb5err));
+		}
 		s_name = malloc(64*sizeof(char));
 		h_name = malloc(64*sizeof(char));
 		strcpy(s_name, "verse");
 		strcpy(h_name, "localhost");
 		/* Get credentials for server */
-		if ((krb5err = krb5_cc_default(ctx->krb5_ctx,
+		if ((krb5err = krb5_cc_default(stream_conn->krb5_ctx,
 				&stream_conn->io_ctx.krb5_cc))) {
 			v_print_log(VRS_PRINT_ERROR, "krb5_cc_default: %d: %s\n", krb5err,
-					krb5_get_error_message(ctx->krb5_ctx, krb5err));
+					krb5_get_error_message(stream_conn->krb5_ctx, krb5err));
 			return NULL;
 		}
 
@@ -1151,13 +1158,14 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		 */
 		inbuf.data = h_name;
 		inbuf.length = strlen(h_name);
-		if ((krb5err = krb5_mk_req(ctx->krb5_ctx,
+		if ((krb5err = krb5_mk_req(stream_conn->krb5_ctx,
 				&stream_conn->io_ctx.krb5_auth_ctx, 0, s_name, h_name, &inbuf,
 				stream_conn->io_ctx.krb5_cc, &packet))) {
 			printf("Error making request\n");
 			v_print_log(VRS_PRINT_ERROR,
 					"krb5_mk_req: %d: %s\t service name: %s\n", krb5err,
-					krb5_get_error_message(ctx->krb5_ctx, krb5err), service);
+					krb5_get_error_message(stream_conn->krb5_ctx, krb5err),
+					service);
 			return NULL;
 		}
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Got credentials for %s.\n", service);
@@ -1168,8 +1176,24 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			v_print_log(VRS_PRINT_ERROR, "Error sending message\n");
 		}
 
-		krb5_free_data_contents(ctx->krb5_ctx, &packet);
+		/* Set rcache */
+		if ((krb5err = krb5_get_server_rcache(stream_conn->krb5_ctx,
+				&inbuf, &krb5_rc))) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_get_server_rcache %d: %s\n",
+					(int) krb5err,
+					krb5_get_error_message(stream_conn->krb5_ctx, krb5err));
+			return 0;
+		}
+
+		if ((krb5err = krb5_auth_con_setrcache(stream_conn->krb5_ctx,
+				stream_conn->io_ctx.krb5_auth_ctx, krb5_rc))) {
+			v_print_log(VRS_PRINT_ERROR, "krb5_auth_con_setrcache %d: %s\n",
+					(int) krb5err,
+					krb5_get_error_message(stream_conn->krb5_ctx, krb5err));
+			return 0;
+		}
 	} else {
+#endif
 		/* Set up SSL */
 		if ((stream_conn->io_ctx.ssl = SSL_new(ctx->tls_ctx)) == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
@@ -1211,7 +1235,9 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 					"SSL connection uses: %s cipher.\n",
 					SSL_get_cipher(stream_conn->io_ctx.ssl));
 		}
+#ifdef WITH_KERBEROS
 	}
+#endif
 
 	return stream_conn;
 }
@@ -1231,18 +1257,8 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	int ret;
 	uint8 error = 0;
 	uint8 *udp_thread_result;
-	krb5_error_code krb5err;
 
 	struct Connect_Terminate_Cmd *conn_term;
-
-	if(vc_ctx->use_kerberos == USE_KERBEROS){
-		krb5err = krb5_init_context(&vc_ctx->krb5_ctx);
-		if (krb5err) {
-			v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n", krb5err,
-					krb5_get_error_message(vc_ctx->krb5_ctx, krb5err));
-			goto closed;
-		}
-	}
 
 	/* Initialize new TCP connection to the server. */
 	if( (stream_conn = vc_create_client_stream_conn(vc_ctx, vsession->peer_hostname, vsession->service, &error)) == NULL ) {
@@ -1265,6 +1281,7 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	CTX_s_message_set(C, s_message);
 	vsession->stream_conn = stream_conn;
 
+#ifdef WITH_KERBEROS
 	if(vc_ctx->use_kerberos == USE_KERBEROS){
 		/* Update client and server states */
 		stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_KRB;
@@ -1279,6 +1296,7 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 		break;
 		}
 	}
+#endif
 	/* Verify server certificate */
 	vc_verify_certificate(C);
 

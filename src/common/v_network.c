@@ -37,7 +37,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
-#include <krb5.h>
+
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -50,6 +50,10 @@
 #include <stdlib.h>
 
 #include "verse.h"
+
+#ifdef WITH_KERBEROS
+#include <krb5.h>
+#endif
 
 #include "verse_types.h"
 #include "v_network.h"
@@ -521,30 +525,240 @@ void v_print_addr(const unsigned char level, const struct VNetworkAddress *addr)
 		v_print_log_simple(level, "%s ", str_addr);
 	}
 }
+#ifdef WITH_KERBEROS
+int v_krb5_set_addrs_ipv4(krb5_context ctx, krb5_auth_context auth_ctx,
+		struct sockaddr_in *local, struct sockaddr_in *remote, krb5_error_code *err)
+{
+	krb5_address *krb5_local, *krb5_remote;
+
+	if (local == NULL){
+		krb5_local = NULL;
+	} else {
+		krb5_local = malloc(sizeof (krb5_address));
+		krb5_local->addrtype = ADDRTYPE_INET;
+		krb5_local->length = sizeof(local->sin_addr);
+		krb5_local->contents = (krb5_octet *)&local->sin_addr;
+	}
+	if (remote == NULL) {
+		krb5_remote = NULL;
+	} else {
+		krb5_remote = malloc(sizeof (krb5_address));
+		krb5_remote->addrtype = ADDRTYPE_INET;
+		krb5_remote->length = sizeof(remote->sin_addr);
+		krb5_remote->contents = (krb5_octet *) &remote->sin_addr;
+	}
+	if ((*err = krb5_auth_con_setaddrs(ctx, auth_ctx, krb5_local, krb5_remote))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_auth_con_setaddrs %d: %s\n",
+				(int) *err, krb5_get_error_message(ctx, *err));
+		return 0;
+	}
+	if (local != NULL){
+		krb5_local->addrtype = ADDRTYPE_IPPORT;
+		krb5_local->length = sizeof(local->sin_port);
+		krb5_local->contents = (krb5_octet *) &local->sin_port;
+	}
+	if (remote != NULL){
+		krb5_remote->addrtype = ADDRTYPE_IPPORT;
+		krb5_remote->length = sizeof(remote->sin_port);
+		krb5_remote->contents = (krb5_octet *) &remote->sin_port;
+	}
+	if ((*err = krb5_auth_con_setports(ctx, auth_ctx, krb5_local, krb5_remote))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_auth_con_setports %d: %s\n",
+				(int) *err, krb5_get_error_message(ctx, *err));
+		return 0;
+	}
+	free(krb5_local);
+	free(krb5_remote);
+	return 1;
+}
+
+int v_krb5_set_addrs_ipv6(krb5_context ctx, krb5_auth_context auth_ctx,
+		struct sockaddr_in6 *local, struct sockaddr_in6 *remote,
+		krb5_error_code *err)
+{
+	krb5_address *krb5_local, *krb5_remote;
+
+	if (local == NULL) {
+		krb5_local = NULL;
+	} else {
+		krb5_local = malloc(sizeof(krb5_address));
+		krb5_local->addrtype = ADDRTYPE_INET;
+		krb5_local->length = sizeof(local->sin6_addr);
+		krb5_local->contents = (krb5_octet *) &local->sin6_addr;
+	}
+	if (remote == NULL) {
+		krb5_remote = NULL;
+	} else {
+		krb5_remote = malloc(sizeof(krb5_address));
+		krb5_remote->addrtype = ADDRTYPE_INET;
+		krb5_remote->length = sizeof(remote->sin6_addr);
+		krb5_remote->contents = (krb5_octet *) &remote->sin6_addr;
+	}
+	if ((*err = krb5_auth_con_setaddrs(ctx, auth_ctx, krb5_local, krb5_remote))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_auth_con_setaddrs %d: %s\n",
+				(int) *err, krb5_get_error_message(ctx, *err));
+		return 0;
+	}
+	if (local != NULL) {
+		krb5_local->addrtype = ADDRTYPE_IPPORT;
+		krb5_local->length = sizeof(local->sin6_port);
+		krb5_local->contents = (krb5_octet *) &local->sin6_port;
+	}
+	if (remote != NULL) {
+		krb5_remote->addrtype = ADDRTYPE_IPPORT;
+		krb5_remote->length = sizeof(remote->sin6_port);
+		krb5_remote->contents = (krb5_octet *) &remote->sin6_port;
+	}
+	if ((*err = krb5_auth_con_setports(ctx, auth_ctx, krb5_local, krb5_remote))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_auth_con_setports %d: %s\n",
+				(int) *err, krb5_get_error_message(ctx, *err));
+		return 0;
+	}
+	free(krb5_local);
+	free(krb5_remote);
+
+	return 1;
+}
+
 /* Read data form kerberos connection to the IO_CTX. Return number of bytes read
  * from the kerberos connection. When some error occurs, then error code is stored
  * in error_num */
-int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num){
-	/*io_ctx->buf_size = recvfrom(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0,
-			NULL, NULL);
-	error_num = krb5_rd_priv();*/
-	/**
-	 * TODO: implementation of this
-	 */
+int v_krb5_read(struct IO_CTX *io_ctx, krb5_context krb5_ctx,
+		krb5_error_code *error_num)
+{
+	int ret;
+	unsigned char pkt_buf[MAX_PACKET_SIZE];
+	krb5_data packet, message;
 
-	return 0;
+	if(io_ctx->host_addr.ip_ver == IPV4) {
+		struct sockaddr_in addr;
+		socklen_t len;
+		/*char str[INET_ADDRSTRLEN];*/
+
+
+		ret = recvfrom(io_ctx->sockfd, pkt_buf, MAX_PACKET_SIZE, 0,
+				(struct sockaddr *) &addr, &len);
+		addr.sin_addr.s_addr = 0;
+		addr.sin_port = 0;
+		/*inet_ntop(AF_INET, (struct sin_addr *)&(addr.sin_addr), str, INET_ADDRSTRLEN);
+		printf("Addr %s port %d\n", str, addr.sin_port);*/
+		if (ret < 0) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Error receiving data\n");
+			return io_ctx->buf_size = 0;
+		}
+		if (v_krb5_set_addrs_ipv4(krb5_ctx, io_ctx->krb5_auth_ctx, NULL, &addr,
+				error_num) != 1) {
+			return io_ctx->buf_size = 0;
+		}
+	} else if (io_ctx->host_addr.ip_ver == IPV6) {
+		struct sockaddr_in6 addr;
+		socklen_t len = INET6_ADDRSTRLEN;
+		/*char str[INET6_ADDRSTRLEN];*/
+
+		ret = recvfrom(io_ctx->sockfd, pkt_buf, MAX_PACKET_SIZE, 0,
+				(struct sockaddr *) &addr, &len);
+		addr.sin6_addr = in6addr_any;
+		addr.sin6_port = 0;
+		/*inet_ntop(AF_INET6, (struct sin_addr *)&(addr.sin6_addr), str, INET6_ADDRSTRLEN);
+		printf("Addr %s port %d\n", str, addr.sin6_port);*/
+		if (ret < 0) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Error receiving data\n");
+			return io_ctx->buf_size = 0;
+		}
+		if (v_krb5_set_addrs_ipv6(krb5_ctx, io_ctx->krb5_auth_ctx, NULL, &addr,
+				error_num) != 1) {
+			return io_ctx->buf_size = 0;
+		}
+	} else {
+		return io_ctx->buf_size = 0;
+	}
+
+
+	packet.data = (krb5_pointer) pkt_buf;
+	io_ctx->buf_size = packet.length = ret;
+	*error_num = krb5_rd_priv(krb5_ctx, io_ctx->krb5_auth_ctx, &packet, &message, NULL);
+	if (*error_num) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_rd_priv %d: %s\n", *error_num,
+				krb5_get_error_message(krb5_ctx, *error_num));
+		return io_ctx->buf_size = 0;
+	}
+	io_ctx->buf = message.data;
+
+	return io_ctx->buf_size;
 }
 
 /* Write data form IO_CTX into kerberos connection. Return number of bytes written
  * to the kerberos connection. When some error occurs, then error code is stored
  * in error_num */
-int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num){
-	/**
-	 * TODO: implementation of this
-	 */
-	return 0;
-}
+int v_krb5_write(struct IO_CTX *io_ctx, krb5_context krb5_ctx,
+		krb5_error_code *error_num)
+{
+	krb5_data inbuf, packet;
+	int ret;
 
+	if (io_ctx->peer_addr.ip_ver == IPV4) {
+		/*socklen_t len = 0;*/
+		struct sockaddr_in addr;
+		/*char str[INET_ADDRSTRLEN];*/
+
+		/*if ((getsockname(io_ctx->sockfd, (struct sockaddr *) &addr,
+				&len)) < 0) {
+			v_print_log(VRS_PRINT_ERROR, "getsockname\n");
+			return 0;
+		}*/
+		addr.sin_addr.s_addr = 0;
+		addr.sin_port = 0;
+		/*inet_ntop(AF_INET, (struct sin_addr *) &(addr.sin_addr), str,
+				INET_ADDRSTRLEN);
+		printf("Addr %s port %d\n", str, addr.sin_port);*/
+		if (v_krb5_set_addrs_ipv4(krb5_ctx, io_ctx->krb5_auth_ctx, &addr, NULL,
+				error_num) != 1) {
+			return io_ctx->buf_size = 0;
+		}
+
+	} else if (io_ctx->peer_addr.ip_ver == IPV6) {
+		/*socklen_t len = 0;*/
+		struct sockaddr_in6 addr;
+		/*char str[INET6_ADDRSTRLEN];*/
+
+		addr.sin6_addr = in6addr_any;
+		addr.sin6_port = 0;
+
+		/*if ((getsockname(io_ctx->sockfd, (struct sockaddr *) &addr, &len))
+				< 0) {
+			v_print_log(VRS_PRINT_ERROR, "getsockname\n");
+			return 0;
+		}*/
+		/*inet_ntop(AF_INET6, (struct sin_addr *) &(addr.sin6_addr), str,
+		INET6_ADDRSTRLEN);
+		printf("Addr %s port %d\n", str, addr.sin6_port);*/
+		if (v_krb5_set_addrs_ipv6(krb5_ctx, io_ctx->krb5_auth_ctx, &addr, NULL,
+				error_num) != 1) {
+			return io_ctx->buf_size = 0;
+		}
+	} else {
+		return 0;
+	}
+
+	inbuf.length = io_ctx->buf_size;
+	inbuf.data = (krb5_pointer) io_ctx->buf;
+
+	*error_num = krb5_mk_priv(krb5_ctx, io_ctx->krb5_auth_ctx, &inbuf, &packet, NULL);
+	if(*error_num){
+		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_mk_priv %d: %s\n", *error_num,
+				krb5_get_error_message(krb5_ctx, *error_num));
+		return /*io_ctx->buf_size =*/ 0;
+	}
+	ret = send(io_ctx->sockfd, (char *)packet.data, (unsigned) packet.length, 0);
+	if (ret < 0) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Error sending data\n");
+		return /*io_ctx->buf_size =*/ 0;
+	}
+	krb5_free_data_contents(krb5_ctx, &packet);
+
+	return ret;
+}
+#endif
 /* Read data form SSL connection to the IO_CTX. Return number of bytes read
  * from the SSL connection. When some error occurs, then error code is stored
  * in error_num */
@@ -552,6 +766,9 @@ int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
 {
 	io_ctx->buf_size = SSL_read(io_ctx->ssl, io_ctx->buf, MAX_PACKET_SIZE);
 
+	/**
+	 * TODO: setting real address
+	 */
 	if( io_ctx->buf_size > 0 ) {
 		*error_num = 0;
 		return io_ctx->buf_size;
@@ -587,6 +804,10 @@ int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
 int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
 {
 	int ret;
+
+	/**
+	 * TODO: Setting real address
+	 */
 
 	ret = SSL_write(io_ctx->ssl, io_ctx->buf, io_ctx->buf_size);
 	if(ret > 0) {
