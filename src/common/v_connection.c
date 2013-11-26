@@ -284,8 +284,10 @@ void v_conn_stream_init(struct VStreamConn *stream_conn)
 	/* Reserved undefined state. State could not be set now, because this
 	 * code is called at client and server too. */
 	stream_conn->host_state = 0;
+#ifdef WITH_KERBEROS
 	/* Kerberos auth context */
 	stream_conn->io_ctx.krb5_auth_ctx = NULL;
+#endif
 	/* Addresses */
 	memset(&(stream_conn->host_address), 0, sizeof(VNetworkAddress));
 	memset(&(stream_conn->peer_address), 0, sizeof(VNetworkAddress));

@@ -42,13 +42,16 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+#include "verse.h"
 #include "v_network.h"
 #include "v_history.h"
 #include "v_context.h"
 
+#ifdef WITH_KERBEROS
 /* Kerberos using */
 #define NO_KERBEROS					0
 #define USE_KERBEROS				1
+#endif
 
 /* Client states (UDP) */
 #define UDP_CLIENT_STATE_RESERVED	0
@@ -74,7 +77,9 @@
 #define TCP_CLIENT_STATE_NEGOTIATE_NEWHOST		4
 #define TCP_CLIENT_STATE_CLOSING				5
 #define TCP_CLIENT_STATE_CLOSED					6
+#ifdef WITH_KERBEROS
 #define TCP_CLIENT_STATE_USRAUTH_KRB			7
+#endif
 
 /* Server states (TCP) */
 #define TCP_SERVER_STATE_RESERVED				0
@@ -85,7 +90,9 @@
 #define TCP_SERVER_STATE_NEGOTIATE_NEWHOST		5
 #define TCP_SERVER_STATE_CLOSING				6
 #define TCP_SERVER_STATE_CLOSED					7
+#ifdef WITH_KERBEROS
 #define TCP_SERVER_STATE_RESPOND_KRB_AUTH		8
+#endif
 
 /* Maximal number of client or server state.  */
 #define STATE_COUNT				(((UDP_CLIENT_STATE_CLOSED > UDP_SERVER_STATE_CLOSED) ? UDP_CLIENT_STATE_CLOSED : UDP_SERVER_STATE_CLOSED)+1)
@@ -168,6 +175,9 @@ typedef struct VStreamConn {
 	struct VNetworkAddress	peer_address;		/* Address of peer and port number */
 	struct VNetworkAddress	host_address;		/* Address of host and port number */
 	/* Security */
+#ifdef WITH_KERBEROS
+	krb5_context			krb5_ctx;			/* Kerberos library context */
+#endif
 	/*SSL						*ssl;*/
 	/* Multi-threading */
 	pthread_mutex_t			mutex;				/* Mutex used, when state of connection is changing */
