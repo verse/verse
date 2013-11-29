@@ -771,7 +771,7 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 	struct VDgramConn *vconn = CTX_current_dgram_conn(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
-	int ret, first_sys_index, i;
+	int ret = 0, first_sys_index, i;
 
 	/* Does packet contains node commands? */
 	if(r_packet->header.flags & PAY_FLAG) {
@@ -790,7 +790,7 @@ int handle_packet_in_OPEN_state(struct vContext *C)
 	}
 
 	/* Handle other system commands */
-	if(ret>=0) {
+	if(ret >= 0) {
 		first_sys_index = ret;
 	} else {
 		first_sys_index = 0;

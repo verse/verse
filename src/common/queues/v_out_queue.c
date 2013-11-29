@@ -453,14 +453,18 @@ struct Generic_Cmd *v_out_queue_pop(struct VOutQueue *out_queue,
 				 * maximum. */
 				if(*len != 0) {
 					if(*len < *queue_cmd->len) {
-						*count = v_cmd_count(cmd, *len, *queue_cmd->share);
-						/* FIXME: compute length and count correctly, when command is added to the queue */
-						*count = ((*count) > (*queue_cmd->counter)) ? *queue_cmd->counter : *count;
-						/* Is enough space in buffer to unpack this command? */
-						if(*count==0) {
+						if (count != NULL) {
+							*count = v_cmd_count(cmd, *len, *queue_cmd->share);
+							/* FIXME: compute length and count correctly, when command is added to the queue */
+							*count = ((*count) > (*queue_cmd->counter)) ? *queue_cmd->counter : *count;
+							/* Is enough space in buffer to unpack this command? */
+							if(*count == 0) {
+								can_pop_cmd = 0;
+							}
+							*len = v_cmds_len(cmd, *count, *queue_cmd->share, 0);
+						} else {
 							can_pop_cmd = 0;
 						}
-						*len = v_cmds_len(cmd, *count, *queue_cmd->share, 0);
 					} else {
 						*len = *queue_cmd->len;
 					}
