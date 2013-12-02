@@ -1,5 +1,4 @@
 /*
- * $Id: v_commands.c 1336 2012-09-15 14:35:23Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -35,6 +34,9 @@
  */
 
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "verse_types.h"
 
@@ -104,7 +106,7 @@ const struct Cmd_Struct cmd_struct[MAX_CMD_ID+1] = {
 						{ITEM_UINT16, UINT16_SIZE, 0, "User_ID"},
 						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE, "Parent_ID"},
 						{ITEM_UINT32, UINT32_SIZE, UINT16_SIZE + UINT32_SIZE, "Node_ID"},
-						{ITEM_UINT16, UINT16_SIZE, UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Type"}
+						{ITEM_UINT16, UINT16_SIZE, UINT16_SIZE + UINT32_SIZE + UINT32_SIZE, "Custom_Type"}
 				}
 		},
 		{
@@ -282,7 +284,7 @@ const struct Cmd_Struct cmd_struct[MAX_CMD_ID+1] = {
 				{
 						{ITEM_UINT32,  UINT32_SIZE, 0, "Node_ID"},
 						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE, "TagGroup_ID"},
-						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Type"}
+						{ITEM_UINT16,  UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Custom_Type"}
 				}
 		},
 		{
@@ -346,7 +348,7 @@ const struct Cmd_Struct cmd_struct[MAX_CMD_ID+1] = {
 						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Tag_ID"},
 						{ITEM_UINT8,  UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Data_Type"},
 						{ITEM_UINT8,  UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Count"},
-						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Type"}
+						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Custom_Type"}
 				}
 		},
 		{
@@ -925,7 +927,7 @@ const struct Cmd_Struct cmd_struct[MAX_CMD_ID+1] = {
 						{ITEM_UINT16, UINT16_SIZE, UINT32_SIZE + UINT16_SIZE, "Layer_ID"},
 						{ITEM_UINT8, UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE, "Data_Type"},
 						{ITEM_UINT8, UINT8_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE, "Count"},
-						{ITEM_UINT16, UINT16_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Type"}
+						{ITEM_UINT16, UINT16_SIZE,  UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE, "Custom_Type"}
 				}
 		},
 		{
@@ -2314,7 +2316,6 @@ struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
 {
 	struct VCommandQueue *cmd_queue = NULL;
 	uint16 flag = (copy_bucket==1) ? HASH_COPY_BUCKET : 0;
-	struct Generic_Cmd cmd;
 
 	cmd_queue = (struct VCommandQueue*)calloc(1, sizeof(struct VCommandQueue));
 	cmd_queue->item_size = UINT8_SIZE + cmd_struct[id].size;
@@ -2328,7 +2329,7 @@ struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
 	}
 	v_hash_array_init(&cmd_queue->cmds,
 			HASH_MOD_256 | flag,
-			(char*)&(cmd.data) - (char*)&(cmd),
+			offsetof(Generic_Cmd, data),
 			cmd_struct[id].key_size);
 
 	return cmd_queue;

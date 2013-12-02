@@ -25,12 +25,16 @@ set (${PROJECT_NAME}_VERSION
 	"${${PROJECT_NAME}_VERSION_MAJOR}.${${PROJECT_NAME}_VERSION_MINOR}")
 
 # Build options
+option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
+option(VERSE_PYTHON2_MODULE "Verse Python2 Module" ON)
+option(VERSE_PYTHON3_MODULE "Verse Python3 Module" ON)
 option(VERSE_LDAP "OpenLDAP" ON)
 option(VERSE_KERBEROS "Kerberos" ON)
-option(VERSE_PYTHON_MODULE "Verse Module" ON)
 option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
+option(VERSE_WEBSOCKET "Support for WebSocket" ON)
+option(VERSE_INIPARSER "Iniparser library" ON)
 
 # Clang compiler
 if (VERSE_CLANG)
@@ -38,23 +42,37 @@ if (VERSE_CLANG)
 	set (CMAKE_CC_COMPILER "/usr/bin/clang++")
 endif (VERSE_CLANG)
 
-# Set up directory with 3rd party cmake modules
-set (CMAKE_MODULE_PATH
-	${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build_files/cmake/modules/")
-
 # Pthread is *prefered* (only supported) thread library
 set (CMAKE_THREAD_PREFER_PTHREAD)
 
 # Try to find required packages
-find_package (OpenSSL REQUIRED)
 find_package (Threads REQUIRED)
-find_package (Iniparser REQUIRED)
 
 # Set output directory for libraries
 set (LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib/)
 
 # Set output directory for binaries
 set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
+
+# Set up directory with 3rd party cmake modules
+set (CMAKE_MODULE_PATH
+	${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build_files/cmake/modules/")
+
+# Try to get information about using /lib/ or /lib64/
+get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+if (${LIB64} STREQUAL "TRUE")
+    set(LIBSUFFIX 64)
+else()
+    set(LIBSUFFIX "")
+endif()
+
+# Check OpenSSL library
+if (VERSE_OPENSSL)
+
+    # Try to find OpenSSL library
+    find_package (OpenSSL)
+    
+endif (VERSE_OPENSSL)
 
 # OpenLDAP library
 if (VERSE_LDAP)
@@ -72,9 +90,14 @@ if (VERSE_KERBEROS)
 
 endif (VERSE_KERBEROS)
 
-# Set up required subdirectories
-add_subdirectory (src)
-add_subdirectory (example)
+# Check iniparser library
+if (VERSE_INIPARSER)
+
+    # Try to find iniparser library
+    find_package (Iniparser)
+       
+endif (VERSE_INIPARSER)
+
 
 # Check unit test
 if (VERSE_CHECK)
@@ -92,9 +115,36 @@ if (VERSE_CHECK)
 
 endif (VERSE_CHECK)
 
-# Python module
-if (VERSE_PYTHON_MODULE)
 
+# Try to fing Python 2.x module, when Python 2.x is selected
+if (VERSE_PYTHON2_MODULE)
+
+    find_package (PythonLibs 2)
+
+	# Set up optional subdirectory for Python 2
+	if (PYTHONLIBS_FOUND)
+		set (PYTHON_2_FOUND 1)
+		add_subdirectory ("python/2.x")
+    endif (PYTHONLIBS_FOUND)
+endif (VERSE_PYTHON2_MODULE)
+
+# Otherwise try to find Python 3.x module
+if (VERSE_PYTHON3_MODULE)
+
+    # Clear variables from previous find module
+    if (PYTHONLIBS_FOUND)
+        unset(PYTHONLIBS_FOUND)
+        unset(PYTHONLIBS_FOUND CACHE)
+        unset(PYTHON_LIBRARY)
+        unset(PYTHON_LIBRARY CACHE)        
+        unset(PYTHON_LIBRARIES)
+        unset(PYTHON_LIBRARIES CACHE)
+        unset(PYTHON_INCLUDE_PATH)
+        unset(PYTHON_INCLUDE_PATH CACHE)
+        unset(PYTHON_INCLUDE_DIRS)
+        unset(PYTHON_INCLUDE_DIRS CACHE)
+    endif (PYTHONLIBS_FOUND)
+    
 	# Try to find optional package Python
 	if (UNIX AND NOT APPLE)
 		# find_package (PythonLibs 3) # Does not work at Linux for Python 3
@@ -105,17 +155,24 @@ if (VERSE_PYTHON_MODULE)
 	
 	# Set up optional subdirectory for Python 3
 	if (PYTHON_LIBRARY)
-		add_subdirectory (python)
+		set (PYTHON_3_FOUND 1)
+		add_subdirectory ("python/3.x")
 	elseif (PYTHONLIBS_FOUND)
-		add_subdirectory (python)
+		set (PYTHON_3_FOUND 1)
+		add_subdirectory ("python/3.x")
 	endif ()
 	
-	# Use only this, when CMake module for Python is fixed for Linux platform
-	#if (PYTHONLIBS_FOUND)
-	#	add_subdirectory (python)
-	#endif (PYTHONLIBS_FOUND)
-	
-endif (VERSE_PYTHON_MODULE)
+endif (VERSE_PYTHON3_MODULE)
+
+
+# Support for WebSocket
+if(VERSE_WEBSOCKET)
+
+    # Try to find optional package libWebSockets
+    find_package (WSLay)
+    
+endif(VERSE_WEBSOCKET)
+
 
 # Doxygen
 if (VERSE_DOXYGEN)
@@ -135,6 +192,12 @@ if (VERSE_DOXYGEN)
 
 endif (VERSE_DOXYGEN)
 
+
+# Set up required subdirectories
+add_subdirectory (src)
+add_subdirectory (example)
+
+
 # Copy ./pki directory to ${PROJECT_BINARY_DIR}
 configure_file ("${PROJECT_SOURCE_DIR}/pki/certificate.pem"
 		"${PROJECT_BINARY_DIR}/pki/certificate.pem")
@@ -152,16 +215,23 @@ install (FILES "${PROJECT_SOURCE_DIR}/include/verse.h"
 	CONFIGURATIONS "Debug"
 	DESTINATION include)
 
+# Create .cvs file without any valid user
+file(WRITE ${PROJECT_BINARY_DIR}/tmp/users.csv "username,password,UID,real name")
+
+# Install "empty" users.csv file
+install (FILES ${PROJECT_BINARY_DIR}/tmp/users.csv
+    DESTINATION /etc/verse) 
+
 # Install configuration file
 install (FILES "${PROJECT_SOURCE_DIR}/config/server.ini"
-	DESTINATION etc)
+	DESTINATION /etc/verse)
 
 
 message ("")
 message ("* Verse Configuration *")
 message ("")
 
-message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+    message (" * Configuration: ${CMAKE_BUILD_TYPE}")
 
 if (LDAP_FOUND)
 	message (" * OpenLDAP:      ON")
@@ -175,12 +245,28 @@ else ()
 	message (" * Kerberos:      OFF")
 endif (KERBEROS_FOUND)
 	
-if (PYTHON_LIBRARY)
-	message (" * Python:        ON")
-elseif (PYTHONLIBS_FOUND)
-	message (" * Python:        ON")
+if (OPENSSL_FOUND)
+	message (" * OpenSSL:       ON")
 else ()
-	message (" * Python:        OFF")
+	message (" * OpenSSL:       OFF")
+endif (OPENSSL_FOUND)
+
+if (INIPARSER_FOUND)
+	message (" * IniParser:     ON")
+else ()
+	message (" * IniParser:     OFF")
+endif (INIPARSER_FOUND)
+
+if (PYTHON_2_FOUND)
+	message (" * Python 2:      ON")
+else ()
+	message (" * Python 2:      OFF")
+endif()
+
+if (PYTHON_3_FOUND)
+	message (" * Python 3:      ON")
+else ()
+	message (" * Python 3:      OFF")
 endif ()
 
 if (CHECK_FOUND)
@@ -188,6 +274,12 @@ if (CHECK_FOUND)
 else ()
 	message (" * Check:         OFF")
 endif (CHECK_FOUND)
+
+if (WSLAY_FOUND AND OPENSSL_FOUND)
+	message (" * WebSocket:     ON")
+else ()
+	message (" * WebSocket:     OFF")
+endif ()
 
 if (DOXYGEN_FOUND)
 	message (" * Doxygen:       ON")

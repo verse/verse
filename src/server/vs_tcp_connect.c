@@ -1,5 +1,4 @@
 /*
- * $Id: vs_tcp_connect.c 1348 2012-09-19 20:08:18Z jiri $
  * 
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -23,10 +22,14 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
-
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
 #ifdef WITH_KERBEROS
 #include <krb5.h>
 #endif
@@ -34,15 +37,15 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
-#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
 #include <pthread.h>
-
-#include "verse.h"
+#include <signal.h>
+#include <errno.h>
 
 #include "verse_types.h"
 
@@ -53,12 +56,20 @@
 #include "vs_auth_csv.h"
 #include "vs_auth_ldap.h"
 #include "vs_node.h"
+#include "vs_handshake.h"
+#include "vs_sys_nodes.h"
 
 #include "v_common.h"
 #include "v_pack.h"
 #include "v_unpack.h"
 #include "v_connection.h"
 #include "v_session.h"
+#include "v_stream.h"
+#include "v_fake_commands.h"
+
+#ifdef WSLAY
+#include "vs_websocket.h"
+#endif
 
 /**
  * \brief Initialize VConnection at Verse server for potential clients
@@ -70,810 +81,6 @@ static void vs_init_stream_conn(struct VStreamConn *stream_conn)
 	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;	/* Server is in listen mode */
 }
 
-/**
- * \brief This function does user authentication according settings of the
- * verse server. When user is authenticated, then return user_id, otherwise
- * returns -1.
- */
-int vs_user_auth(struct vContext *C, const char *username, const char *data)
-{
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-	int uid = -1;
-
-	switch(vs_ctx->auth_type) {
-		case AUTH_METHOD_CSV_FILE:
-			uid = vs_csv_auth_user(C, username, data);
-			break;
-		case AUTH_METHOD_PAM:
-#if defined WITH_PAM
-			uid = vs_pam_auth_user(C, username, data);
-#else
-			uid = -1;
-#endif
-			break;
-		case AUTH_METHOD_LDAP:
-			uid = vs_ldap_auth_user(C, username, data);
-			break;
-		case AUTH_METHOD_LDAP_LOAD_AT_LOGIN:
-			uid = vs_ldap_auth_and_add_user(C, username, data);
-			break;
-	}
-
-	return uid;
-}
-#ifdef WITH_KERBEROS
-/**
- * \brief This function tries to find given user name in list of users
- * \param[in]	vContextc *C			The context of verse server
- * \param[in]	const char *username	User's username
- * \return	uid of user or -1 if usere was not found
- */
-static int vs_krb_make_user(struct vContext *C, const char *username){
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-	struct VSUser *vsuser;
-	int uid = -1;
-
-	vsuser = vs_ctx->users.first;
-
-	while (vsuser) {
-		/* Try to find record with this username. (the username has to be
-		 * unique). The user could not be fake user (super user and other users) */
-		if (vsuser->fake_user != 1) {
-			if (strcmp(vsuser->username, username) == 0) {
-				/* When record with username return uid */
-				uid = vsuser->user_id;
-				break;
-			}
-		}
-		vsuser = vsuser->next;
-	}
-	return uid;
-}
-
-/**
- * \brief Establishing Kerberos connection, verifies clients credentials
- * \param[in]	vContextc *C	The context of verse server
- * \param[out]	char **u_name	user name of client
- * \return	returns 1 if Kerberos authentication was OK 0 if something went wrong
- */
-static int vs_kerberos_auth(struct vContext *C, char **u_name){
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
-	int flags = 0;
-	int len = MAX_PACKET_SIZE;
-	unsigned char buffer[MAX_PACKET_SIZE];
-	char *client_principal;
-	krb5_data packet;
-	krb5_error_code krb5err;
-	int flag;
-
-	/* Make sure socket is blocking */
-	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
-	if ((fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK))
-			== -1) {
-		if (is_log_level(VRS_PRINT_ERROR))
-			v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-		return 0;
-	}
-
-	/* Get KRB_AP_REQ message */
-	if ((len = recvfrom(stream_conn->io_ctx.sockfd, (char *) buffer,
-			MAX_PACKET_SIZE, flags,
-			NULL, NULL)) < 0) {
-		v_print_log(VRS_PRINT_ERROR, "recvfrom failed.\n");
-		return 0;
-	}
-
-	packet.length = len;
-	packet.data = (krb5_pointer) buffer;
-
-	io_ctx->krb5_auth_ctx = NULL;
-	io_ctx->krb5_ticket = NULL;
-
-	/* Check authentication info */
-	if ((krb5err = krb5_rd_req(vs_ctx->krb5_ctx,
-			(krb5_auth_context *) &io_ctx->krb5_auth_ctx, &packet,
-			vs_ctx->krb5_principal, vs_ctx->krb5_keytab,
-			NULL, (krb5_ticket **) &io_ctx->krb5_ticket))) {
-		v_print_log(VRS_PRINT_ERROR, "krb5_rd_req %d: %s\n", (int) krb5err,
-				krb5_get_error_message(vs_ctx->krb5_ctx, krb5err));
-		return 0;
-	}
-	/* Get user name */
-	if ((krb5err = krb5_unparse_name(vs_ctx->krb5_ctx,
-			io_ctx->krb5_ticket->enc_part2->client, &client_principal))) {
-		v_print_log(VRS_PRINT_ERROR, "krb5_unparse_name %d: %s\n",
-				(int) krb5err,
-				krb5_get_error_message(vs_ctx->krb5_ctx, krb5err));
-		return 0;
-	}
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Got authentication info from %s\n", client_principal);
-	*u_name = client_principal;
-
-	return 1;
-}
-#endif
-/**
- * \brief do TLS negotiation with client application
- * \param[in]	*C	The context of verse server
- * \return This function returns 1, when TLS connection was established and
- * it returns 0, when TLS was not established.
- */
-static int vs_TLS_handshake(struct vContext *C)
-{
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
-
-	int flag, ret;
-
-	/* Make sure socket is blocking */
-	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
-	if( (fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-		return 0;
-	}
-
-	/* Set up SSL */
-	if( (stream_conn->io_ctx.ssl=SSL_new(vs_ctx->tls_ctx)) == NULL) {
-		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		stream_conn->io_ctx.ssl = NULL;
-		close(io_ctx->sockfd);
-		return 0;
-	}
-
-	/* Bind socket and SSL */
-	if (SSL_set_fd(stream_conn->io_ctx.ssl, io_ctx->sockfd) == 0) {
-		v_print_log(VRS_PRINT_ERROR, "Failed binding socket descriptor and SSL.\n");
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		stream_conn->io_ctx.ssl = NULL;
-		close(io_ctx->sockfd);
-		return 0;
-	}
-
-	SSL_set_mode(stream_conn->io_ctx.ssl, SSL_MODE_AUTO_RETRY);
-
-	/* Do TLS handshake and negotiation */
-	if( (ret = SSL_accept(stream_conn->io_ctx.ssl)) != 1) {
-		int err = SSL_get_error(stream_conn->io_ctx.ssl, ret);
-		v_print_log(VRS_PRINT_ERROR, "SSL handshake failed: %d -> %d\n", ret, err);
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		stream_conn->io_ctx.ssl = NULL;
-		close(io_ctx->sockfd);
-		return 0;
-	}
-
-	v_print_log(VRS_PRINT_DEBUG_MSG, "SSL handshake succeed.\n");
-	return 1;
-}
-
-/**
- * \brief Teardown TLS connection with client
- * \param[in]	*C	The context of verse server
- * \return This function returns 1, when TLS teardown was successfull, otherwise
- * it returns 0.
- */
-static int vs_TLS_teardown(struct vContext *C)
-{
-	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
-	int ret;
-
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
-
-	ret = SSL_shutdown(stream_conn->io_ctx.ssl);
-	if(ret!=1) {
-		ret = SSL_shutdown(stream_conn->io_ctx.ssl);
-	}
-
-	switch(ret) {
-	case 1:
-		/* SSL was successfully closed */
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was shut down.\n");
-		break;
-	case 0:
-	case -1:
-	default:
-		/* some error occured */
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was not able to shut down.\n");
-		break;
-	}
-
-	SSL_free(stream_conn->io_ctx.ssl);
-	close(stream_conn->io_ctx.sockfd);
-
-	return 1;
-}
-
-static void vs_CLOSING(struct vContext *C)
-{
-	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
-
-	if(stream_conn->io_ctx.ssl!=NULL) vs_TLS_teardown(C);
-
-}
-
-static int vs_NEGOTIATE_newhost_loop(struct vContext *C)
-{
-	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	struct VSession *vsession = CTX_current_session(C);
-	struct VMessage *r_message = CTX_r_message(C);
-	int i, buffer_pos=0;
-
-	/* Reset content of received message */
-	memset(r_message, 0, sizeof(struct VMessage));
-
-	/* Unpack Verse message header */
-	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	/* Unpack all system commands */
-	buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	v_print_receive_message(C);
-
-	/* Process all system commands */
-	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-		switch(r_message->sys_cmd[i].cmd.id) {
-		case CMD_CONFIRM_L_ID:
-			if(r_message->sys_cmd[i].confirm_l_cmd.feature==FTR_HOST_URL) {
-				if(r_message->sys_cmd[i].confirm_l_cmd.count == 1) {
-					if(vsession->host_url!=NULL &&
-							strcmp(vsession->host_url, (char*)r_message->sys_cmd[i].confirm_l_cmd.value[0].string8.str) == 0) {
-						return 1;
-					}
-				}
-			}
-			break;
-		}
-	}
-
-	return 0;
-}
-
-static int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
-{
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	struct VSession *vsession = CTX_current_session(C);
-	struct VMessage *r_message = CTX_r_message(C);
-	struct VMessage *s_message = CTX_s_message(C);
-	int i, j, ret, error;
-	unsigned short buffer_pos = 0;
-	int host_url_proposed = 0, host_cookie_proposed = 0, peer_cookie_confirmed = 0, ded_confirmed = 0;
-	struct timeval tv;
-	struct VURL url;
-
-	/* Reset content of received message */
-	memset(r_message, 0, sizeof(struct VMessage));
-
-	/* Unpack Verse message header */
-	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	/* Unpack all system commands */
-	buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	v_print_receive_message(C);
-
-	/* Process all system commands */
-	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-		switch(r_message->sys_cmd[i].cmd.id) {
-		case CMD_CHANGE_R_ID:
-			/* Client has to propose url in this state */
-			if(r_message->sys_cmd[i].change_r_cmd.feature == FTR_HOST_URL) {
-				if(r_message->sys_cmd[i].change_r_cmd.count > 0) {
-					if(vsession->host_url!=NULL) {
-						free(vsession->host_url);
-					}
-					/* Only first proposed URL will be used */
-					vsession->host_url = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
-					/* Check if proposed URL is correct */
-					ret = v_parse_url(vsession->host_url, &url);
-					if(ret == 1)
-						host_url_proposed = 1;
-					else
-						host_url_proposed = 0;
-				}
-			/* Client has to propose host cookie in this state */
-			} else if(r_message->sys_cmd[i].change_r_cmd.feature == FTR_COOKIE) {
-				if(r_message->sys_cmd[i].change_r_cmd.count > 0) {
-					if(vsession->host_cookie.str!=NULL) {
-						free(vsession->host_cookie.str);
-					}
-					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].change_r_cmd.value[0].string8.str);
-					host_cookie_proposed = 1;
-				}
-			} else {
-				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
-						r_message->sys_cmd[i].change_r_cmd.feature);
-			}
-			break;
-		case CMD_CONFIRM_R_ID:
-			/* Client has to confirm peer cookie in this state */
-			if(r_message->sys_cmd[i].confirm_r_cmd.feature == FTR_COOKIE) {
-				if (r_message->sys_cmd[i].confirm_r_cmd.count == 1) {
-					if(vsession->peer_cookie.str!=NULL &&
-						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str) == 0)
-					{
-						gettimeofday(&tv, NULL);
-						vsession->peer_cookie.tv.tv_sec = tv.tv_sec;
-						vsession->peer_cookie.tv.tv_usec = tv.tv_usec;
-						peer_cookie_confirmed = 1;
-					}
-				}
-			} else {
-				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
-						r_message->sys_cmd[i].change_r_cmd.feature);
-			}
-			break;
-		case CMD_CONFIRM_L_ID:
-			/* Client has to confirm DED in this state */
-			if(r_message->sys_cmd[i].confirm_l_cmd.feature == FTR_DED) {
-				if(r_message->sys_cmd[i].confirm_l_cmd.count == 1) {
-					if(vsession->ded.str != NULL &&
-							strcmp(vsession->ded.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str) == 0)
-					{
-						ded_confirmed = 1;
-					} else {
-						printf("%s != %s\n", vsession->ded.str, (char*)r_message->sys_cmd[i].confirm_r_cmd.value[0].string8.str);
-					}
-				}
-			}
-			break;
-		default:
-			v_print_log(VRS_PRINT_WARNING, "This command id: %d is not supported in this state\n",
-					r_message->sys_cmd[i].cmd.id);
-			break;
-		}
-	}
-
-
-	/* Send response on cookie request */
-	if(host_url_proposed==1 &&
-			host_cookie_proposed==1 &&
-			peer_cookie_confirmed==1 &&
-			ded_confirmed==1)
-	{
-		struct vContext *new_C;
-
-		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-		/* Copy address of peer */
-		memcpy(&vsession->peer_address, &io_ctx->peer_addr, sizeof(struct VNetworkAddress));
-
-		/* Do not confirm proposed URL */
-		s_message->sys_cmd[0].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_message->sys_cmd[0].confirm_r_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[0].confirm_r_cmd.count = 0;
-
-		/* Find first unused port from port range */
-		for(i=vs_ctx->port_low, j=0; i<vs_ctx->port_high; i++, j++) {
-			if(!(vs_ctx->port_list[j].flag & SERVER_PORT_USED)) {
-				vsession->dgram_conn->io_ctx.host_addr.port = vs_ctx->port_list[j].port_number;
-				vs_ctx->port_list[j].flag |= SERVER_PORT_USED;
-				break;
-			}
-		}
-
-		/* Copy settings about dgram connection to the session */
-		vsession->flags |= url.security_protocol;
-		vsession->flags |= url.dgram_protocol;
-
-		/* Create copy of new Verse context for new thread */
-		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-		memcpy(new_C, C, sizeof(struct vContext));
-
-		/* Try to create new thread */
-		if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-			return 0;
-		}
-
-		/* Wait for datagram thread to be in LISTEN state */
-		while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
-			usleep(10);
-		}
-
-		s_message->sys_cmd[1].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_message->sys_cmd[1].change_l_cmd.feature = FTR_HOST_URL;
-		s_message->sys_cmd[1].change_l_cmd.count = 1;
-		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
-		if(url.ip_ver==IPV6) {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_DGRAM_SEC_NONE &&
-					(vs_ctx->security_protocol & VRS_DGRAM_SEC_DTLS)) {
-				sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_DGRAM_SEC_DTLS) {
-				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else {
-				/* Default security policy */
-				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			}
-#else
-			sprintf(vsession->host_url, "verse-udp-none://[%s]:%d",
-					url.node,
-					vsession->dgram_conn->io_ctx.host_addr.port);
-#endif
-		} else {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
-			if(url.security_protocol==VRS_DGRAM_SEC_NONE &&
-					(vs_ctx->security_protocol & VRS_DGRAM_SEC_DTLS)) {
-				sprintf(vsession->host_url, "verse-udp-none://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else if(url.security_protocol==VRS_DGRAM_SEC_DTLS) {
-				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			} else {
-				/* Default security policy */
-				sprintf(vsession->host_url, "verse-udp-dtls://%s:%d",
-						url.node,
-						vsession->dgram_conn->io_ctx.host_addr.port);
-			}
-#else
-			sprintf(vsession->host_url, "verse-udp-none://%s:%d",
-					url.node,
-					vsession->dgram_conn->io_ctx.host_addr.port);
-#endif
-		}
-		s_message->sys_cmd[1].change_l_cmd.value[0].string8.length = strlen(vsession->host_url);
-		strcpy((char*)s_message->sys_cmd[1].change_l_cmd.value[0].string8.str, vsession->host_url);
-
-		/* Set time for the host cookie */
-		gettimeofday(&tv, NULL);
-		vsession->host_cookie.tv.tv_sec = tv.tv_sec;
-		vsession->host_cookie.tv.tv_usec = tv.tv_usec;
-
-		/* Send confirmation about host cookie */
-		s_message->sys_cmd[2].confirm_r_cmd.id = CMD_CONFIRM_R_ID;
-		s_message->sys_cmd[2].confirm_r_cmd.feature = FTR_COOKIE;
-		s_message->sys_cmd[2].confirm_r_cmd.count = 1;
-		s_message->sys_cmd[2].confirm_r_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-		strcpy((char*)s_message->sys_cmd[2].confirm_r_cmd.value[0].string8.str, vsession->host_cookie.str);
-
-		s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
-
-		/* Pack all system commands to the buffer */
-		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
-
-		/* Update length of message in the header (data in buffer) */
-		s_message->header.version = VRS_VERSION;
-		s_message->header.len = io_ctx->buf_size = buffer_pos;
-
-		/* Pack header to the beginning of the buffer */
-		v_pack_message_header(s_message, io_ctx->buf);
-
-		v_print_send_message(C);
-
-		/* Send command to the client */
-		if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-			return 0;
-		} else {
-			return 1;
-		}
-	} else {
-		return 0;
-	}
-
-	return 0;
-}
-
-static int vs_RESPOND_userauth_loop(struct vContext *C)
-{
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	struct VSession *vsession = CTX_current_session(C);
-	struct VMessage *r_message = CTX_r_message(C);
-	struct VMessage *s_message = CTX_s_message(C);
-	int i, ret, error;
-	unsigned short buffer_pos = 0;
-
-	/* Reset content of received message */
-	memset(r_message, 0, sizeof(struct VMessage));
-
-	/* Unpack Verse message header */
-	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	/* Unpack all system commands */
-	buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	v_print_receive_message(C);
-
-	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-		if(r_message->sys_cmd[i].cmd.id == CMD_USER_AUTH_REQUEST) {
-			if(r_message->sys_cmd[i].ua_req.method_type == VRS_UA_METHOD_PASSWORD) {
-				int user_id;
-
-				/* Do user authentication */
-				if((user_id = vs_user_auth(C,
-						r_message->sys_cmd[i].ua_req.username,
-						r_message->sys_cmd[i].ua_req.data)) != -1)
-				{
-					long int avatar_id;
-
-					pthread_mutex_lock(&vs_ctx->data.mutex);
-					avatar_id = vs_node_new_avatar_node(vs_ctx, user_id);
-					pthread_mutex_unlock(&vs_ctx->data.mutex);
-
-					if(avatar_id == -1) {
-						v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
-						return 0;
-					}
-
-					buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-					s_message->sys_cmd[0].ua_succ.id = CMD_USER_AUTH_SUCCESS;
-					/* Save user_id to the session and send it in
-					 * connect_accept command */
-					vsession->user_id = user_id;
-					vsession->avatar_id = avatar_id;
-					s_message->sys_cmd[0].ua_succ.user_id = user_id;
-					s_message->sys_cmd[0].ua_succ.avatar_id = avatar_id;
-
-					/* Set up negotiate command of the host cookie */
-					s_message->sys_cmd[1].change_r_cmd.id = CMD_CHANGE_R_ID;
-					s_message->sys_cmd[1].change_r_cmd.feature = FTR_COOKIE;
-					s_message->sys_cmd[1].change_r_cmd.count = 1;
-					/* Generate random string */
-					vsession->peer_cookie.str = (char*)calloc((COOKIE_SIZE+1), sizeof(char));
-					for(i=0; i<COOKIE_SIZE; i++) {
-						/* Generate only printable characters (debug prints) */
-						vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
-					}
-					vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-					s_message->sys_cmd[1].change_r_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-					strcpy((char*)s_message->sys_cmd[1].change_r_cmd.value[0].string8.str, vsession->peer_cookie.str);
-
-					s_message->sys_cmd[2].change_l_cmd.id = CMD_CHANGE_L_ID;
-					s_message->sys_cmd[2].change_l_cmd.feature = FTR_DED;
-					s_message->sys_cmd[2].change_l_cmd.count = 1;
-					/* Load DED from configuration and save it to the session */
-					vsession->ded.str = strdup(vs_ctx->ded);
-					s_message->sys_cmd[2].change_l_cmd.value[0].string8.length = strlen(vsession->ded.str);
-					strcpy((char*)s_message->sys_cmd[2].change_l_cmd.value[0].string8.str, vsession->ded.str);
-
-					/* Terminating command */
-					s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
-
-					buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
-
-					s_message->header.len = io_ctx->buf_size = buffer_pos;
-					s_message->header.version = VRS_VERSION;
-					/* Pack header to the beginning of the buffer */
-					v_pack_message_header(s_message, io_ctx->buf);
-
-					v_print_send_message(C);
-
-					/* Send command to the client */
-					if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-						return 0;
-					} else {
-						return 1;
-					}
-				} else {
-
-					buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-					s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
-					s_message->sys_cmd[0].ua_fail.count = 0;
-
-					s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
-
-					buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
-
-					s_message->header.len = io_ctx->buf_size = buffer_pos;
-					s_message->header.version = VRS_VERSION;
-					/* Pack header to the beginning of the buffer */
-					v_pack_message_header(s_message, io_ctx->buf);
-
-					v_print_send_message(C);
-
-					/* Send command to the client */
-					if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-						/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
-						return 0;
-					} else {
-						return 0;
-					}
-				}
-			}
-		}
-	}
-	return 0;
-}
-
-/**
- * \brief This function process received message and send respond to the client
- * if client sent CMD_USER_AUTH_REQUEST with method type UA_METHOD_NONE. The
- * response contains list of supported authentication methods (only Password
- * method is supported now)
- * \param[in]	*C	The pointer at Verse context
- * \return		The function returns 1, when response was sent to the client
- * and it returns 0, when all needs were not meet or error occurred.
- */
-static int vs_RESPOND_methods_loop(struct vContext *C)
-{
-	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	struct VMessage *r_message = CTX_r_message(C);
-	struct VMessage *s_message = CTX_s_message(C);
-	int i, ret, error;
-	unsigned short buffer_pos = 0;
-
-	/* Reset content of received message */
-	memset(r_message, 0, sizeof(struct VMessage));
-
-	/* Unpack Verse message header */
-	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	/* Unpack all system commands */
-	buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
-
-	v_print_receive_message(C);
-
-	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-		if(r_message->sys_cmd[i].cmd.id == CMD_USER_AUTH_REQUEST) {
-			if(r_message->sys_cmd[i].ua_req.method_type == VRS_UA_METHOD_NONE) {
-				/* This is not supported method. Send list of
-				 * supported methods. Current implementation supports
-				 * only PASSWORD method now. */
-
-				buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-				s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
-				s_message->sys_cmd[0].ua_fail.count = 1;
-				s_message->sys_cmd[0].ua_fail.method[0] = VRS_UA_METHOD_PASSWORD;
-				s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
-
-				/* Pack USER_AUTH_FAILURE command to the buffer */
-				buffer_pos += v_pack_stream_system_commands(s_message,&io_ctx->buf[buffer_pos]);
-
-				s_message->header.len = io_ctx->buf_size = buffer_pos;
-				s_message->header.version = VRS_VERSION;
-				/* Pack header to the beginning of the buffer */
-				v_pack_message_header(s_message, io_ctx->buf);
-
-				/* Debug print of command to be send */
-				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-					v_print_send_message(C);
-				}
-
-				/* Send command to the client */
-				if( (ret = v_SSL_write(io_ctx, &error)) <= 0) {
-					/* When error is SSL_ERROR_ZERO_RETURN, then SSL connection was closed by peer */
-					return 0;
-				} else {
-					return 1;
-				}
-			} else {
-				v_print_log(VRS_PRINT_WARNING, "This method id: %d is not supported in this state\n", r_message->sys_cmd[i].ua_req.method_type);
-			}
-		} else {
-			v_print_log(VRS_PRINT_WARNING, "This command id: %d is not supported in this state\n", r_message->sys_cmd[i].cmd.id);
-		}
-	}
-
-	return 0;
-}
-
-#ifdef WITH_KERBEROS
-static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name){
-	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-		struct IO_CTX *io_ctx = CTX_io_ctx(C);
-		struct VSession *vsession = CTX_current_session(C);
-		struct VMessage *s_message = CTX_s_message(C);
-		int i, ret, error;
-		unsigned short buffer_pos = 0;
-
-		int user_id;
-
-		/* Do user authentication */
-		if ((user_id = vs_krb_make_user(C, u_name)) != -1) {
-			long int avatar_id;
-
-			pthread_mutex_lock(&vs_ctx->data.mutex);
-			avatar_id = vs_node_new_avatar_node(vs_ctx, user_id);
-			pthread_mutex_unlock(&vs_ctx->data.mutex);
-
-			if (avatar_id == -1) {
-				v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
-				return 0;
-			}
-
-			buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-			s_message->sys_cmd[0].ua_succ.id = CMD_USER_AUTH_SUCCESS;
-			/* Save user_id to the session and send it in
-			 * connect_accept command */
-			vsession->user_id = user_id;
-			vsession->avatar_id = avatar_id;
-			s_message->sys_cmd[0].ua_succ.user_id = user_id;
-			s_message->sys_cmd[0].ua_succ.avatar_id = avatar_id;
-
-			/* Set up negotiate command of the host cookie */
-			s_message->sys_cmd[1].change_r_cmd.id = CMD_CHANGE_R_ID;
-			s_message->sys_cmd[1].change_r_cmd.feature = FTR_COOKIE;
-			s_message->sys_cmd[1].change_r_cmd.count = 1;
-			/* Generate random string */
-			vsession->peer_cookie.str = (char*) calloc((COOKIE_SIZE + 1), sizeof(char));
-			for (i = 0; i < COOKIE_SIZE; i++) {
-				/* Generate only printable characters (debug prints) */
-				vsession->peer_cookie.str[i] = 32
-						+ (char) ((float) rand() * 94.0 / RAND_MAX);
-			}
-			vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-			s_message->sys_cmd[1].change_r_cmd.value[0].string8.length = strlen(
-					vsession->peer_cookie.str);
-			strcpy((char*) s_message->sys_cmd[1].change_r_cmd.value[0].string8.str,
-					vsession->peer_cookie.str);
-
-			s_message->sys_cmd[2].change_l_cmd.id = CMD_CHANGE_L_ID;
-			s_message->sys_cmd[2].change_l_cmd.feature = FTR_DED;
-			s_message->sys_cmd[2].change_l_cmd.count = 1;
-			/* Load DED from configuration and save it to the session */
-			vsession->ded.str = strdup(vs_ctx->ded);
-			s_message->sys_cmd[2].change_l_cmd.value[0].string8.length = strlen(
-					vsession->ded.str);
-			strcpy((char*) s_message->sys_cmd[2].change_l_cmd.value[0].string8.str,
-					vsession->ded.str);
-
-			/* Terminating command */
-			s_message->sys_cmd[3].cmd.id = CMD_RESERVED_ID;
-
-			buffer_pos += v_pack_stream_system_commands(s_message,
-					&io_ctx->buf[buffer_pos]);
-
-			s_message->header.len = io_ctx->buf_size = buffer_pos;
-			s_message->header.version = VRS_VERSION;
-			/* Pack header to the beginning of the buffer */
-			v_pack_message_header(s_message, io_ctx->buf);
-
-			v_print_send_message(C);
-
-			/* Send command to the client */
-			if ((ret = v_krb5_write(io_ctx, vs_ctx->krb5_ctx, &error)) <= 0) {
-				return 0;
-			} else {
-				return 1;
-			}
-		} else {
-
-			buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-			s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
-			s_message->sys_cmd[0].ua_fail.count = 0;
-
-			s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
-
-			buffer_pos += v_pack_stream_system_commands(s_message,
-					&io_ctx->buf[buffer_pos]);
-
-			s_message->header.len = io_ctx->buf_size = buffer_pos;
-			s_message->header.version = VRS_VERSION;
-			/* Pack header to the beginning of the buffer */
-			v_pack_message_header(s_message, io_ctx->buf);
-
-			v_print_send_message(C);
-
-			/* Send command to the client */
-			if ((ret = v_krb5_write(io_ctx, vs_ctx->krb5_ctx, &error)) <= 0) {
-				return 0;
-			} else {
-				return 0;
-			}
-		}
-		return 0;
-}
-#endif
 
 /**
  * \brief Main function for new thread. This thread is created for new
@@ -889,29 +96,40 @@ void *vs_tcp_conn_loop(void *arg)
 	struct VMessage *r_message=NULL, *s_message=NULL;
 	struct timeval tv;
 	fd_set set;
-	int error, ret, user_auth_attempts=0;
+	int error, ret;
 	void *udp_thread_result;
+	unsigned int int_size;
 #ifdef WITH_KERBEROS
 	char **u_name;
+#endif
 
 
-	/* Is Kerberos used? */
-	if (vs_ctx->use_krb5 == USE_KERBEROS) {
-		/* Try to verify Kerberos */
-		u_name = malloc(sizeof(char *));
-		if (vs_kerberos_auth(C, u_name) != 1){
-			goto end;
-		}
-	} else {
+	/* Try to get size of TCP buffer */
+	int_size = sizeof(int_size);
+	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size);
+
+#ifdef WITH_OPENSSL
+#ifdef WITH_KERBEROS
+	if (vs_ctx->use_krb5 != USE_KERBEROS) {
 #endif
 		/* Try to do TLS handshake with client */
-		if (vs_TLS_handshake(C) != 1) {
+		if(vs_TLS_handshake(C)!=1) {
 			goto end;
 		}
 #ifdef WITH_KERBEROS
 	}
 #endif
+#endif
 
+#ifdef WITH_KERBEROS
+	if (vs_ctx->use_krb5 == USE_KERBEROS) {
+		u_name = malloc(sizeof(char *));
+		if (vs_kerberos_auth(C, u_name) != 1) {
+			goto end;
+		}
+	}
+#endif
 	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	CTX_r_message_set(C, r_message);
@@ -923,25 +141,21 @@ void *vs_tcp_conn_loop(void *arg)
 
 		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
 			printf("%c[%d;%dm", 27, 1, 31);
-			v_print_log(VRS_PRINT_DEBUG_MSG,
-					"Server TCP state: RESPOND_krb\n");
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_krb_auth\n");
 			printf("%c[%dm", 27, 0);
 		}
 	} else {
 #endif
-		stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+	stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
 
-		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
-			printf("%c[%d;%dm", 27, 1, 31);
-			v_print_log(VRS_PRINT_DEBUG_MSG,
-					"Server TCP state: RESPOND_methods\n");
-			printf("%c[%dm", 27, 0);
-		}
+	if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
+		printf("%c[%d;%dm", 27, 1, 31);
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
+		printf("%c[%dm", 27, 0);
+	}
 #ifdef WITH_KERBEROS
 	}
 #endif
-
-	user_auth_attempts = 0;
 
 	/* "Never ending" loop */
 	while(1)
@@ -953,116 +167,51 @@ void *vs_tcp_conn_loop(void *arg)
 		tv.tv_usec = 0;
 
 #ifdef WITH_KERBEROS
-		if(vs_ctx->use_krb5 == USE_KERBEROS){
+		if(vs_ctx->use_krb5 == USE_KERBEROS) {
 			goto respond_krb;
 		}
 #endif
 
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
+
+			/* Try to receive data through TCP connection */
+			if( v_tcp_read(io_ctx, &error) <= 0 ) {
+				goto end;
+			}
+			/* Handle verse handshake at TCP connection */
 #ifdef WITH_KERBEROS
-			if (vs_ctx->use_krb5 != USE_KERBEROS) {
-#endif
-				/* Try to receive data through SSL connection */
-				if (v_SSL_read(io_ctx, &error) <= 0) {
+respond_krb:
+			if (vs_ctx->use_krb5 == USE_KERBEROS) {
+				if( (ret = vs_handle_handshake(C, *u_name)) == -1) {
 					goto end;
 				}
-#ifdef WITH_KERBEROS
-			}
+			} else {
 #endif
-
-			/* Make sure, that buffer contains at least Verse message
-			 * header. If this condition is not reached, then somebody tries
-			 * to do some very bad things! .. Close this connection. */
-			if(io_ctx->buf_size < VERSE_MESSAGE_HEADER_SIZE) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "received buffer too small %d\n", io_ctx->buf_size);
+			if( (ret = vs_handle_handshake(C, NULL)) == -1) {
 				goto end;
 			}
 #ifdef WITH_KERBEROS
-respond_krb:
+	}
 #endif
-			switch(stream_conn->host_state) {
-			case TCP_SERVER_STATE_RESPOND_METHODS:
-				ret = vs_RESPOND_methods_loop(C);
-				if(ret==1) {
-					stream_conn->host_state = TCP_SERVER_STATE_RESPOND_USRAUTH;
-					if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-						printf("%c[%d;%dm", 27, 1, 31);
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_userauth\n");
-						printf("%c[%dm", 27, 0);
-					}
-				} else {
-					goto end;
-				}
-				break;
-			case TCP_SERVER_STATE_RESPOND_USRAUTH:
-				ret = vs_RESPOND_userauth_loop(C);
-				if(ret==1) {
-					stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
-
-					if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-						printf("%c[%d;%dm", 27, 1, 31);
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: NEGOTIATE_cookie_ded\n");
-						printf("%c[%dm", 27, 0);
-					}
-				} else {
-					user_auth_attempts++;
-					if(user_auth_attempts >= MAX_USER_AUTH_ATTEMPTS) {
-						goto end;
-					}
-				}
-				break;
+			/* When there is something to send, then send it to peer */
+			if( ret == 1 ) {
 #ifdef WITH_KERBEROS
-			case TCP_SERVER_STATE_RESPOND_KRB_AUTH:
-				ret = vs_RESPOND_krb_auth_loop(C, *u_name);
-				if (ret == 1) {
-					stream_conn->host_state =
-							TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
-
-					if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
-						printf("%c[%d;%dm", 27, 1, 31);
-						v_print_log(VRS_PRINT_DEBUG_MSG,
-								"Server TCP state: NEGOTIATE_cookie_ded\n");
-						printf("%c[%dm", 27, 0);
-					}
-				} else {
-					goto end;
-				}
-				break;
+				if(vs_ctx->use_krb5 != USE_KERBEROS){
 #endif
-			case TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED:
-				ret = vs_NEGOTIATE_cookie_ded_loop(C);
-				if(ret==1) {
-					stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_NEWHOST;
-
-					if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-						printf("%c[%d;%dm", 27, 1, 31);
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: NEGOTIATE_newhost\n");
-						printf("%c[%dm", 27, 0);
-					}
-				} else {
+				/* Send response message to the client */
+				if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
 					goto end;
 				}
-				break;
-			case TCP_SERVER_STATE_NEGOTIATE_NEWHOST:
-				/* Wait VERSE_TIMEOT seconds to confirming proposed URL */
-				ret = vs_NEGOTIATE_newhost_loop(C);
-				if(ret==1) {
-					/* When URL was confirmed, then go to the end state */
-					goto end;
-				} else {
-					/* When thread was not confirmed, then try to cancel
-					 * UDP thread*/
-					if(pthread_cancel(vsession->udp_thread) != 0) {
-						v_print_log(VRS_PRINT_DEBUG_MSG, "UDP thread was not canceled\n");
-					}
-					goto end;
+#ifdef WITH_KERBEROS
 				}
-				break;
+#endif
 			}
+
 		} else {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "No response in %d seconds\n", VRS_TIMEOUT);
 			goto end;
@@ -1080,12 +229,12 @@ end:
 	vs_CLOSING(C);
 
 	/* Receive and Send messages are not neccessary any more */
-	if(r_message!=NULL) {
+	if(r_message != NULL) {
 		free(r_message);
 		r_message = NULL;
 		CTX_r_message_set(C, NULL);
 	}
-	if(s_message!=NULL) {
+	if(s_message != NULL) {
 		free(s_message);
 		s_message = NULL;
 		CTX_s_message_set(C, NULL);
@@ -1122,7 +271,27 @@ end:
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 	/* This session could be used again for authentication */
-	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
+	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
+
+	/* Clear session flags */
+	vsession->flags = 0;
+
+	if(vsession->peer_cookie.str != NULL) {
+		free(vsession->peer_cookie.str);
+		vsession->peer_cookie.str = NULL;
+	}
+	if(vsession->ded.str != NULL) {
+		free(vsession->ded.str);
+		vsession->ded.str = NULL;
+	}
+	if(vsession->client_name != NULL) {
+		free(vsession->client_name);
+		vsession->client_name = NULL;
+	}
+	if(vsession->client_version != NULL) {
+		free(vsession->client_version);
+		vsession->client_version = NULL;
+	}
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -1137,23 +306,168 @@ end:
 	return NULL;
 }
 
-/* Main Verse server loop. Server waits for connect attempts, responds to attempts
- * and creates per connection threads */
-int vs_main_stream_loop(VS_CTX *vs_ctx)
+
+/**
+ * \brief This connection tries to handle new connection attempt. When this
+ * attempt is successful, then it creates new thread
+ */
+static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
+{
+	VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct VSession *current_session = NULL;
+	socklen_t addr_len;
+	int ret, i;
+	static uint32 last_session_id = 0;
+
+	/* Try to find free session */
+	for(i=0; i< vs_ctx->max_sessions; i++) {
+		if(vs_ctx->vsessions[i]->stream_conn->host_state == TCP_SERVER_STATE_LISTEN) {
+			/* TODO: lock mutex here */
+			current_session = vs_ctx->vsessions[i];
+			current_session->stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+			current_session->session_id = last_session_id++;
+			/* TODO: unlock mutex here */
+			break;
+		}
+	}
+
+	if(current_session != NULL) {
+		struct vContext *new_C;
+		int flag;
+
+		/* Try to accept client connection (do TCP handshake) */
+		if(io_ctx->host_addr.ip_ver==IPV4) {
+			/* Prepare IPv4 variables for TCP handshake */
+			struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
+			current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
+			addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv4);
+
+			/* Try to do TCP handshake */
+			if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr4, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+
+			/* Save the IPv4 of the client as string in verse session */
+			inet_ntop(AF_INET, &client_addr4->sin_addr, current_session->peer_hostname, INET_ADDRSTRLEN);
+		} else if(io_ctx->host_addr.ip_ver==IPV6) {
+			/* Prepare IPv6 variables for TCP handshake */
+			struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
+			current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
+			addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv6);
+
+			/* Try to do TCP handshake */
+			if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr6, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+
+			/* Save the IPv6 of the client as string in verse session */
+			inet_ntop(AF_INET6, &client_addr6->sin6_addr, current_session->peer_hostname, INET6_ADDRSTRLEN);
+		}
+
+		/* Set to this socket flag "no delay" */
+		flag = 1;
+		if(setsockopt(current_session->stream_conn->io_ctx.sockfd,
+				IPPROTO_TCP, TCP_NODELAY, &flag, (socklen_t)sizeof(flag)) == -1)
+		{
+			if(is_log_level(VRS_PRINT_ERROR)) {
+				v_print_log(VRS_PRINT_ERROR,
+						"setsockopt: TCP_NODELAY: %d\n",
+						strerror(errno));
+			}
+			return -1;;
+		}
+
+		CTX_current_session_set(C, current_session);
+		CTX_current_stream_conn_set(C, current_session->stream_conn);
+		CTX_io_ctx_set(C, &current_session->stream_conn->io_ctx);
+
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "New connection from: ");
+			v_print_addr_port(VRS_PRINT_DEBUG_MSG, &(current_session->stream_conn->io_ctx.peer_addr));
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
+		}
+
+		/* Duplicate verse context for new thread */
+		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
+		memcpy(new_C, C, sizeof(struct vContext));
+
+		/* Try to initialize thread attributes */
+		if( (ret = pthread_attr_init(&current_session->tcp_thread_attr)) !=0 ) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
+			return 0;
+		}
+
+		/* Try to set thread attributes as detached */
+		if( (ret = pthread_attr_setdetachstate(&current_session->tcp_thread_attr, PTHREAD_CREATE_DETACHED)) != 0) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
+			return 0;
+		}
+
+		/* Try to create new thread */
+		if((ret = pthread_create(&current_session->tcp_thread, &current_session->tcp_thread_attr, conn_loop, (void*)new_C)) != 0) {
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		}
+
+		/* Destroy thread attributes */
+		pthread_attr_destroy(&current_session->tcp_thread_attr);
+	} else {
+		int tmp_sockfd;
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Number of session slot: %d reached\n", vs_ctx->max_sessions);
+		/* TODO: return some error. Not only accept and close connection. */
+		/* Try to accept client connection (do TCP handshake) */
+		if(io_ctx->host_addr.ip_ver == IPV4) {
+			/* Prepare IP6 variables for TCP handshake */
+			struct sockaddr_in client_addr4;
+
+			addr_len = sizeof(client_addr4);
+
+			/* Try to do TCP handshake */
+			if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr4, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+			/* Close connection (no more free session slots) */
+			close(tmp_sockfd);
+		} else if(io_ctx->host_addr.ip_ver == IPV6) {
+			/* Prepare IP6 variables for TCP handshake */
+			struct sockaddr_in6 client_addr6;
+			addr_len = sizeof(client_addr6);
+
+			/* Try to do TCP handshake */
+			if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr6, &addr_len)) == -1) {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				return 0;
+			}
+			/* Close connection (no more free session slots) */
+			close(tmp_sockfd);
+		}
+		/* TODO: Fix this */
+		sleep(1);
+	}
+
+	return 1;
+}
+
+/**
+ * \brief Main Verse server loop. Server waits for connect attempts, responds to attempts
+ * and creates per connection threads
+ */
+int vs_main_listen_loop(VS_CTX *vs_ctx)
 {
 	struct vContext *C;
-	struct IO_CTX *io_ctx = &vs_ctx->io_ctx;
 	struct timeval start, tv;
 	fd_set set;
 	int count, tmp, i, ret;
-	static uint32 last_session_id = 0;
+	int sockfd;
 
 	/* Allocate context for server */
 	C = (struct vContext*)calloc(1, sizeof(struct vContext));
 	/* Set up client context, connection context and IO context */
 	CTX_server_ctx_set(C, vs_ctx);
 	CTX_client_ctx_set(C, NULL);
-	CTX_io_ctx_set(C, io_ctx);
 	CTX_current_dgram_conn_set(C, NULL);
 
 	/* Get time of the start of the server */
@@ -1177,146 +491,64 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+0s");
 			else
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+%lds", (long int)(tv.tv_sec - start.tv_sec));
-			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\tServer listen on TCP port: %d\n", vs_ctx->io_ctx.host_addr.port);
+#ifdef WSLAY
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+					"\tServer listen on (TCP port: %d, WebSocket port: %d)\n",
+					vs_ctx->tcp_io_ctx.host_addr.port,
+					vs_ctx->ws_io_ctx.host_addr.port);
+#else
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+					"\tServer listen on TCP port: %d\n",
+					vs_ctx->tcp_io_ctx.host_addr.port);
+#endif
 		}
 
 		/* Set up set of sockets */
 		FD_ZERO(&set);
-		FD_SET(io_ctx->sockfd, &set);
+		FD_SET(vs_ctx->tcp_io_ctx.sockfd, &set);
+		/* When Verse is compiled with support of WebSocket, then listen on
+		 * WebSocket port too */
+#ifdef WSLAY
+		FD_SET(vs_ctx->ws_io_ctx.sockfd, &set);
+		sockfd = (vs_ctx->tcp_io_ctx.sockfd > vs_ctx->ws_io_ctx.sockfd) ?
+				vs_ctx->tcp_io_ctx.sockfd : vs_ctx->ws_io_ctx.sockfd;
+#else
+		sockfd = vs_ctx->tcp_io_ctx.sockfd;
+#endif
 
 		/* We will wait one second for connect attempt, then debug print will
 		 * be print again */
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
 
-		/* Wait for event on listening socket */
-		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
+
+		/* Wait for event on listening sockets */
+		if( (ret = select(sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
 			int err = errno;
 			if(err==EINTR) {
 				break;
 			} else {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__,  __LINE__, strerror(err));
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR,
+						"%s:%s():%d select(): %s\n",
+						__FILE__,
+						__FUNCTION__,
+						__LINE__,
+						strerror(err));
 				return -1;
 			}
 			/* Was event on the listen socket */
-		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
-			struct VSession *current_session = NULL;
-			socklen_t addr_len;
-			int i;
-
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Connection attempt\n");
-
-			/* Try to find free session */
-			for(i=0; i< vs_ctx->max_sessions; i++) {
-				if(vs_ctx->vsessions[i]->stream_conn->host_state==TCP_SERVER_STATE_LISTEN) {
-					/* TODO: lock mutex here */
-					current_session = vs_ctx->vsessions[i];
-					current_session->stream_conn->host_state=TCP_SERVER_STATE_RESPOND_METHODS;
-					current_session->session_id = last_session_id++;
-					/* TODO: unlock mutex here */
-					break;
-				}
-			}
-
-			if(current_session != NULL) {
-				struct vContext *new_C;
-
-				/* Try to accept client connection (do TCP handshake) */
-				if(io_ctx->host_addr.ip_ver==IPV4) {
-					/* Prepare IP6 variables for TCP handshake */
-					struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
-					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
-					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv4);
-
-					/* Try to do TCP handshake */
-					if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr4, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-
-					/* Save the IP of the client as string in verse session */
-					inet_ntop(AF_INET6, client_addr4, current_session->peer_hostname, INET_ADDRSTRLEN);
-				} else if(io_ctx->host_addr.ip_ver==IPV6) {
-					/* Prepare IP6 variables for TCP handshake */
-					struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
-					current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
-					addr_len = sizeof(current_session->stream_conn->io_ctx.peer_addr.addr.ipv6);
-
-					/* Try to do TCP handshake */
-					if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr6, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-
-					/* Save the IP of the client as string in verse session */
-					inet_ntop(AF_INET6, client_addr6, current_session->peer_hostname, INET6_ADDRSTRLEN);
-				}
-
-				CTX_current_session_set(C, current_session);
-				CTX_current_stream_conn_set(C, current_session->stream_conn);
-				CTX_io_ctx_set(C, &current_session->stream_conn->io_ctx);
-
-				if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "New connection from: ");
-					v_print_addr_port(VRS_PRINT_DEBUG_MSG, &(current_session->stream_conn->io_ctx.peer_addr));
-					v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
-				}
-
-				/* Duplicate verse context for new thread */
-				new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-				memcpy(new_C, C, sizeof(struct vContext));
-
-				/* Try to initialize thread attributes */
-				if( (ret = pthread_attr_init(&current_session->tcp_thread_attr)) !=0 ) {
-					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
-					continue;
-				}
-
-				/* Try to set thread attributes as detached */
-				if( (ret = pthread_attr_setdetachstate(&current_session->tcp_thread_attr, PTHREAD_CREATE_DETACHED)) != 0) {
-					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
-					continue;
-				}
-
-				/* Try to create new thread */
-				if((ret = pthread_create(&current_session->tcp_thread, &current_session->tcp_thread_attr, vs_tcp_conn_loop, (void*)new_C)) != 0) {
-					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-				}
-
-				/* Destroy thread attributes */
-				pthread_attr_destroy(&current_session->tcp_thread_attr);
-			} else {
-				int tmp_sockfd;
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Number of session slot: %d reached\n", vs_ctx->max_sessions);
-				/* TODO: return some error. Not only accept and close connection. */
-				/* Try to accept client connection (do TCP handshake) */
-				if(io_ctx->host_addr.ip_ver==IPV4) {
-					/* Prepare IP6 variables for TCP handshake */
-					struct sockaddr_in client_addr4;
-
-					addr_len = sizeof(client_addr4);
-
-					/* Try to do TCP handshake */
-					if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr4, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-					/* Close connection (no more free session slots) */
-					close(tmp_sockfd);
-				} else if(io_ctx->host_addr.ip_ver==IPV6) {
-					/* Prepare IP6 variables for TCP handshake */
-					struct sockaddr_in6 client_addr6;
-					addr_len = sizeof(client_addr6);
-
-					/* Try to do TCP handshake */
-					if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr6, &addr_len)) == -1) {
-						if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
-						continue;
-					}
-					/* Close connection (no more free session slots) */
-					close(tmp_sockfd);
-				}
-				sleep(1);
+		} else if(ret>0) {
+			if (FD_ISSET(vs_ctx->tcp_io_ctx.sockfd, &set))
+			{
+				v_print_log(VRS_PRINT_DEBUG_MSG, "TCP Connection attempt\n");
+				CTX_io_ctx_set(C, &vs_ctx->tcp_io_ctx);
+				vs_new_stream_conn(C, vs_tcp_conn_loop);
+#ifdef WSLAY
+			} else if(FD_ISSET(vs_ctx->ws_io_ctx.sockfd, &set)) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "WebSocket Connection attempt\n");
+				CTX_io_ctx_set(C, &vs_ctx->ws_io_ctx);
+				vs_new_stream_conn(C, vs_websocket_loop);
+#endif
 			}
 		}
 	}
@@ -1333,7 +565,11 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 					vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN ) {
 					tmp++;
 				}
-				/* TODO: cancel thread with closed connection to speed up server exit */
+				/* TODO: cancel thread with closed connection to speed up server exit
+					pthread_kill(vs_ctx->vsessions[i]->tcp_thread, SIGALRM);
+					pthread_join(vs_ctx->vsessions[i]->tcp_thread, NULL);
+				*/
+
 			}
 		}
 		if(tmp==0) {
@@ -1348,282 +584,296 @@ int vs_main_stream_loop(VS_CTX *vs_ctx)
 	return 1;
 }
 
-/* Initialize verse server context */
-int vs_init_stream_ctx(VS_CTX *vs_ctx)
+
+#ifdef WITH_OPENSSL
+/**
+ * \brief Destroy stream part of verse context
+ */
+void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
 {
-	int i, flag;
-#ifdef WITH_KERBEROS
-	char *name;
-	krb5_error_code krb5_err;
+	if(vs_ctx->tls_ctx != NULL) {
+		SSL_CTX_free(vs_ctx->tls_ctx);
+		vs_ctx->tls_ctx = NULL;
+	}
+	if(vs_ctx->dtls_ctx != NULL) {
+		SSL_CTX_free(vs_ctx->dtls_ctx);
+		vs_ctx->dtls_ctx = NULL;
+	}
+}
 
-	/* Will be Kerberos used? */
-	if (vs_ctx->use_krb5 == USE_KERBEROS) {
-		/* Using Kerberos */
-		krb5_err = krb5_init_context(&vs_ctx->krb5_ctx);
-		if (krb5_err) {
-			v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n",
-					krb5_err,
-					krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
-			return -1;
-		}
-		/** TODO
-		 * resolv service and domain names
-		 */
-		if ((krb5_err = krb5_sname_to_principal(vs_ctx->krb5_ctx, "localhost",
-				"verse",
-				KRB5_NT_SRV_HST, &vs_ctx->krb5_principal))) {
-			v_print_log(VRS_PRINT_ERROR, "krb5_sname_to_principal: %d: %s\n",
-					krb5_err,
-					krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
-			return -1;
-		}
-		krb5_unparse_name(vs_ctx->krb5_ctx, vs_ctx->krb5_principal, &name);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Kerberos principal: %s\n", name);
-	} else {
-#endif
-		/* Don't using Kerberos */
-		/* Set up the library */
-		SSL_library_init();
-		ERR_load_BIO_strings();
-		SSL_load_error_strings();
-		OpenSSL_add_all_algorithms();
 
-		/* Set up SSL context for TLS  */
-		if ((vs_ctx->tls_ctx = SSL_CTX_new(TLSv1_server_method())) == NULL) {
-			v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
+/*
+ * \brief Initialize OpenSSl of Verse server
+ */
+static int vs_init_ssl(VS_CTX *vs_ctx)
+{
+	/* Set up the library */
+	SSL_library_init();
+	ERR_load_BIO_strings();
+	SSL_load_error_strings();
+	OpenSSL_add_all_algorithms();
+
+	/* Set up SSL context for TLS  */
+	if( (vs_ctx->tls_ctx = SSL_CTX_new(TLSv1_server_method())) == NULL ) {
+		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
+
+	/* Load certificate chain file from CA */
+	if(vs_ctx->ca_cert_file != NULL) {
+		if(SSL_CTX_use_certificate_chain_file(vs_ctx->tls_ctx, vs_ctx->ca_cert_file) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate chain file: %s failed.\n",
+					vs_ctx->ca_cert_file);
 			ERR_print_errors_fp(v_log_file());
 			return -1;
 		}
+	}
 
-		/* TODO: use int SSL_CTX_use_certificate_chain_file(SSL_CTX *ctx, const char *file); */
+	/* Load certificate with public key for TLS */
+	if(SSL_CTX_use_certificate_file(vs_ctx->tls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
+		v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate file: %s failed.\n",
+				vs_ctx->public_cert_file);
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
 
-		/* Load certificate with public key for TLS */
-		if (SSL_CTX_use_certificate_file(vs_ctx->tls_ctx,
-				vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
-			v_print_log(VRS_PRINT_ERROR,
-					"TLS: Loading certificate file: %s failed.\n",
-					vs_ctx->public_cert_file);
+	/* Load private key for TLS */
+	if(SSL_CTX_use_PrivateKey_file(vs_ctx->tls_ctx, vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
+		v_print_log(VRS_PRINT_ERROR, "TLS: Loading private key file: %s failed.\n",
+				vs_ctx->private_cert_file);
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
+
+	/* Check the consistency of a private key with the corresponding
+	 * certificate loaded into ssl_ctx */
+	if(SSL_CTX_check_private_key(vs_ctx->tls_ctx) != 1) {
+		v_print_log(VRS_PRINT_ERROR, "TLS: Private key does not match the certificate public key\n");
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
+
+	/* When CA certificate file was set, then try to load it */
+	if(vs_ctx->ca_cert_file != NULL) {
+		if(SSL_CTX_load_verify_locations(vs_ctx->tls_ctx, vs_ctx->ca_cert_file, NULL) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "TLS: Loading CA certificate file: %s failed.\n",
+					vs_ctx->ca_cert_file);
 			ERR_print_errors_fp(v_log_file());
 			return -1;
 		}
-
-		/* Load private key for TLS */
-		if (SSL_CTX_use_PrivateKey_file(vs_ctx->tls_ctx,
-				vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
-			v_print_log(VRS_PRINT_ERROR,
-					"TLS: Loading private key file: %s failed.\n",
-					vs_ctx->private_cert_file);
-			ERR_print_errors_fp(v_log_file());
-			return -1;
-		}
-
-		/* Check the consistency of a private key with the corresponding
-		 * certificate loaded into ssl_ctx */
-		if (SSL_CTX_check_private_key(vs_ctx->tls_ctx) != 1) {
-			v_print_log(VRS_PRINT_ERROR,
-					"TLS: Private key does not match the certificate public key\n");
-			ERR_print_errors_fp(v_log_file());
-			return -1;
-		}
-
-		/* When CA certificate file was set, then try to load it */
-		if (vs_ctx->ca_cert_file != NULL) {
-			if (SSL_CTX_load_verify_locations(vs_ctx->tls_ctx,
-					vs_ctx->ca_cert_file, NULL) != 1) {
-				v_print_log(VRS_PRINT_ERROR,
-						"TLS: Loading CA certificate file: %s failed.\n",
-						vs_ctx->ca_cert_file);
-				ERR_print_errors_fp(v_log_file());
-				return -1;
-			}
-		}
+	}
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
-		/* Set up SSL context for DTLS  */
-		if ((vs_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_server_method())) == NULL) {
-			v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
-			ERR_print_errors_fp(v_log_file());
-			return -1;
-		}
 
-		/* Load certificate with public key for DTLS */
-		if (SSL_CTX_use_certificate_file(vs_ctx->dtls_ctx,
-				vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
-			v_print_log(VRS_PRINT_ERROR,
-					"DTLS: Loading certificate file: %s failed.\n",
-					vs_ctx->public_cert_file);
-			ERR_print_errors_fp(v_log_file());
-			return -1;
-		}
-
-		/* Load private key for DTLS */
-		if (SSL_CTX_use_PrivateKey_file(vs_ctx->dtls_ctx,
-				vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
-			v_print_log(VRS_PRINT_ERROR,
-					"DTLS: Loading private key file: %s failed.\n",
-					vs_ctx->private_cert_file);
-			ERR_print_errors_fp(v_log_file());
-			return -1;
-		}
-
-		/* Check the consistency of a private key with the corresponding
-		 * certificate loaded into ssl_ctx */
-		if (SSL_CTX_check_private_key(vs_ctx->dtls_ctx) != 1) {
-			v_print_log(VRS_PRINT_ERROR,
-					"DTLS: Private key does not match the certificate public key\n");
-			ERR_print_errors_fp(v_log_file());
-			return -1;
-		}
-
-		/* When CA certificate file was set, then try to load it */
-		if (vs_ctx->ca_cert_file != NULL) {
-			if (SSL_CTX_load_verify_locations(vs_ctx->dtls_ctx,
-					vs_ctx->ca_cert_file, NULL) != 1) {
-				v_print_log(VRS_PRINT_ERROR,
-						"DTLS: Loading CA certificate file: %s failed.\n",
-						vs_ctx->ca_cert_file);
-				ERR_print_errors_fp(v_log_file());
-				return -1;
-			}
-		}
-
-		/* Set up callback functions for DTLS cookie */
-		SSL_CTX_set_cookie_generate_cb(vs_ctx->dtls_ctx,
-				vs_dtls_generate_cookie);
-		SSL_CTX_set_cookie_verify_cb(vs_ctx->dtls_ctx, vs_dtls_verify_cookie);
-		/* Accept all cipher including NULL cipher (testing) */
-		if (SSL_CTX_set_cipher_list(vs_ctx->dtls_ctx, "ALL:NULL:eNULL:aNULL")
-				== 0) {
-			v_print_log(VRS_PRINT_ERROR, "Setting ciphers for DTLS failed.\n");
-			ERR_print_errors_fp(v_log_file());
-			return 0;
-		}
-		/* DTLS require this */
-		SSL_CTX_set_read_ahead(vs_ctx->dtls_ctx, 1);
-#else
-		vs_ctx->dtls_ctx = NULL;
-#endif
-#ifdef WITH_KERBEROS
+	/* Set up SSL context for DTLS  */
+	if( (vs_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_server_method())) == NULL ) {
+		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
+		ERR_print_errors_fp(v_log_file());
+		return -1;
 	}
+
+	/* Load certificate chain file from CA */
+	if(vs_ctx->ca_cert_file != NULL) {
+		if(SSL_CTX_use_certificate_chain_file(vs_ctx->dtls_ctx, vs_ctx->ca_cert_file) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "DTLS: Loading certificate chain file: %s failed.\n",
+					vs_ctx->ca_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+	}
+
+	/* Load certificate with public key for DTLS */
+	if (SSL_CTX_use_certificate_file(vs_ctx->dtls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
+		v_print_log(VRS_PRINT_ERROR, "DTLS: Loading certificate file: %s failed.\n",
+						vs_ctx->public_cert_file);
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
+
+	/* Load private key for DTLS */
+	if(SSL_CTX_use_PrivateKey_file(vs_ctx->dtls_ctx, vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
+		v_print_log(VRS_PRINT_ERROR, "DTLS: Loading private key file: %s failed.\n",
+						vs_ctx->private_cert_file);
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
+
+	/* Check the consistency of a private key with the corresponding
+	 * certificate loaded into ssl_ctx */
+	if(SSL_CTX_check_private_key(vs_ctx->dtls_ctx) != 1) {
+		v_print_log(VRS_PRINT_ERROR, "DTLS: Private key does not match the certificate public key\n");
+		ERR_print_errors_fp(v_log_file());
+		return -1;
+	}
+
+	/* When CA certificate file was set, then try to load it */
+	if(vs_ctx->ca_cert_file != NULL) {
+		if(SSL_CTX_load_verify_locations(vs_ctx->dtls_ctx, vs_ctx->ca_cert_file, NULL) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "DTLS: Loading CA certificate file: %s failed.\n",
+					vs_ctx->ca_cert_file);
+			ERR_print_errors_fp(v_log_file());
+			return -1;
+		}
+	}
+
+	/* Set up callback functions for DTLS cookie */
+	SSL_CTX_set_cookie_generate_cb(vs_ctx->dtls_ctx, vs_dtls_generate_cookie);
+	SSL_CTX_set_cookie_verify_cb(vs_ctx->dtls_ctx, vs_dtls_verify_cookie);
+	/* Accept all cipher including NULL cipher (testing) */
+	if( SSL_CTX_set_cipher_list(vs_ctx->dtls_ctx, "ALL:NULL:eNULL:aNULL") == 0) {
+		v_print_log(VRS_PRINT_ERROR, "Setting ciphers for DTLS failed.\n");
+		ERR_print_errors_fp(v_log_file());
+		return 0;
+	}
+	/* DTLS require this */
+	SSL_CTX_set_read_ahead(vs_ctx->dtls_ctx, 1);
+#else
+	vs_ctx->dtls_ctx = NULL;
 #endif
-	vs_ctx->connected_clients = 0;
+
+	return 1;
+}
+#endif
+
+
+/**
+ * \brief Initialize IO context of Verse server used for incomming connections (TCP, WebSocket)
+ */
+static int vs_init_io_ctx(struct IO_CTX *io_ctx,
+		unsigned short port,
+		int max_sessions)
+{
+	int flag;
 
 	/* Allocate buffer for incoming packets */
-	if ( (vs_ctx->io_ctx.buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
+	if ( (io_ctx->buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		return -1;
 	}
 
 	/* "Address" of server */
-	if(vs_ctx->io_ctx.host_addr.ip_ver == IPV4) {		/* IPv4 */
+	if(io_ctx->host_addr.ip_ver == IPV4) {		/* IPv4 */
 
 		/* Create socket which server uses for listening for new connections */
-		if ( (vs_ctx->io_ctx.sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		if ( (io_ctx->sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		/* Set socket non-blocking */
-/*		flag = fcntl(vs_ctx->io_ctx.sockfd, F_GETFL, 0);
-		if( (fcntl(vs_ctx->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-			return -1;
-		}*/
-
 		/* Set socket to reuse address */
 		flag = 1;
-		if( setsockopt(vs_ctx->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+		if( setsockopt(io_ctx->sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_family = AF_INET;
-		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
-		vs_ctx->io_ctx.host_addr.addr.ipv4.sin_port = htons(vs_ctx->port);
-		vs_ctx->io_ctx.host_addr.port = vs_ctx->port;
+		io_ctx->host_addr.addr.ipv4.sin_family = AF_INET;
+		io_ctx->host_addr.addr.ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
+		io_ctx->host_addr.addr.ipv4.sin_port = htons(port);
+		io_ctx->host_addr.port = port;
 
 		/* Bind address and socket */
-		if( bind(vs_ctx->io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->io_ctx.host_addr.addr.ipv4), sizeof(vs_ctx->io_ctx.host_addr.addr.ipv4)) == -1) {
+		if( bind(io_ctx->sockfd,
+				(struct sockaddr*)&(io_ctx->host_addr.addr.ipv4),
+				sizeof(io_ctx->host_addr.addr.ipv4)) == -1)
+		{
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		/* Create queue for TCP connection attempts */
-		if( listen(vs_ctx->io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
-			return -1;
-		}
 	}
-	else if(vs_ctx->io_ctx.host_addr.ip_ver == IPV6) {	/* IPv6 */
+	else if(io_ctx->host_addr.ip_ver == IPV6) {	/* IPv6 */
 
 		/* Create socket which server uses for listening for new connections */
-		if ( (vs_ctx->io_ctx.sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
+		if ( (io_ctx->sockfd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP)) == -1 ) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		/* Set socket non-blocking */
-/*		flag = fcntl(vs_ctx->io_ctx.sockfd, F_GETFL, 0);
-		if( (fcntl(vs_ctx->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-			return -1;
-		}*/
-
 		/* Set socket to reuse address */
 		flag = 1;
-		if( setsockopt(vs_ctx->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
+		if( setsockopt(io_ctx->sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 			return -1;
 		}
 
-		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_family = AF_INET6;
-		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_addr = in6addr_any;
-		vs_ctx->io_ctx.host_addr.addr.ipv6.sin6_port = htons(vs_ctx->port);
-		vs_ctx->io_ctx.host_addr.port = vs_ctx->port;
+		io_ctx->host_addr.addr.ipv6.sin6_family = AF_INET6;
+		io_ctx->host_addr.addr.ipv6.sin6_addr = in6addr_any;
+		io_ctx->host_addr.addr.ipv6.sin6_port = htons(port);
+		io_ctx->host_addr.addr.ipv6.sin6_flowinfo = 0; /* Obsolete value */
+		io_ctx->host_addr.addr.ipv6.sin6_scope_id = 0;
+		io_ctx->host_addr.port = port;
 
 		/* Bind address and socket */
-		if( bind(vs_ctx->io_ctx.sockfd, (struct sockaddr*)&(vs_ctx->io_ctx.host_addr.addr.ipv6), sizeof(vs_ctx->io_ctx.host_addr.addr.ipv6)) == -1) {
+		if( bind(io_ctx->sockfd,
+				(struct sockaddr*)&(io_ctx->host_addr.addr.ipv6),
+				sizeof(io_ctx->host_addr.addr.ipv6)) == -1)
+		{
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "bind(): %d\n", strerror(errno));
 			return -1;
 		}
 
-		/* Create queue for TCP connection attempts, set maximum number of
-		 * attempts in listen queue */
-		if( listen(vs_ctx->io_ctx.sockfd, vs_ctx->max_sessions) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
-			return -1;
-		}
 	}
 
-	/* Set up free ports for communication with clients */
-	if( (vs_ctx->port_list = (struct VS_Port*)calloc((vs_ctx->port_high - vs_ctx->port_low), sizeof(struct VS_Port))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
+	/* Create queue for TCP connection attempts, set maximum number of
+	 * attempts in listen queue */
+	if( listen(io_ctx->sockfd, max_sessions) == -1) {
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "listen(): %s\n", strerror(errno));
 		return -1;
-	} else {
-		for(i=0; i<(vs_ctx->port_high-vs_ctx->port_low); i++) {
-			vs_ctx->port_list[i].port_number = i+vs_ctx->port_low;
-			vs_ctx->port_list[i].flag = 0;
-		}
 	}
 
 	/* Set up flag for V_CTX of server */
-	vs_ctx->io_ctx.flags = 0;
+	io_ctx->flags = 0;
 
 	/* Set all bytes of buffer for incoming packet to zero */
-	memset(vs_ctx->io_ctx.buf, 0, MAX_PACKET_SIZE);
+	memset(io_ctx->buf, 0, MAX_PACKET_SIZE);
+
+	return 1;
+}
+
+
+/**
+ * \brief Initialize IO context for TCP connection
+ */
+static int vs_init_tcp_io_ctx(VS_CTX *vs_ctx)
+{
+	return vs_init_io_ctx(&vs_ctx->tcp_io_ctx, vs_ctx->tcp_port, vs_ctx->max_sessions);
+}
+
+#ifdef WSLAY
+/**
+ * \brief Initialize IO context for WebSocket TCP connection
+ */
+static int vs_init_websocket_io_ctx(VS_CTX *vs_ctx)
+{
+	return vs_init_io_ctx(&vs_ctx->ws_io_ctx, vs_ctx->ws_port, vs_ctx->max_sessions);
+}
+#endif
+
+/**
+ * \brief Initialize list of verse sessions
+ */
+static int vs_init_sessions(VS_CTX *vs_ctx)
+{
+	int i;
+
+	vs_ctx->connected_clients = 0;
 
 	/* Initialize list of connections */
 	vs_ctx->vsessions = (struct VSession**)calloc(vs_ctx->max_sessions, sizeof(struct VSession*));
 	for (i=0; i<vs_ctx->max_sessions; i++) {
 		if( (vs_ctx->vsessions[i] = (struct VSession*)calloc(1, sizeof(struct VSession))) == NULL ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 			return -1;
 		}
+		/* Set up verse session */
+		v_init_session(vs_ctx->vsessions[i]);
 		/* Set up input and output queues */
 		vs_ctx->vsessions[i]->in_queue = (struct VInQueue*)calloc(1, sizeof(VInQueue));
-		v_in_queue_init(vs_ctx->vsessions[i]->in_queue);
+		v_in_queue_init(vs_ctx->vsessions[i]->in_queue, vs_ctx->in_queue_max_size);
 		vs_ctx->vsessions[i]->out_queue = (struct VOutQueue*)calloc(1, sizeof(VOutQueue));
-		v_out_queue_init(vs_ctx->vsessions[i]->out_queue);
+		v_out_queue_init(vs_ctx->vsessions[i]->out_queue, vs_ctx->out_queue_max_size);
 		/* Allocate memory for TCP connection */
 		vs_ctx->vsessions[i]->stream_conn = (struct VStreamConn*)calloc(1, sizeof(struct VStreamConn));
 		/* Allocate memory for peer hostname */
@@ -1643,5 +893,86 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		vs_ctx->vsessions[i]->pamh = NULL;
 #endif
 	}
+
+	return 1;
+}
+
+#ifdef WITH_KERBEROS
+/**
+ *
+ */
+int vs_init_kerberos(VS_CTX *vs_ctx){
+	char *name;
+	krb5_error_code krb5_err;
+
+	/* Using Kerberos */
+	krb5_err = krb5_init_context(&vs_ctx->krb5_ctx);
+	if (krb5_err) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n", krb5_err,
+				krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
+		return -1;
+	}
+	/** TODO
+	 * resolv service and domain names
+	 */
+	if ((krb5_err = krb5_sname_to_principal(vs_ctx->krb5_ctx, "localhost",
+			"verse",
+			KRB5_NT_SRV_HST, &vs_ctx->krb5_principal))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_sname_to_principal: %d: %s\n",
+				krb5_err, krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
+		return -1;
+	}
+	krb5_unparse_name(vs_ctx->krb5_ctx, vs_ctx->krb5_principal, &name);
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Kerberos principal: %s\n", name);
+
+	return 1;
+}
+#endif
+/**
+ * \brief Initialize verse server context for connection at TCP
+ */
+int vs_init_stream_ctx(VS_CTX *vs_ctx)
+{
+	int ret;
+
+#ifdef WITH_OPENSSL
+	/* Will be Kerberos used? */
+#ifdef WITH_KERBEROS
+	if (vs_ctx->use_krb5 != USE_KERBEROS) {
+#endif
+		ret = vs_init_ssl(vs_ctx);
+		if(ret != 1) {
+			return ret;
+		}
+#ifdef WITH_KERBEROS
+	}
+#endif
+#endif
+#ifdef WITH_KERBEROS
+	/* Will be Kerberos used? */
+	if (vs_ctx->use_krb5 == USE_KERBEROS) {
+		ret = vs_init_kerberos(vs_ctx);
+		if (ret != 1) {
+			return ret;
+		}
+	}
+#endif
+	ret = vs_init_tcp_io_ctx(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+
+#ifdef WSLAY
+	ret = vs_init_websocket_io_ctx(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+#endif
+
+	ret = vs_init_sessions(vs_ctx);
+	if(ret != 1) {
+		return ret;
+	}
+
 	return 1;
 }

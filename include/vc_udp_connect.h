@@ -1,5 +1,4 @@
 /*
- * $Id: vc_udp_connect.h 903 2011-08-08 12:38:35Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

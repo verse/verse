@@ -1,5 +1,4 @@
 /*
- * $Id: v_history.h 1268 2012-07-24 08:14:52Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -110,5 +109,6 @@ int v_ack_nak_history_remove_cmds(struct AckNakHistory *history,
 int v_ack_nak_history_add_cmd(struct AckNakHistory *ack_nak_history,
 		struct Ack_Nak_Cmd *cmd);
 int v_ack_nak_history_init(struct AckNakHistory *ack_nak_history);
+void v_ack_nak_history_clear(struct AckNakHistory *history);
 
 #endif

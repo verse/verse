@@ -1,5 +1,4 @@
 /*
- * $Id: vs_tag.c 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -47,7 +46,7 @@ void vs_tag_send_set(struct VSession *vsession,
 {
 	struct Generic_Cmd *tag_set_cmd = NULL;
 
-	tag_set_cmd = v_tag_set_create(node->id, tg->id, tag->id, tag->value_type, tag->count, tag->value);
+	tag_set_cmd = v_tag_set_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->value);
 
 	v_out_queue_push_tail(vsession->out_queue, prio, tag_set_cmd);
 }
@@ -92,7 +91,7 @@ int vs_tag_send_create(struct VSEntitySubscriber *tg_subscriber,
 	}
 
 	/* Create new Tag_Create command */
-	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->value_type, tag->count, tag->type);
+	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->type);
 
 	/* Put command to the outgoing queue */
 	if(tag_create != NULL &&
@@ -151,18 +150,103 @@ int vs_tag_send_destroy(struct VSNode *node,
 /**
  * \brief This function initialize structure storing tag
  */
-void vs_tag_init(struct VSTag *tag)
+static void vs_tag_init(struct VSTag *tag)
 {
 	tag->id = 0;
 	tag->type = 0;
 	tag->tag_folls.first = NULL;
 	tag->tag_folls.last = NULL;
-	tag->value_type = VRS_VALUE_TYPE_RESERVED;
+	tag->data_type = VRS_VALUE_TYPE_RESERVED;
 	tag->count = 0;
 	tag->flag = TAG_UNINITIALIZED;
 	tag->value = NULL;
 	tag->state = ENTITY_RESERVED;
 }
+
+
+/**
+ * \brief This function creates new Verse Tag
+ */
+struct VSTag *vs_tag_create(struct VSTagGroup *tg,
+		uint8 data_type,
+		uint8 count,
+		uint16 custom_type)
+{
+	struct VSTag *tag = NULL;
+	struct VBucket *tag_bucket;
+
+	tag = (struct VSTag*)calloc(1, sizeof(struct VSTag));
+	if(tag == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Out of memory.\n");
+		return NULL;
+	}
+
+	/* Initialize new tag */
+	vs_tag_init(tag);
+
+	/* Try to find first free id for tag */
+	tag->id = tg->last_tag_id;
+	while( v_hash_array_find_item(&tg->tags, tag) != NULL ) {
+		tag->id++;
+
+		if(tag->id > LAST_TAG_ID) {
+			tag->id = FIRST_TAG_ID;
+		}
+
+		/* TODO: this could be more effective */
+	}
+	tg->last_tag_id = tag->id;
+
+	/* Try to add new Tag to the hashed linked list of tags */
+	tag_bucket = v_hash_array_add_item(&tg->tags, (void*)tag, sizeof(struct VSTag));
+
+	if(tag_bucket==NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Tag could not be added to tag group: %d.\n",
+				tg->id);
+		free(tag);
+		return NULL;
+	}
+
+	tag->data_type = data_type;
+	tag->count = count;
+	tag->type = custom_type;
+
+	/* Allocate memory for value (not for type string8) */
+	switch(data_type) {
+		case VRS_VALUE_TYPE_UINT8:
+			tag->value = (void*)calloc(count, sizeof(uint8));
+			break;
+		case VRS_VALUE_TYPE_UINT16:
+			tag->value = (void*)calloc(count, sizeof(uint16));
+			break;
+		case VRS_VALUE_TYPE_UINT32:
+			tag->value = (void*)calloc(count, sizeof(uint32));
+			break;
+		case VRS_VALUE_TYPE_UINT64:
+			tag->value = (void*)calloc(count, sizeof(uint64));
+			break;
+		case VRS_VALUE_TYPE_REAL16:
+			tag->value = (void*)calloc(count, sizeof(real16));
+			break;
+		case VRS_VALUE_TYPE_REAL32:
+			tag->value = (void*)calloc(count, sizeof(real32));
+			break;
+		case VRS_VALUE_TYPE_REAL64:
+			tag->value = (void*)calloc(count, sizeof(real64));
+			break;
+		case VRS_VALUE_TYPE_STRING8:
+			/* Memory for this type of tag is allocated, when value of
+			 * tag is set. */
+			tag->value = NULL;
+			break;
+		default:
+			break;
+	}
+
+	return tag;
+}
+
 
 /**
  * \brief This function destroy structure storing information about tag. This
@@ -295,12 +379,12 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	struct VSTagGroup		*tg;
 	struct VSTag			*tag;
 	struct VSUser			*user;
-	struct VBucket			*tag_bucket, *vbucket;
+	struct VBucket			*vbucket;
 	struct VSEntitySubscriber	*tg_subscriber;
 	uint32 					node_id = UINT32(tag_create->data[0]);
 	uint16 					taggroup_id = UINT16(tag_create->data[UINT32_SIZE]);
 	uint16					tag_id = UINT16(tag_create->data[UINT32_SIZE + UINT16_SIZE]);
-	uint8					value_type = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE]);
+	uint8					data_type = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE]);
 	uint8					count = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE]);
 	uint16 					type = UINT16(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE]);
 
@@ -355,9 +439,9 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is type of Tag supported? */
-	if(!(value_type>VRS_VALUE_TYPE_RESERVED && value_type<=VRS_VALUE_TYPE_STRING8)) {
+	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_STRING8)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_type: %d is not supported\n",
-				__FUNCTION__, value_type);
+				__FUNCTION__, data_type);
 		return 0;
 	}
 
@@ -379,65 +463,13 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	tag = (struct VSTag*)calloc(1, sizeof(struct VSTag));
-	vs_tag_init(tag);
-
-	/* Try to find first free id for tag */
-	/* TODO: this could be more effective */
-	tag->id = tg->last_tag_id;
-	while( v_hash_array_find_item(&tg->tags, tag) != NULL ) {
-		tag->id++;
-
-		if(tag->id > LAST_TAG_ID) {
-			tag->id = FIRST_TAG_ID;
-		}
-	}
-	tg->last_tag_id = tag->id;
-
-	/* Try to add new Tag to the hashed linked list of tags */
-	tag_bucket = v_hash_array_add_item(&tg->tags, (void*)tag, sizeof(struct VSTag));
-
-	if(tag_bucket==NULL) {
-		free(tag);
-		tag=NULL;
+	/* Try to create new tag */
+	tag = vs_tag_create(tg, data_type, count, type);
+	if(tag == NULL) {
 		return 0;
 	}
 
-	tag->value_type = value_type;
-	tag->count = count;
-	tag->type = type;
-
-	/* Allocate memory for value (not for type string8) */
-	switch(value_type) {
-		case VRS_VALUE_TYPE_UINT8:
-			tag->value = (void*)calloc(count, sizeof(uint8));
-			break;
-		case VRS_VALUE_TYPE_UINT16:
-			tag->value = (void*)calloc(count, sizeof(uint16));
-			break;
-		case VRS_VALUE_TYPE_UINT32:
-			tag->value = (void*)calloc(count, sizeof(uint32));
-			break;
-		case VRS_VALUE_TYPE_UINT64:
-			tag->value = (void*)calloc(count, sizeof(uint64));
-			break;
-		case VRS_VALUE_TYPE_REAL16:
-			tag->value = (void*)calloc(count, sizeof(real16));
-			break;
-		case VRS_VALUE_TYPE_REAL32:
-			tag->value = (void*)calloc(count, sizeof(real32));
-			break;
-		case VRS_VALUE_TYPE_REAL64:
-			tag->value = (void*)calloc(count, sizeof(real64));
-			break;
-		case VRS_VALUE_TYPE_STRING8:
-			/* Memory for this type of tag is allocated, when value of
-			 * tag is set. */
-			tag->value = NULL;
-			break;
-		default:
-			break;
-	}
+	tag->state = ENTITY_CREATING;
 
 	/* Send TagCreate to all subscribers of tag group */
 	tg_subscriber = tg->tg_subs.first;
@@ -445,8 +477,6 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		vs_tag_send_create(tg_subscriber, node, tg, tag);
 		tg_subscriber = tg_subscriber->next;
 	}
-
-	tag->state = ENTITY_CREATING;
 
 	return 1;
 }
@@ -636,9 +666,9 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	}
 
 	/* Data type has to match */
-	if(data_type != tag->value_type) {
+	if(data_type != tag->data_type) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() data type (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
-						__FUNCTION__, tag->value_type, tag_id, taggroup_id, node_id, data_type);
+						__FUNCTION__, tag->data_type, tag_id, taggroup_id, node_id, data_type);
 		return 0;
 	}
 
@@ -650,7 +680,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	}
 
 	/* Set value in tag */
-	switch(tag->value_type) {
+	switch(tag->data_type) {
 	case VRS_VALUE_TYPE_UINT8:
 		memcpy(tag->value, &tag_set->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE], UINT8_SIZE*tag->count);
 		break;

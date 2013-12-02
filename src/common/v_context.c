@@ -1,5 +1,4 @@
 /*
- * $Id: v_context.c 528 2010-08-17 09:55:35Z jiri $
  * 
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

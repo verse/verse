@@ -1,7 +1,3 @@
-#
-# $Id: Makefile 735 2011-01-13 14:29:25Z jiri $
-#
-
 SPIN=spin
 CC=gcc
 #CFLAGS=-DNP

@@ -1,5 +1,4 @@
 /*
- * $Id: v_node_destroy.c 1195 2012-04-12 07:49:18Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

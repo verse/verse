@@ -1,5 +1,4 @@
 /*
- * $Id: verse.h 1338 2012-09-16 20:51:04Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -44,7 +43,7 @@ extern "C" {
 
 #define VERSE_H
 
-#define WITH_KERBEROS
+/*#define WITH_KERBEROS*/
 #include <stdint.h>
 #include <limits.h>
 
@@ -54,6 +53,11 @@ extern "C" {
 /* Verse session will be closed, when verse server or client does not respond
  * for more then 30 seconds */
 #define VRS_TIMEOUT	30
+
+/* Default ports */
+#define VRS_DEFAULT_TCP_PORT	12344
+#define VRS_DEFAULT_TLS_PORT	12345
+#define VRS_DEFAULT_WEB_PORT	23456
 
 /* Return codes */
 #define VRS_SUCCESS				0
@@ -77,8 +81,14 @@ extern "C" {
 #define VRS_CONN_TERM_SERVER		8	/* Connection terminated by server */
 
 /* Access permissions */
-#define VRS_PERM_NODE_READ			1
-#define VRS_PERM_NODE_WRITE			2
+#define VRS_PERM_NODE_READ			1	/* User can read content of the node */
+#define VRS_PERM_NODE_WRITE			2	/* User can do anything with content of the node */
+#if 0
+/* Proposal */
+#define VRS_PERM_NODE_APPEND		4	/* User can add new entities to node */
+#define VRS_PERM_NODE_CHANGE		8	/* User can change content of the node */
+#define VRS_PERM_NODE_CLEAR			16	/* User can delete any entity in the node */
+#endif
 
 /* Methods of user authentication */
 #define VRS_UA_METHOD_RESERVED		0
@@ -103,6 +113,15 @@ extern "C" {
 #define VRS_AVATAR_PARENT_NODE_ID	1
 #define VRS_USERS_PARENT_NODE_ID	2
 #define VRS_SCENE_PARENT_NODE_ID	3
+
+/* There are some special custom_types of special nodes */
+#define VRS_ROOT_NODE_CT			0
+#define VRS_AVATAR_PARENT_NODE_CT	1
+#define VRS_USERS_PARENT_NODE_CT	2
+#define VRS_SCENE_PARENT_NODE_CT	3
+#define VRS_AVATAR_NODE_CT			4
+#define VRS_AVATAR_INFO_NODE_CT		5
+#define VRS_USER_NODE_CT			6
 
 /* Superuser of verse server has defined UID */
 #define VRS_SUPER_USER_UID			100
@@ -131,9 +150,13 @@ extern "C" {
 #define VRS_PRINT_DEBUG_MSG			4
 
 /* Flags used in function verse_send_connect_request */
-#define VRS_DGRAM_SEC_NONE			1
-#define VRS_DGRAM_SEC_DTLS			2
-#define VRS_DGRAM_TP_UDP			4
+#define VRS_SEC_DATA_NONE			1	/* No security at data exchange connection */
+#define VRS_SEC_DATA_TLS			2	/* Use TLS/DTLS at data exchange connection */
+#define VRS_TP_UDP					4	/* Transport protocol: UDP */
+#define VRS_TP_TCP					8	/* Transport protocol: TCP */
+#define VRS_TP_WEBSOCKET			16
+#define VRS_CMD_CMPR_NONE			32	/* No command compression */
+#define VRS_CMD_CMPR_ADDR_SHARE		64	/* Share command addresses to compress commands */
 
 /* Type of verse value */
 #define VRS_VALUE_TYPE_RESERVED		0
@@ -178,6 +201,8 @@ int vrs_callback_update(const uint8_t session_id);
 
 int vrs_set_debug_level(uint8_t debug_level);
 
+int vrs_set_client_info(char *name, char *version);
+
 char *vrs_strerror(const uint32_t error_num);
 
 int vrs_send_fps(const uint8_t session_id,
@@ -203,7 +228,8 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 int vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
-		const uint32_t version);
+		const uint32_t version,
+		const uint32_t crc32);
 void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t version,

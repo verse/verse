@@ -1,5 +1,4 @@
 /*
- * $Id: v_connection.h 1039 2011-10-23 20:27:33Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -42,7 +41,6 @@
 #include <sys/time.h>
 #include <pthread.h>
 
-#include "verse.h"
 #include "v_network.h"
 #include "v_history.h"
 #include "v_context.h"
@@ -75,10 +73,11 @@
 #define TCP_CLIENT_STATE_USRAUTH_DATA			2
 #define TCP_CLIENT_STATE_NEGOTIATE_COOKIE_DED	3
 #define TCP_CLIENT_STATE_NEGOTIATE_NEWHOST		4
-#define TCP_CLIENT_STATE_CLOSING				5
-#define TCP_CLIENT_STATE_CLOSED					6
+#define TCP_CLIENT_STATE_STREAM_OPEN			5
+#define TCP_CLIENT_STATE_CLOSING				6
+#define TCP_CLIENT_STATE_CLOSED					7
 #ifdef WITH_KERBEROS
-#define TCP_CLIENT_STATE_USRAUTH_KRB			7
+#define TCP_CLIENT_STATE_USRAUTH_KRB			8
 #endif
 
 /* Server states (TCP) */
@@ -88,18 +87,15 @@
 #define TCP_SERVER_STATE_RESPOND_USRAUTH		3
 #define TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED	4
 #define TCP_SERVER_STATE_NEGOTIATE_NEWHOST		5
-#define TCP_SERVER_STATE_CLOSING				6
-#define TCP_SERVER_STATE_CLOSED					7
+#define TCP_SERVER_STATE_STREAM_OPEN			6
+#define TCP_SERVER_STATE_CLOSING				7
+#define TCP_SERVER_STATE_CLOSED					8
 #ifdef WITH_KERBEROS
-#define TCP_SERVER_STATE_RESPOND_KRB_AUTH		8
+#define TCP_SERVER_STATE_RESPOND_KRB_AUTH		9
 #endif
 
 /* Maximal number of client or server state.  */
 #define STATE_COUNT				(((UDP_CLIENT_STATE_CLOSED > UDP_SERVER_STATE_CLOSED) ? UDP_CLIENT_STATE_CLOSED : UDP_SERVER_STATE_CLOSED)+1)
-
-/* When negotiation is not used, then client and server consider
- * FPS to be 60 */
-#define DEFAULT_FPS				60.0
 
 /* Temporary flags that keeps information about receiving system commands
  * in OPEN and CLOSEREQ states */
@@ -151,11 +147,11 @@ typedef struct VDgramConn {
 	unsigned int			cwin;				/* Congestion Control Window */
 	unsigned int			rwin_host;			/* Flow Control Window of host (my) */
 	unsigned int			rwin_peer;			/* Flow Control Window of peer */
+	unsigned int			sent_size;			/* Size of data that were sent and were not acknowledged */
 	unsigned char			rwin_host_scale;	/* Scaling of host Flow Control Window (my) */
 	unsigned char			rwin_peer_scale;	/* Scaling of perr Flow Control Window */
-	float					fps_host;			/* FPS used by this host */
-	float					fps_peer;			/* Negotiated FPS used by peer */
-	unsigned char			tmp_flags;			/* Temporary flags (notification of received system commands) */
+	unsigned char			host_cmd_cmpr;		/* Command compression used by host for sedning commands */
+	unsigned char			peer_cmd_cmpr;		/* Command compression used by peer for sending commands */
 	/* States */
 	struct VConnectionState	state[STATE_COUNT];	/* Array of structure storing state specific things (callbacks, counters, etc.) */
 	/* Histories */
@@ -165,7 +161,7 @@ typedef struct VDgramConn {
 	pthread_mutex_t			mutex;				/* Mutex used, when state of connection is changing */
 } VDgramConn;
 
-/* VDgramConn is structure storing information about stream (TCP) connection. */
+/* VStreamConn is structure storing information about stream (TCP) connection. */
 typedef struct VStreamConn {
 	/* IO */
 	struct IO_CTX			io_ctx;				/* Context for sending and receiving data */
@@ -178,7 +174,10 @@ typedef struct VStreamConn {
 #ifdef WITH_KERBEROS
 	krb5_context			krb5_ctx;			/* Kerberos library context */
 #endif
-	/*SSL						*ssl;*/
+	/* Flow control */
+	int						socket_buffer_size;	/* Size of socket buffer */
+	int						sent_data_offset;	/* Offset of data poped from TCP stack */
+	int						pushed_data_offset;	/* Offset of data pushed to TCP stack*/
 	/* Multi-threading */
 	pthread_mutex_t			mutex;				/* Mutex used, when state of connection is changing */
 } VStreamConn;

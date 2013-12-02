@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 #
-# $Id: verse_client.py 1359 2012-10-18 14:25:10Z jiri $
-#
 # ***** BEGIN BSD LICENSE BLOCK *****
 #
 # Copyright (c) 2009-2012, Jiri Hnidek
@@ -33,6 +31,8 @@
 #
 # Authors: Jiri Hnidek <jiri.hnidek@tul.cz>
 #
+
+
 """
 Example of Verse client implemented in Python language
 """
@@ -41,6 +41,7 @@ Example of Verse client implemented in Python language
 import verse as vrs
 import time
 import getpass
+import sys
 
 class MyLayer():
     """Class representing layer"""
@@ -118,11 +119,11 @@ class MySession(vrs.Session):
         # My testing attributes
         self.test_node = None
         self.test_taggroup = None
-        self.test_tag = None
+        self.test_string_tag = None
         #self.test_child_layer = None
         #self.test_parent_layer = None
         
-    def receive_connect_terminate(self, error):
+    def _receive_connect_terminate(self, error):
         """Callback function for connect accept"""
         print("MY connect_terminate(): ",
               "error: ", error)
@@ -130,7 +131,7 @@ class MySession(vrs.Session):
         # Clear dictionary of nodes
         self.nodes.clear()
 
-    def receive_connect_accept(self, user_id, avatar_id):
+    def _receive_connect_accept(self, user_id, avatar_id):
         """Callback function for connect accept"""
         print("MY connect_accept(): ",
               "user_id: ", user_id,
@@ -143,17 +144,20 @@ class MySession(vrs.Session):
         # Add root node to the dictionary of nodes
         self.nodes[0] = MyNode(0, None, 0, 0)
         # Subscribe to the root of node tree
-        self.send_node_subscribe(prio=vrs.DEFAULT_PRIORITY, node_id=0, version=0)
+        self.send_node_subscribe(prio=vrs.DEFAULT_PRIORITY, node_id=0, version=0, crc32=0)
         # Create my new node
-        self.send_node_create(prio=vrs.DEFAULT_PRIORITY, custom_type=10)
+        self.send_node_create(prio=vrs.DEFAULT_PRIORITY, custom_type=32)
 
-    def receive_user_authenticate(self, username, methods):
+    def _receive_user_authenticate(self, username, methods):
         """Callback function for user authenticate"""
         print("MY user_authenticate(): ",
               "username: ", username,
               ", methods: ", methods)
         if username == "":
-            username = __builtins__.input('Username: ')
+            if sys.version > '3':
+                username = __builtins__.input('Username: ')
+            else:
+                username = __builtins__.raw_input('Username: ')
             self.send_user_authenticate(username, vrs.UA_METHOD_NONE, "")
         else:
             if methods.count(vrs.UA_METHOD_PASSWORD)>=1:
@@ -162,7 +166,7 @@ class MySession(vrs.Session):
             else:
                 print("Unsuported authenticate method")
 
-    def receive_node_create(self, node_id, parent_id, user_id, custom_type):
+    def _receive_node_create(self, node_id, parent_id, user_id, custom_type):
         """Callback function for node create"""
         print("MY node_create(): ",
               "node_id: ", node_id,
@@ -170,7 +174,7 @@ class MySession(vrs.Session):
               ", user_id: ", user_id,
               ", custom_type: ", custom_type)
         # Subscribe to node
-        self.send_node_subscribe(vrs.DEFAULT_PRIORITY, node_id, 0)
+        self.send_node_subscribe(vrs.DEFAULT_PRIORITY, node_id, 0, 0)
         # Try to find parent node
         try:
             parent_node = self.nodes[parent_id]
@@ -185,7 +189,7 @@ class MySession(vrs.Session):
             self.send_taggroup_create(vrs.DEFAULT_PRIORITY, node_id, 0)
             self.send_layer_create(vrs.DEFAULT_PRIORITY, node_id, -1, vrs.VALUE_TYPE_UINT8, 3, 1)
     
-    def receive_node_destroy(self, node_id):
+    def _receive_node_destroy(self, node_id):
         """Callback function for node destroy"""
         print("MY node_destroy(): ",
               "node_id: ", node_id)
@@ -195,7 +199,7 @@ class MySession(vrs.Session):
         except KeyError:
             pass
     
-    def receive_node_link(self, parent_node_id, child_node_id):
+    def _receive_node_link(self, parent_node_id, child_node_id):
         """Callback function for node link"""
         print("MY node_link(): ",
               "parent_node_id: ", parent_node_id,
@@ -210,7 +214,7 @@ class MySession(vrs.Session):
             return
         child_node.parent = parent_node
         
-    def receive_node_perm(self, node_id, user_id, perm):
+    def _receive_node_perm(self, node_id, user_id, perm):
         """Callback function for node perm"""
         print("MY node_perm(): ",
               "node_id: ", node_id,
@@ -222,7 +226,7 @@ class MySession(vrs.Session):
             return
         node.perms[user_id] = perm
     
-    def receive_node_owner(self, node_id, user_id):
+    def _receive_node_owner(self, node_id, user_id):
         """Callback function for node owner"""
         print("MY node_owner(): ",
               "node_id: ", node_id,
@@ -233,7 +237,7 @@ class MySession(vrs.Session):
             return
         node.user_id = user_id
     
-    def receive_node_lock(self, node_id, avatar_id):
+    def _receive_node_lock(self, node_id, avatar_id):
         """Callback function for node lock"""
         print("MY node_lock(): ",
               "node_id: ", node_id,
@@ -244,7 +248,7 @@ class MySession(vrs.Session):
             return
         node.locker = avatar_id
         
-    def receive_node_unlock(self, node_id, avatar_id):
+    def _receive_node_unlock(self, node_id, avatar_id):
         """Callback function for node unlock"""
         print("MY node_unlock(): ",
               "node_id: ", node_id,
@@ -255,7 +259,7 @@ class MySession(vrs.Session):
             return
         node.locker = None
             
-    def receive_taggroup_create(self, node_id, taggroup_id, custom_type):
+    def _receive_taggroup_create(self, node_id, taggroup_id, custom_type):
         """Callback function for taggroup create"""
         print("MY taggroup_create(): ",
               "node_id: ", node_id,
@@ -265,10 +269,12 @@ class MySession(vrs.Session):
         self.nodes[node_id].taggroups[taggroup_id] = MyTagGroup(self.nodes[node_id], taggroup_id, custom_type)
         if self.nodes[node_id] == self.test_node:
             self.test_taggroup = self.test_node.taggroups[taggroup_id]
-            #self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_UINT8, 3, 1)
-            self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_STRING8, 1, 1)
+            self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_UINT8, 3, 1)
+            self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_UINT8, 1, 2)
+            self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_REAL32, 1, 3)
+            self.send_tag_create(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, vrs.VALUE_TYPE_STRING8, 1, 4)
 
-    def receive_taggroup_destroy(self, node_id, taggroup_id):
+    def _receive_taggroup_destroy(self, node_id, taggroup_id):
         """Callback function for taggroup destroy"""
         print("MY taggroup_destroy(): ",
               "node_id: ", node_id,
@@ -278,7 +284,7 @@ class MySession(vrs.Session):
         except KeyError:
             pass
     
-    def receive_tag_create(self, node_id, taggroup_id, tag_id, data_type, count, custom_type):
+    def _receive_tag_create(self, node_id, taggroup_id, tag_id, data_type, count, custom_type):
         """Callback function for tag create"""
         print("MY tag_create(): ",
               "node_id: ", node_id,
@@ -290,13 +296,24 @@ class MySession(vrs.Session):
         taggroup = self.nodes[node_id].taggroups[taggroup_id]
         tag = MyTag(taggroup, tag_id, data_type, count, custom_type)
         taggroup.tags[tag_id] = tag
-        if self.test_taggroup == taggroup:
-            self.test_tag = tag
-            #tag.value = [123,124,125]
-            tag.value = ["Ahoj"]
-            self.send_tag_set_value(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tuple(tag.value))
+        if self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_UINT8 and custom_type == 1:
+            self.test_tuple_tag = tag
+            tag.value = (123, 124, 125)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+        elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_UINT8 and custom_type == 2:
+            self.test_int_tag = tag
+            tag.value = (10,)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+        elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_REAL32 and custom_type == 3:
+            self.test_float_tag = tag
+            tag.value = (12.345,)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
+        elif self.test_taggroup == taggroup and data_type == vrs.VALUE_TYPE_STRING8 and custom_type == 4:
+            self.test_string_tag = tag
+            tag.value = ('Ahoj',)
+            self.send_tag_set_values(vrs.DEFAULT_PRIORITY, node_id, taggroup_id, tag_id, tag.data_type, tag.value)
     
-    def receive_tag_destroy(self, node_id, taggroup_id, tag_id):
+    def _receive_tag_destroy(self, node_id, taggroup_id, tag_id):
         """Callback function for tag destroy"""
         print("MY tag_destroy(): ",
               "node_id: ", node_id,
@@ -307,7 +324,7 @@ class MySession(vrs.Session):
         except KeyError:
             pass
     
-    def receive_tag_set_value(self, node_id, taggroup_id, tag_id, values):
+    def _receive_tag_set_values(self, node_id, taggroup_id, tag_id, values):
         """Callback function for tag set value"""
         print("MY tag_set_values(): ",
               "node_id: ", node_id,
@@ -316,7 +333,7 @@ class MySession(vrs.Session):
               " ,values: ", values)
         self.nodes[node_id].taggroups[taggroup_id].tags[tag_id].value = list(values)
     
-    def receive_layer_create(self, node_id, parent_layer_id, layer_id, data_type, count, custom_type):
+    def _receive_layer_create(self, node_id, parent_layer_id, layer_id, data_type, count, custom_type):
         """Callback function for layer create"""
         print("MY layer_create(): ",
               "node_id: ", node_id,
@@ -333,7 +350,7 @@ class MySession(vrs.Session):
             parent_layer = None
         self.nodes[node_id].layers[layer_id] = MyLayer(parent_layer, layer_id, data_type, count, custom_type)
     
-    def receive_layer_destroy(self, node_id, layer_id):         
+    def _receive_layer_destroy(self, node_id, layer_id):         
         """Callback function for layer destroy"""
         print("MY layer_destroy(): ",
               "node_id: ", node_id,
@@ -343,7 +360,7 @@ class MySession(vrs.Session):
         except KeyError:
             pass
     
-    def receive_layer_set_value(self, node_id, layer_id, item_id, values):
+    def _receive_layer_set_value(self, node_id, layer_id, item_id, values):
         """Callback function for layer set value"""
         print("MY layer_set_values(): ",
               "node_id: ", node_id,
@@ -352,7 +369,7 @@ class MySession(vrs.Session):
               " ,values: ", values)
         self.nodes[node_id].layers[layer_id].values[item_id] = values
     
-    def receive_layer_unset_value(self, node_id, layer_id, item_id):
+    def _receive_layer_unset_value(self, node_id, layer_id, item_id):
         """Callback function for layer set value"""
         print("MY layer_unset_values(): ",
               "node_id: ", node_id,
@@ -371,7 +388,10 @@ def main(hostname='localhost'):
     received_signal = False
     
     # Set debug level
-    vrs.set_debug_level(vrs.PRINT_NONE)
+    vrs.set_debug_level(vrs.PRINT_DEBUG_MSG)
+    
+    # Set name and version of client
+    vrs.set_client_info("Example Python Verse Client", "0.1")
     
     try:
         session = MySession(hostname, "12345", vrs.DGRAM_SEC_NONE)

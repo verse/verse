@@ -1,5 +1,4 @@
 /*
- * $Id$
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -34,12 +33,81 @@
  *
  */
 
+#include <stdarg.h>
+#include <string.h>
+
 #include "v_sys_commands.h"
 #include "v_commands.h"
 #include "v_common.h"
 #include "v_pack.h"
 #include "v_unpack.h"
-#include <string.h>
+#include "v_network.h"
+
+/**
+ * \brief Add next system command to the structure of array of union of
+ * system commands
+ *
+ * \param[out]	packet		The pointer at packet, where negotiate commands will be added
+ * \param[in]	cmd_rank	The rank of negotiate of command sequence
+ * \param[in]	cmd_op_code	The OpCode of negotiate command
+ * \param[in]	ftr_op_code	The OpCode of features that is negotiated
+ * \param[in]	...			Arguments with pointers at values terminated with NULL pointer
+ */
+int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
+		uint8 cmd_rank,
+		uint8 cmd_op_code,
+		uint8 ftr_op_code,
+		...)
+{
+	va_list args;
+	void *value;
+	unsigned char ftr_rank = 0;
+
+	/* Add command OpCode */
+	sys_cmds[cmd_rank].negotiate_cmd.id = cmd_op_code;
+	/* Add OpCode of features */
+	sys_cmds[cmd_rank].negotiate_cmd.feature = ftr_op_code;
+
+	va_start(args, ftr_op_code);
+	while( (value = va_arg(args, void*)) != NULL) {
+		switch(ftr_op_code) {
+		case FTR_FC_ID:
+		case FTR_CC_ID:
+		case FTR_RWIN_SCALE:
+		case FTR_CMD_COMPRESS:
+			/* Add unsigned char value */
+			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].uint8 = *(uint8*)value;
+			break;
+		case FTR_HOST_URL:
+		case FTR_COOKIE:
+		case FTR_DED:
+		case FTR_CLIENT_NAME:
+		case FTR_CLIENT_VERSION:
+			/* Add string */
+			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.length = strlen((char*)value);
+			strcpy((char*)sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.str, (char*)value);
+			break;
+		case FTR_FPS:
+			/* Add float value */
+			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].real32 = *(real32*)value;
+			break;
+		default:
+			/* When unsuported feature*/
+			sys_cmds[cmd_rank].cmd.id = CMD_RESERVED_ID;
+			return 0;
+		}
+		ftr_rank++;
+	}
+	va_end(args);
+
+	/* Add count of values to the command*/
+	sys_cmds[cmd_rank].negotiate_cmd.count = ftr_rank;
+
+	/* Add terminating fake command */
+	sys_cmds[cmd_rank+1].cmd.id = CMD_RESERVED_ID;
+
+	return 1;
+}
 
 /**
  * \brief This function prints negotiate commands: Change_L/R and Confirm_L/R
@@ -89,6 +157,15 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 		case FTR_FPS:
 			v_print_log_simple(level, "feature: FPS, ");
 			break;
+		case FTR_CMD_COMPRESS:
+			v_print_log_simple(level, "feature: CMD_COMPRESS, ");
+			break;
+		case FTR_CLIENT_NAME:
+			v_print_log_simple(level, "feature: CLIENT_NAME, ");
+			break;
+		case FTR_CLIENT_VERSION:
+			v_print_log_simple(level, "feature: CLIENT_VERSION, ");
+			break;
 		default:
 			v_print_log_simple(level, "unknown feature, ");
 			break;
@@ -98,19 +175,19 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
 			case FTR_CC_ID:
+			case FTR_RWIN_SCALE:
+			case FTR_CMD_COMPRESS:
 				v_print_log_simple(level, "%d, ",
 						negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
 			case FTR_COOKIE:
 			case FTR_DED:
+			case FTR_CLIENT_NAME:
+			case FTR_CLIENT_VERSION:
 				v_print_log_simple(level, "%d:%s, ",
 						negotiate_cmd->value[i].string8.length,
 						negotiate_cmd->value[i].string8.str);
-				break;
-			case FTR_RWIN_SCALE:
-				v_print_log_simple(level, "%d, ",
-						negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_FPS:
 				v_print_log_simple(level, "%6.3f, ",
@@ -135,7 +212,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 {
 	int str_len=0;
 	unsigned short buffer_pos = 0, length, i;
-	unsigned char length8, len8, lenlen;
+	unsigned char length8 = 0, len8, lenlen;
 
 	/* Unpack command ID */
 	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &negotiate_cmd->id);
@@ -182,20 +259,21 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 			return length;	/* This feature id should never be sent or received */
 		case FTR_FC_ID:
 		case FTR_CC_ID:
+		case FTR_RWIN_SCALE:
+		case FTR_CMD_COMPRESS:
 			negotiate_cmd->count = length - (1+lenlen+1);
 			break;
 		case FTR_HOST_URL:
 		case FTR_COOKIE:
 		case FTR_DED:
+		case FTR_CLIENT_NAME:
+		case FTR_CLIENT_VERSION:
 			negotiate_cmd->count = 0;
 			while(str_len < (length -(1+lenlen+1))) {
 				vnp_raw_unpack_uint8(&buffer[buffer_pos+str_len], &len8);
 				str_len += 1 + len8;
 				negotiate_cmd->count++;
 			}
-			break;
-		case FTR_RWIN_SCALE:
-			negotiate_cmd->count = length - (1+lenlen+1);
 			break;
 		case FTR_FPS:
 			negotiate_cmd->count = (length - (1+lenlen))/4;
@@ -211,19 +289,19 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
 			case FTR_CC_ID:
+			case FTR_RWIN_SCALE:
+			case FTR_CMD_COMPRESS:
 				buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos],
 						&negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
 			case FTR_COOKIE:
 			case FTR_DED:
+			case FTR_CLIENT_NAME:
+			case FTR_CLIENT_VERSION:
 				buffer_pos += vnp_raw_unpack_string8_(&buffer[buffer_pos],
 						buffer_size-buffer_pos,
 						&negotiate_cmd->value[i].string8);
-				break;
-			case FTR_RWIN_SCALE:
-				buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos],
-						&negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_FPS:
 				buffer_pos += vnp_raw_unpack_real32(&buffer[buffer_pos],
@@ -270,7 +348,10 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 		negotiate_cmd->feature == FTR_COOKIE ||
 		negotiate_cmd->feature == FTR_DED ||
 		negotiate_cmd->feature == FTR_RWIN_SCALE ||
-		negotiate_cmd->feature == FTR_FPS) )
+		negotiate_cmd->feature == FTR_FPS ||
+		negotiate_cmd->feature == FTR_CMD_COMPRESS ||
+		negotiate_cmd->feature == FTR_CLIENT_NAME ||
+		negotiate_cmd->feature == FTR_CLIENT_VERSION) )
 	{
 		v_print_log(VRS_PRINT_WARNING, "Try to send UNKNOWN feature ID: %d\n",
 				negotiate_cmd->feature);
@@ -284,21 +365,21 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 	switch(negotiate_cmd->feature) {
 		case FTR_FC_ID:
 		case FTR_CC_ID:
+		case FTR_RWIN_SCALE:
+		case FTR_CMD_COMPRESS:
 			/* CommandID + Length + FeatureID + features */
 			length = 1 + 1 + 1 + negotiate_cmd->count*sizeof(uint8);
 			break;
 		case FTR_HOST_URL:
 		case FTR_COOKIE:
 		case FTR_DED:
+		case FTR_CLIENT_NAME:
+		case FTR_CLIENT_VERSION:
 			length = 1 + 1 + 1;	/* CommandID + Length + FeatureID */
 			for(i=0; i<negotiate_cmd->count; i++) {
 				/* + String length + String */
 				length += 1 + (sizeof(unsigned char))*negotiate_cmd->value[i].string8.length;
 			}
-			break;
-		case FTR_RWIN_SCALE:
-			/* CommandID + Length + FeatureID + features */
-			length = 1 + 1 + 1 + negotiate_cmd->count*sizeof(uint8);
 			break;
 		case FTR_FPS:
 			/* CommandID + Length + FeatureID + features */
@@ -317,15 +398,16 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
 			case FTR_CC_ID:
+			case FTR_RWIN_SCALE:
+			case FTR_CMD_COMPRESS:
 				buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
 			case FTR_COOKIE:
 			case FTR_DED:
+			case FTR_CLIENT_NAME:
+			case FTR_CLIENT_VERSION:
 				buffer_pos += vnp_raw_pack_string8(&buffer[buffer_pos], (char*)negotiate_cmd->value[i].string8.str);
-				break;
-			case FTR_RWIN_SCALE:
-				buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_FPS:
 				buffer_pos += vnp_raw_pack_real32(&buffer[buffer_pos], negotiate_cmd->value[i].real32);

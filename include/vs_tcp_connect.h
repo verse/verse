@@ -1,5 +1,4 @@
 /*
- * $Id: vs_tcp_connect.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -28,8 +27,9 @@
 
 #include "vs_main.h"
 
+void vs_destroy_stream_ctx(VS_CTX *vs_ctx);
 int vs_init_stream_ctx(VS_CTX *vs_ctx);
 void *vs_tcp_conn_loop(void *arg);
-int vs_main_stream_loop(VS_CTX *vs_ctx);
+int vs_main_listen_loop(VS_CTX *vs_ctx);
 
 #endif /* VS_TCP_TLS_MAIN_H */

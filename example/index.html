@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+        <script type="text/javascript">
+            $(function() {
+            	
+                window.WebSocket = window.WebSocket || window.MozWebSocket;
+                
+                const STATE_RESERVED = 0;
+                const STATE_USRAUTH_NONE = 1;
+                const STATE_USRAUTH_DATA = 2;
+                const STATE_NEGOTIATE_COOCKIE = 3;
+                const STATE_NEGOTIATE_NEWHOST = 4;
+                const STATE_STREAM_OPEN = 5;
+                const STATE_CLOSING = 6;
+                const STATE_CLOSED = 7;
+                
+                var websocket;
+                var state = STATE_RESERVED; 
+                
+                setGuiConnected(false);
+               
+                function onConnect(event) {
+                	console.log('[Connected]');
+                	setGuiConnected(true);
+                    $('h1').css('color', 'green');
+                    
+                    var buf_pos = 0;
+                    
+                    /* Change state */
+                    state = STATE_USRAUTH_NONE;
+                    
+                    /* Get username */
+                    var name = $('#username').val();
+                    var name_len = name.length;
+                    
+                    console.log('username:' + name + ', len:' + name_len);
+                    
+                    /* Fill buffer with data of Verse header and user_auth
+                     * command */
+                    var message_len = 4+1+1+1+name_len+1;
+                    var buf = new ArrayBuffer(message_len);
+                    var view = new DataView(buf);
+                    /* Verse header starts with version */
+                    view.setUint8(buf_pos, 1 << 4); /* First 4 bits are reserved for version of protocol */
+                    buf_pos += 2;
+                    /* The lenght of the message */
+                    view.setUint16(buf_pos, message_len);
+                    buf_pos += 2;
+                    
+                    /* Pack OpCode of user_auth command */
+                    view.setUint8(buf_pos, 7);
+                    buf_pos++;
+                    /* Pack length of the command */
+                    view.setUint8(buf_pos, 1+1+1+name_len+1);
+                    buf_pos++;
+                    /* Pack length of string */
+                    view.setUint8(buf_pos, name_len);
+                    buf_pos++;
+                    /* Pack the string of the username */
+                    for (var i=0; i<name_len; i++) {
+                        view.setUint8(buf_pos+i, name.charCodeAt(i));
+                    }
+                    buf_pos += name_len;
+                    /* Pack method NONE ... it is not supported and server will
+                     * return list of supported methods in command user_auth_fail */
+                    view.setUint8(buf_pos, 1);
+                    buf_pos++;
+                    
+                    /* Send the blob */
+                    websocket.send(buf);
+                };
+
+                function onError(event) {
+                	console.log('Error:' + event.data);
+                    $('h1').css('color', 'red');
+                };
+                
+                window.onbeforeunload = function() {
+                    websocket.onclose = function () {}; // disable onclose handler first
+                    websocket.close()
+                };
+                
+                function onClose(event) {
+                	console.log('[Disconnected], Code:' + event.code + ', Reason: ' + event.reason);
+                	setGuiConnected(false);
+                    $('h1').css('color', 'red');
+                };
+
+                function onMessage(message) {
+                    console.log(message.data);
+                    if(message.data instanceof ArrayBuffer) {
+                        /* TODO: do communication here :-) */
+                        $('div').prepend($('<p>', { binary: message.data }));
+                        var rec_view = new DataView(message.data);
+                        
+                        var buf_pos = 0;
+                        
+                        /* Parse header */
+                        var version = rec_view.getUint8(buf_pos) >> 4;
+                        buf_pos += 2;
+                        
+                        console.log('Version: ' + version);
+                        if(version != 1) {
+                        	/* TODO: end connection */
+                        	return;
+                        }
+                        
+                        var message_len = rec_view.getUint16(buf_pos);
+                        buf_pos += 2;
+                        console.log('Received message length: ' + message_len);
+                        
+            			switch(state) {
+            				case STATE_USRAUTH_NONE:
+            					var op_code = rec_view.getUint8(buf_pos);
+            					buf_pos++;
+            					if(op_code == 8) { /* Is it command usr_auth_fail */
+            						var cmd_len = rec_view.getUint8(buf_pos);
+            						buf_pos++;
+            						if(cmd_len > 2) {
+            							/* TODO: proccess all supported methods in loop and
+            							 * check cmd_len with message.len (should be smaller) */
+            							var method = rec_view.getUint8(buf_pos);
+            							buf_pos++;
+            							
+            							if(method == 2) { /* Password method */
+            								
+            								/* Cange state ... we do and send something different */
+            								state = STATE_USRAUTH_DATA;
+            								
+            			                    /* Get username */
+            			                    var name = $('#username').val();
+            			                    var pass = $('#password').val();
+            			                    var name_len = name.length;
+            			                    var pass_len = pass.length;
+            			                    
+            			                    buf_pos = 0;
+            			                    
+            			                    console.log('username:' + name + ', len:' + name_len);
+            			                    console.log('password:' + pass + ', len:' + pass_len);
+            			                    
+            			                    /* Fill buffer with data of Verse header and user_auth
+            			                     * command */
+            			                    var message_len = 4+1+1+1+name_len+1+1+pass_len;
+            			                    console.log('Response message length: ' + message_len);
+            			                    var buf = new ArrayBuffer(message_len);
+            			                    var view = new DataView(buf);
+            			                    /* Verse header starts with version */
+            			                    view.setUint8(buf_pos, 1 << 4); /* First 4 bits are reserved for version of protocol */
+            			                    buf_pos += 2;
+            			                    /* The lenght of the message */
+            			                    view.setUint16(buf_pos, message_len);
+            			                    buf_pos += 2;
+            			                    
+            			                    /* Pack OpCode of user_auth command */
+            			                    view.setUint8(buf_pos, 7);
+            			                    buf_pos++;
+            			                    /* Pack length of the command */
+            			                    view.setUint8(buf_pos, 1+1+1+name_len+1+1+pass_len);
+            			                    buf_pos++;
+            			                    /* Pack length of string */
+            			                    view.setUint8(buf_pos, name_len);
+            			                    buf_pos++;
+            			                    /* Pack the string of the username */
+            			                    for (var i=0; i<name_len; i++) {
+            			                        view.setUint8(buf_pos+i, name.charCodeAt(i));
+            			                    }
+            			                    buf_pos += name_len;
+            			                    
+            			                    /* Pack method Password  */
+            			                    view.setUint8(buf_pos, 2);
+            			                    buf_pos++;
+            			                    /* Pack password length */
+            			                    view.setUint8(buf_pos, pass_len);
+            			                    buf_pos++;
+            			                    /* Pack the string of the password */
+            			                    for (var i=0; i<name_len; i++) {
+            			                        view.setUint8(buf_pos+i, pass.charCodeAt(i));
+            			                    }
+            			                    buf_pos += pass_len;
+            			                    
+            			                    /* Send the blob */
+            			                    websocket.send(buf);
+            							}
+            						} else {
+            							/* TODO: end connection */
+            							return;
+            						}
+            					}
+            					break;
+            				case STATE_USRAUTH_DATA:
+            					/* TODO: handle received commands */
+            					break;
+            			}
+                    } else {
+                        $('div').prepend($('<p>', { text: message.data }));
+                    }
+                };
+                
+                $('#connectBut').click(function(event) {
+                	event.preventDefault();
+                	var uri = $('#uriInput').val();
+                	console.log('Connecting to URI:' + uri + ' ...');
+                    websocket = new WebSocket(uri,
+                    	'v1.verse.tul.cz');
+					websocket.binaryType = "arraybuffer";
+					
+					websocket.onopen = function(event) { onConnect(event) };
+					websocket.onerror = function(event) { onError(event) };
+					websocket.onclose = function(event) { onClose(event) };
+					websocket.onmessage = function(message) { onMessage(message) };
+                });
+                
+                $('#closeBut').click(function(event) {
+                	console.log('Disconnecting ...')
+                    event.preventDefault();
+                    websocket.close();
+                });
+                
+                function setGuiConnected(isConnected) {
+                	console.log('Gui connected:'+isConnected);
+                	if(isConnected == true) {
+                        $('#uriInput').attr('disabled', 'disabled');;
+                        $('#connectBut').attr('disabled', 'disabled');
+                        $('#closeBut').removeAttr('disabled');
+                        $('#username').attr('disabled', 'disabled');
+                        $('#password').attr('disabled', 'disabled');
+                	} else {
+                        $('#uriInput').removeAttr('disabled');
+                        $('#connectBut').removeAttr('disabled');
+                        $('#closeBut').attr('disabled', 'disabled');
+                        $('#username').removeAttr('disabled');
+                        $('#password').removeAttr('disabled');                		
+                	}
+                }
+            });
+        </script>
+        </head>
+    <body>
+        <h1>WebSockets test</h1>
+        <form>
+	        <b>Server URI:</b>
+	        <br/>
+            <input id="uriInput" type="text" value="ws://127.0.0.1:23456"/>
+            <br/>
+        	<b>Username:</b>
+        	<br/>
+            <input id="username" type="text" value="username"/>
+            <br/>
+            <b>Password:</b>
+            <br/>
+            <input id="password" type="text" value="password"/>
+            <br/>
+            <button id="connectBut">Connect</button>
+            <button id="closeBut">Close</button>
+            <br/>
+        </form>
+        <div id="consoleLog"></div>
+        <!-- <button id="sendBut">Send</button> -->
+        <div></div>
+    </body>
+</html>

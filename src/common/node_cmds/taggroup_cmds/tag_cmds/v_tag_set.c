@@ -1,5 +1,4 @@
 /*
- * $Id: v_tag_set.c 1276 2012-07-27 19:53:27Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -51,7 +50,7 @@ extern struct Cmd_Struct cmd_struct[];
 struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 		const uint16 taggroup_id,
 		const uint16 tag_id,
-		const uint8 value_type,
+		const uint8 data_type,
 		const uint8 count,
 		const void *value)
 {
@@ -61,7 +60,7 @@ struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 	assert(count<=4);
 
 	/* Tricky part :-) */
-	cmd_id = CMD_TAG_SET_UINT8 + 4*(value_type-1) + (count-1);
+	cmd_id = CMD_TAG_SET_UINT8 + 4*(data_type-1) + (count-1);
 
 	tag_set = (struct Generic_Cmd *)malloc(UINT8_SIZE +
 			cmd_struct[cmd_id].size);
@@ -71,7 +70,7 @@ struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 	UINT16(tag_set->data[UINT32_SIZE]) = taggroup_id;
 	UINT16(tag_set->data[UINT32_SIZE + UINT16_SIZE]) = tag_id;
 
-	switch(value_type) {
+	switch(data_type) {
 	case VRS_VALUE_TYPE_UINT8:
 		for(i=0; i<count; i++) {
 			UINT8(tag_set->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + i*INT8_SIZE]) = ((uint8*)value)[i];
@@ -108,7 +107,8 @@ struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 		}
 		break;
 	case VRS_VALUE_TYPE_STRING8:
-		if((char*)value != NULL) {
+		assert((char*)value != NULL);
+		{
 			char *name = (char*)value;
 			size_t string8_len = strlen(name);
 

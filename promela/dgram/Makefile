@@ -1,7 +1,3 @@
-#
-# $Id: Makefile 701 2010-11-17 21:49:34Z jiri $
-#
-
 SPIN=spin
 CC=gcc
 CFLAGS=-DNP -DBITSTATE

@@ -1,5 +1,4 @@
 /*
- * $Id: v_commands.h 1277 2012-07-29 21:56:06Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

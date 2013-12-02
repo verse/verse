@@ -1,5 +1,4 @@
 /*
- * $Id: t_suites.h 931 2011-08-23 21:27:05Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

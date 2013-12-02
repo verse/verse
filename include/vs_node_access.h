@@ -1,5 +1,4 @@
 /*
- * $Id: vs_node_access.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -25,6 +24,10 @@
 
 #ifndef VS_NODE_ACCESS_H_
 #define VS_NODE_ACCESS_H_
+
+int vs_node_set_perm(struct VSNode *node,
+		VSUser *user,
+		uint8 permission);
 
 int vs_node_can_write(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,

@@ -1,5 +1,4 @@
 /*
- * $Id: vc_udp_connect.c 1267 2012-07-23 19:10:28Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -34,7 +33,12 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/err.h>
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -69,7 +73,7 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_l_cmd = (struct Negotiate_Cmd*)cmd;
-	int i;
+	int value_rank;
 
 	if(change_l_cmd->feature == FTR_COOKIE) {
 		/* This block of code checks, if received cookie is the same as the
@@ -89,9 +93,11 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Server proposes it's own Flow Control */
 	if(change_l_cmd->feature == FTR_FC_ID) {
-		for(i=0; i<change_l_cmd->count; i++) {
-			/* TODO: better implementation */
-			if(change_l_cmd->value[i].uint8 == FC_NONE) { /* list of supported methods */
+		for(value_rank=0; value_rank<change_l_cmd->count; value_rank++) {
+			/* Is value in "list" of supported methods */
+			if(change_l_cmd->value[value_rank].uint8 == FC_NONE ||
+					change_l_cmd->value[value_rank].uint8 == FC_TCP_LIKE)
+			{
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Flow Control has not been proposed yet */
@@ -99,17 +105,17 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Server has to propose same FC methods for client
 					 * and server. Client can't use different method then
 					 * server and vice versa. */
-					if(dgram_conn->fc_meth != change_l_cmd->value[i].uint8) {
+					if(dgram_conn->fc_meth != change_l_cmd->value[value_rank].uint8) {
 						v_print_log(VRS_PRINT_WARNING, "Proposed FC local :%d is not same as proposed FC remote: %d\n",
-								change_l_cmd->value[i].uint8, dgram_conn->fc_meth);
+								change_l_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
 						return 0;
 					}
 				}
-				dgram_conn->fc_meth = change_l_cmd->value[i].uint8;
+				dgram_conn->fc_meth = change_l_cmd->value[value_rank].uint8;
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Local Flow Control ID: %d proposed\n", change_l_cmd->value[0].uint8);
 				return 1;
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control\n");
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control method\n");
 				return 0;
 			}
 		}
@@ -127,6 +133,7 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 	}
 
+	/* Ignore unknown feature */
 	return 1;
 }
 
@@ -138,12 +145,14 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 {
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *change_r_cmd = (struct Negotiate_Cmd*)cmd;
-	int i;
+	int value_rank;
 
 	if(change_r_cmd->feature == FTR_FC_ID) {
-		for(i=0; i<change_r_cmd->count; i++) {
-			/* TODO: better implementation */
-			if(change_r_cmd->value[i].uint8 == FC_NONE) { /* list of supported methods */
+		for(value_rank=0; value_rank<change_r_cmd->count; value_rank++) {
+			/* Is value in "list" of supported methods */
+			if(change_r_cmd->value[value_rank].uint8 == FC_NONE ||
+					change_r_cmd->value[value_rank].uint8 == FC_TCP_LIKE)
+			{
 				/* It will try to use first found supported method, but ... */
 				if(dgram_conn->fc_meth == FC_RESERVED) {
 					/* Flow Control has not been proposed yet */
@@ -151,22 +160,26 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					/* Server has to propose same FC methods for client
 					 * and server. Client can't use different method then
 					 * server and vice versa. */
-					if(dgram_conn->fc_meth != change_r_cmd->value[i].uint8) {
-						v_print_log(VRS_PRINT_WARNING, "Proposed FC remote :%d is not same as proposed FC local: %d\n",
-								change_r_cmd->value[i].uint8, dgram_conn->fc_meth);
+					if(dgram_conn->fc_meth != change_r_cmd->value[value_rank].uint8) {
+						v_print_log(VRS_PRINT_WARNING,
+								"Proposed FC remote :%d is not same as proposed FC local: %d\n",
+								change_r_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
 						return 0;
 					}
 				}
-				dgram_conn->fc_meth = change_r_cmd->value[i].uint8;
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Flow Control ID: %d proposed\n", change_r_cmd->value[0].uint8);
+				dgram_conn->fc_meth = change_r_cmd->value[value_rank].uint8;
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Remote Flow Control ID: %d proposed\n",
+						change_r_cmd->value[0].uint8);
 				return 1;
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control\n");
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control method\n");
 				return 0;
 			}
 		}
 	}
 
+	/* Ignore unknown feature */
 	return 1;
 }
 
@@ -184,14 +197,18 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(confirm_l_cmd->feature == FTR_COOKIE) {
 		/* This block of code checks if the server confirmed send cookie. */
 		if( vsession->host_cookie.str != NULL &&
-				confirm_l_cmd->count > 0 &&
+				confirm_l_cmd->count == 1 &&
 				confirm_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_cookie.str)==0 )
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Local COOKIE: %s confirmed\n", confirm_l_cmd->value[0].string8.str);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Local COOKIE: %s confirmed\n",
+					confirm_l_cmd->value[0].string8.str);
 			return 1;
 		} else {
-			v_print_log(VRS_PRINT_WARNING, "COOCKIE: %s not confirmed\n", vsession->peer_cookie.str);
+			v_print_log(VRS_PRINT_WARNING,
+					"COOCKIE: %s not confirmed\n",
+					vsession->peer_cookie.str);
 			return 0;
 		}
 	}
@@ -201,7 +218,9 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		/* TODO: better implementation */
 		if(confirm_l_cmd->count == 1 &&	/* Any confirm command has to include only one value */
 				confirm_l_cmd->value[0].uint8 == CC_NONE) {	/* list of supported methods */
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Local Congestion Control ID: %d confirmed\n", confirm_l_cmd->value[0].uint8);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Local Congestion Control ID: %d confirmed\n",
+					confirm_l_cmd->value[0].uint8);
 			dgram_conn->cc_meth = CC_NONE;
 			return 1;
 		} else {
@@ -212,9 +231,10 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Server should confirm client proposal of Flow Control Window scale (local) */
 	if(confirm_l_cmd->feature == FTR_RWIN_SCALE) {
-		if(confirm_l_cmd->count >= 1 ) {
+		if(confirm_l_cmd->count == 1 ) {
 			if(vc_ctx->rwin_scale == confirm_l_cmd->value[0].uint8) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Scale of host RWIN: %d confirmed\n", vc_ctx->rwin_scale);
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Scale of host RWIN: %d confirmed\n", vc_ctx->rwin_scale);
 				dgram_conn->rwin_host_scale = vc_ctx->rwin_scale;
 				return 1;
 			} else {
@@ -230,7 +250,25 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		}
 	}
 
-	return 0;
+	/* Server should confirm client proposal of command compression */
+	if(confirm_l_cmd->feature == FTR_CMD_COMPRESS) {
+		if(confirm_l_cmd->count == 1) {
+			if(confirm_l_cmd->value[0].uint8 == CMPR_NONE ||
+					confirm_l_cmd->value[0].uint8 == CMPR_ADDR_SHARE)
+			{
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Local Command Compression: %d confirmed\n",
+						confirm_l_cmd->value[0].uint8);
+				dgram_conn->host_cmd_cmpr = confirm_l_cmd->value[0].uint8;
+				return 1;
+			} else {
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Command Compress\n");
+				return 0;
+			}
+		}
+	}
+
+	/* Ignore unknown feature */
+	return 1;
 }
 
 /**
@@ -246,13 +284,32 @@ static int vc_REQUEST_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(confirm_r_cmd->feature == FTR_CC_ID) {
 		/* TODO: better implementation */
 		if(confirm_r_cmd->count == 1 &&	/* Any confirm command has to include only one value */
-				confirm_r_cmd->value[0].uint8 == CC_NONE) {	/* list of supported methods */
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Congestion Control ID: %d confirmed\n", confirm_r_cmd->value[0].uint8);
+				confirm_r_cmd->value[0].uint8 == CC_NONE) /* "List" of supported methods */
+		{
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Congestion Control ID: %d confirmed\n",
+					confirm_r_cmd->value[0].uint8);
 			dgram_conn->cc_meth = CC_NONE;
 			return 1;
 		} else {
 			v_print_log(VRS_PRINT_ERROR, "Unsupported Congestion Control\n");
 			return 0;
+		}
+	}
+
+	/* Server should confirm client proposal of command compression */
+	if(confirm_r_cmd->feature == FTR_CMD_COMPRESS) {
+		if(confirm_r_cmd->count == 1) {
+			if(confirm_r_cmd->value[0].uint8 == CMPR_NONE ||
+					confirm_r_cmd->value[0].uint8 == CMPR_ADDR_SHARE)
+			{
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Remote Command Compression: %d confirmed\n",
+						confirm_r_cmd->value[0].uint8);
+				dgram_conn->peer_cmd_cmpr = confirm_r_cmd->value[0].uint8;
+				return 1;
+			} else {
+				v_print_log(VRS_PRINT_ERROR, "Unsupported Command Compress\n");
+				return 0;
+			}
 		}
 	}
 
@@ -265,7 +322,10 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct VPacket *s_packet = CTX_s_packet(C);
-	int i=0;
+	int cmd_rank = 0;
+	static const uint8 cc_none = CC_NONE,
+			cmpr_none = CMPR_NONE,
+			cmpr_addr_share = CMPR_ADDR_SHARE;
 
 	/* Verse packet header */
 	s_packet->header.version = 1;
@@ -278,37 +338,38 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	/* System commands */
 	if(vsession->host_cookie.str!=NULL) {
 		/* Add negotiated cookie */
-		s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-		s_packet->sys_cmd[i].change_l_cmd.feature = FTR_COOKIE;
-		s_packet->sys_cmd[i].change_l_cmd.count = 1;
-		s_packet->sys_cmd[i].change_l_cmd.value[0].string8.length = strlen(vsession->host_cookie.str);
-		strcpy((char*)s_packet->sys_cmd[0].change_l_cmd.value[0].string8.str, vsession->host_cookie.str);
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
 	}
 
 	/* Add CC (local) proposal */
-	s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-	s_packet->sys_cmd[i].change_l_cmd.feature = FTR_CC_ID;
-	s_packet->sys_cmd[i].change_l_cmd.count = 1;
-	s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = CC_NONE;
-	i++;
+	cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+			CMD_CHANGE_L_ID, FTR_CC_ID, &cc_none, NULL);
 
 	/* Add CC (remote) proposal */
-	s_packet->sys_cmd[i].change_r_cmd.id = CMD_CHANGE_R_ID;
-	s_packet->sys_cmd[i].change_r_cmd.feature = FTR_CC_ID;
-	s_packet->sys_cmd[i].change_r_cmd.count = 1;
-	s_packet->sys_cmd[i].change_r_cmd.value[0].uint8 = CC_NONE;
-	i++;
+	cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+			CMD_CHANGE_R_ID, FTR_CC_ID, &cc_none, NULL);
 
 	/* Add Scale Window proposal */
-	s_packet->sys_cmd[i].change_l_cmd.id = CMD_CHANGE_L_ID;
-	s_packet->sys_cmd[i].change_l_cmd.feature = FTR_RWIN_SCALE;
-	s_packet->sys_cmd[i].change_l_cmd.count = 1;
-	s_packet->sys_cmd[i].change_l_cmd.value[0].uint8 = vc_ctx->rwin_scale;
-	i++;
+	cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+			CMD_CHANGE_L_ID, FTR_RWIN_SCALE, &vc_ctx->rwin_scale, NULL);
 
-	/* Add fake terminate command (this command will not be sent) */
-	s_packet->sys_cmd[i].cmd.id = CMD_RESERVED_ID;
+	/* Add command compression proposal */
+	if(vsession->flags & VRS_CMD_CMPR_NONE) {
+		/* Client doesn't want to send compressed commands (local proposal) */
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, NULL);
+		/* Client isn't able to receive compressed commands (remote proposal) */
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
+	} else {
+		/* Client wants to send compressed commands (local proposal) */
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
+		/* Client is able to receive compressed commands (remote proposal) */
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
+	}
 }
 
 /**
@@ -399,12 +460,14 @@ int vc_REQUEST_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	/* Maximal count of connection attempts reached and the client is
@@ -426,7 +489,7 @@ void vc_PARTOPEN_init_send_packet(struct vContext *C)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VPacket *s_packet = CTX_s_packet(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
-	int i=0;
+	int cmd_rank = 0;
 
 	/* Verse packet header */
 	s_packet->header.version = 1;
@@ -443,45 +506,29 @@ void vc_PARTOPEN_init_send_packet(struct vContext *C)
 	}
 
 	/* System commands */
-	s_packet->sys_cmd[i].ack_cmd.id = CMD_ACK_ID;
-	s_packet->sys_cmd[i].ack_cmd.pay_id = dgram_conn->peer_id;
-	i++;
+	s_packet->sys_cmd[cmd_rank].ack_cmd.id = CMD_ACK_ID;
+	s_packet->sys_cmd[cmd_rank].ack_cmd.pay_id = dgram_conn->peer_id;
+	cmd_rank++;
 
 	/* Confirm proposed COOKIE */
 	if(vsession->peer_cookie.str!=NULL) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_COOKIE;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].string8.length = strlen(vsession->peer_cookie.str);
-		strcpy((char*)s_packet->sys_cmd[1].confirm_l_cmd.value[0].string8.str, vsession->peer_cookie.str);
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
 	}
 
 	/* Confirm proposed Flow Control ID */
 	if(dgram_conn->fc_meth != FC_RESERVED) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_FC_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->fc_meth;
-		i++;
-
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_R_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_FC_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->fc_meth;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_FC_ID, &dgram_conn->fc_meth, NULL);
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CONFIRM_R_ID, FTR_FC_ID, &dgram_conn->fc_meth, NULL);
 	}
 
 	/* Confirm proposed shifting of Flow Control Window */
 	if(dgram_conn->rwin_peer_scale != 0) {
-		s_packet->sys_cmd[i].confirm_l_cmd.id = CMD_CONFIRM_L_ID;
-		s_packet->sys_cmd[i].confirm_l_cmd.feature = FTR_RWIN_SCALE;
-		s_packet->sys_cmd[i].confirm_l_cmd.count = 1;
-		s_packet->sys_cmd[i].confirm_l_cmd.value[0].uint8 = dgram_conn->rwin_peer_scale;
-		i++;
+		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
+				CMD_CONFIRM_L_ID, FTR_RWIN_SCALE, &dgram_conn->rwin_peer_scale, NULL);
 	}
-
-	s_packet->sys_cmd[i].cmd.id = CMD_RESERVED_ID;
 }
 
 int vc_PARTOPEN_send_packet(struct vContext *C)
@@ -558,12 +605,14 @@ int vc_PARTOPEN_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	if(dgram_conn->host_state == UDP_CLIENT_STATE_PARTOPEN) {
@@ -648,12 +697,14 @@ int vc_OPEN_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	return STATE_EXIT_SUCCESS;
@@ -749,12 +800,14 @@ int vc_CLOSING_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
 		}
+#endif
 	}
 
 	if(dgram_conn->host_state == UDP_CLIENT_STATE_CLOSING) {
@@ -773,7 +826,7 @@ int vc_receive_and_handle_packet(struct vContext *C, int handle_packet(struct vC
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
 	int ret, error_num;
-	long int sec, usec;
+	long int sec = 0, usec = 0;
 	fd_set set;
 	struct timeval tv;
 
@@ -806,7 +859,7 @@ int vc_receive_and_handle_packet(struct vContext *C, int handle_packet(struct vC
 	/* Check if the event occurred on sockfd */
 	else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 		/* Try to receive packet from server */
-		if(v_receive_packet(io_ctx, &error_num)==-1) {
+		if(v_receive_packet(io_ctx, &error_num) == -1) {
 			switch(error_num) {
 				case ECONNREFUSED:	/* A remote host refused this connection */
 					return RECEIVE_PACKET_ERROR;
@@ -928,7 +981,7 @@ int vc_send_packet(struct vContext *C)
 	/* Send buffer */
 	ret = v_send_packet(io_ctx, &error_num);
 
-	if(ret==SEND_PACKET_SUCCESS) {
+	if(ret == SEND_PACKET_SUCCESS) {
 
 		/* Update time of sending last packet */
 		gettimeofday(&tv, NULL);
@@ -959,7 +1012,8 @@ int vc_send_packet(struct vContext *C)
 	return ret;
 }
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 
 void vc_destroy_dtls_connection(struct vContext *C)
 {
@@ -993,7 +1047,7 @@ int vc_create_dtls_connection(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct timeval timeout;
-	int ret;
+	int ret = 0;
 
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to do DTLS handshake at UDP socket: %d\n",
 			dgram_conn->io_ctx.sockfd);
@@ -1058,6 +1112,7 @@ again:
 
 #endif
 
+
 /* Create new UDP connection to the server */
 struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 {
@@ -1080,7 +1135,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 #endif
 
 	if (v_parse_url(vsession->host_url, &url) != 1) {
-		return NULL;
+		goto end;
 	} else {
 		/* v_print_url(VRS_PRINT_DEBUG_MSG, &url); */
 	}
@@ -1101,7 +1156,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 
 	if( (ret = getaddrinfo(url.node, url.service, &hints, &result)) !=0 ) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "getaddrinfo(): %s\n", gai_strerror(ret));
-		return NULL;
+		goto end;
 	}
 
 	/* Try to use addrinfo from getaddrinfo() */
@@ -1128,13 +1183,13 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 			}
 		}
 		freeaddrinfo(result);
-		return NULL;
+		goto end;
 	}
 
 	if( (dgram_conn = (struct VDgramConn*)calloc(1, sizeof(struct VDgramConn))) == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
-		return NULL;
+		goto end;
 	}
 
 	/* Initialize datagram connection */
@@ -1149,7 +1204,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		free(dgram_conn);
 		freeaddrinfo(result);
-		return NULL;
+		goto end;
 	}
 
 	/* Set socket to reuse address */
@@ -1157,7 +1212,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	if( setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 		free(dgram_conn);
-		return NULL;
+		goto end;
 	}
 
 	/* Set address of peer and host */
@@ -1195,26 +1250,26 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	freeaddrinfo(result);
 
 	/* When DTLS was negotiated, then set flag */
-	if(url.security_protocol == VRS_DGRAM_SEC_DTLS) {
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+	if(url.security_protocol == VRS_SEC_DATA_TLS) {
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 		dgram_conn->io_ctx.flags |= SOCKET_SECURED;
 #else
 		v_print_log(VRS_PRINT_ERROR, "Server tries to force client to use secured connection, but it is not supported\n");
-		return NULL;
+		goto end;
 #endif
 	}
 
-
+#ifdef WITH_OPENSSL
 	/* Create BIO, connect and set to already connected */
 	if( (dgram_conn->io_ctx.bio = BIO_new_dgram(dgram_conn->io_ctx.sockfd, BIO_CLOSE)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "BIO_new_dgram()\n");
-		return NULL;
+		goto end;
 	}
 
 	/* Try to do PMTU discovery */
 	if( BIO_ctrl(dgram_conn->io_ctx.bio, BIO_CTRL_DGRAM_MTU_DISCOVER, 0, NULL) < 0) {
 		v_print_log(VRS_PRINT_ERROR, "BIO_ctrl()\n");
-		return NULL;
+		goto end;
 	}
 
 	/* Try to get MTU from the bio */
@@ -1226,12 +1281,17 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		dgram_conn->io_ctx.mtu = DEFAULT_MTU;
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Default MTU: %d\n", dgram_conn->io_ctx.mtu);
 	}
+#else
+	dgram_conn->io_ctx.mtu = DEFAULT_MTU;
+#endif
 
 	/* Set up necessary flag for V_CTX (client will be able to send and receive packets only to/from server) */
 	dgram_conn->io_ctx.flags |= SOCKET_CONNECTED;
 
 	dgram_conn->host_id = (unsigned int)rand();
 
+end:
+	v_clear_url(&url);
 	return dgram_conn;
 }
 
@@ -1247,8 +1307,8 @@ void* vc_main_dgram_loop(void *arg)
 	struct VDgramConn *dgram_conn = vsession->dgram_conn;
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
 	struct VPacket *r_packet, *s_packet;
-	char error=0;
-	const uint8 *ret_val;
+	char error = 0;
+	const uint8 *ret_val = 0;
 
 	if(dgram_conn==NULL) {
 		/* Create new datagrame connection */
@@ -1261,7 +1321,7 @@ void* vc_main_dgram_loop(void *arg)
 	CTX_current_dgram_conn_set(C, dgram_conn);
 	CTX_io_ctx_set(C, &dgram_conn->io_ctx);
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	/* If negotiated security is DTLS, then try to do DTLS handshake */
 	if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 		if(vc_create_dtls_connection(C) == 0) {
@@ -1346,7 +1406,7 @@ end:
 	free(r_packet);
 	free(s_packet);
 
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 		vc_destroy_dtls_connection(C);
 	}

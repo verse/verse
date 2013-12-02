@@ -1,5 +1,4 @@
 /**
- * $Id: host_neg.pml 709 2010-11-26 14:31:37Z jiri $
  *
  * This PROMELA program simulates and helps to verify the negotiation of new
  * datagram connection between Verse client and Verse server.

@@ -1,5 +1,4 @@
 /*
- * $Id: v_sys_commands.h 1268 2012-07-24 08:14:52Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -41,6 +40,7 @@
 #include <limits.h>
 
 #include "verse_types.h"
+#include "v_commands.h"
 
 /* System Commands (IDs are in range 0-31). These commands can not be added to the
  * packet directly by client application*/
@@ -56,6 +56,9 @@
 #define FTR_DED					5	/* Data Exchange Definition */
 #define FTR_RWIN_SCALE			6	/* Scale factor of rwin used for Flow Control */
 #define FTR_FPS					7	/* FPS currently used at client */
+#define FTR_CMD_COMPRESS		8	/* Command compression */
+#define FTR_CLIENT_NAME			9	/* The name of Verse client application */
+#define FTR_CLIENT_VERSION		10	/* The version of Verse client application */
 
 /* Minimal and maximal length of negotiate command */
 #define MIN_FTR_CMD_LEN			3
@@ -74,6 +77,11 @@
 #define CC_RESERVED				0	/* Should never be used */
 #define CC_NONE					1
 #define CC_TCP_LIKE				2
+
+/* Methods of Command Compression */
+#define CMPR_RESERVED			0	/* Should never be used */
+#define CMPR_NONE				1
+#define CMPR_ADDR_SHARE			2
 
 
 /* Following commands are real system commands, that are packed to the packets
@@ -125,8 +133,25 @@ typedef struct Ack_Nak_Cmd {
 	uint32			pay_id;			/* ID of payload packet */
 } Ack_Nak_Cmd;
 
+/* Union of system commands */
+typedef union VSystemCommands {
+	struct Generic_Cmd					cmd;
+	struct Ack_Nak_Cmd					ack_cmd;
+	struct Ack_Nak_Cmd					nak_cmd;
+	struct User_Authentication_Request	ua_req;
+	struct User_Authentication_Failure	ua_fail;
+	struct User_Authentication_Success	ua_succ;
+	struct Negotiate_Cmd				negotiate_cmd;
+} VSystemCommands;
+
 struct VPacket;
 struct VMessage;
+
+int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
+		uint8 cmd_rank,
+		uint8 cmd_op_code,
+		uint8 ftr_op_code,
+		...);
 
 void v_print_user_auth_success(const unsigned char level, struct User_Authentication_Success *ua_suc);
 int v_raw_unpack_user_auth_success(const char *buffer, ssize_t buffer_size, struct User_Authentication_Success *ua_suc);

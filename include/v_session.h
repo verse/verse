@@ -1,5 +1,4 @@
 /*
- * $Id: v_session.h 1268 2012-07-24 08:14:52Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -59,6 +58,10 @@
 
 #define COOKIE_SIZE		16
 
+/* When negotiation is not used, then client and server consider
+ * FPS to be 60 */
+#define DEFAULT_FPS				60.0
+
 /* Data Exchange Definition */
 typedef struct VDED {
 	char				*str;	/* String of negotiated DED */
@@ -71,8 +74,8 @@ typedef struct VCookie {
 
 typedef struct VSession {
 	/* Thread stuffs */
-	pthread_t				tcp_thread;		/* TCP Thread for this session */
-	pthread_attr_t			tcp_thread_attr;/* Attributes of the TCP thread */
+	pthread_t				tcp_thread;		/* TCP/WebSocket thread for this session */
+	pthread_attr_t			tcp_thread_attr;/* Attributes of the TCP/WebSocket thread */
 	pthread_t				udp_thread;		/* UDP Thread for this session */
 	pthread_attr_t			udp_thread_attr;/* Attributes of the UDP thread */
 	/* Connection */
@@ -87,6 +90,7 @@ typedef struct VSession {
 	struct VDED				ded;			/* Data Exchange Definition */
 	uint16					flags;			/* Flags from verse_send_connect_request function */
 	uint8					tmp;			/* Temporary value */
+	int						usr_auth_att;	/* Number of user authentintication attempts */
 #if defined WITH_PAM
 	/* PAM authentication (verse server specific) */
 	struct pam_conv			conv;
@@ -98,7 +102,14 @@ typedef struct VSession {
 	struct VCookie			host_cookie;	/* Cookie negotiated during authentication */
 	/* Queues */
 	struct VOutQueue		*out_queue;		/* Queue of outgoing data (node commands) */
-	struct VInQueue			*in_queue;			/* Queue of incoming data (fake and node commands) */
+	struct VInQueue			*in_queue;		/* Queue of incoming data (fake and node commands) */
+	/* FPS used by UDP and TCP data connection */
+	float					fps_host;		/* FPS used by this host */
+	float					fps_peer;		/* Negotiated FPS used by peer */
+	unsigned char			tmp_flags;		/* Temporary flags (notification of received system commands) */
+	/* Information about client program */
+	char					*client_name;
+	char					*client_version;
 } VSession;
 
 void v_init_session(struct VSession *vsession);

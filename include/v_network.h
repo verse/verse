@@ -1,5 +1,4 @@
 /*
- * $Id: v_network.h 903 2011-08-08 12:38:35Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -37,12 +36,17 @@
 #if !defined V_NETWORK_H
 #define V_NETWORK_H
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
+#endif
+
+#ifdef WITH_KERBEROS
+#include <krb5.h>
+#endif
 
 #include <netinet/in.h>
 #include <limits.h>
 
-#include "verse.h"
 #include "v_commands.h"
 #include "v_sys_commands.h"
 #include "v_node_commands.h"
@@ -159,42 +163,13 @@ typedef struct VPacket {
 	struct VPacketHeader		header;
 	/* Flag controlling if this packed has been already acked? */
 	char						acked;
-
-	/* Union of supported system commands: ACK/NAK commands
-	 * and Negotiate Commands */
-	union {
-		struct Generic_Cmd		cmd;
-		struct Ack_Nak_Cmd		ack_cmd;
-		struct Ack_Nak_Cmd		nak_cmd;
-		struct Negotiate_Cmd	change_l_cmd;
-		struct Negotiate_Cmd	change_r_cmd;
-		struct Negotiate_Cmd	confirm_l_cmd;
-		struct Negotiate_Cmd	confirm_r_cmd;
-	} sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
-
+	/* Array of unions of system commands */
+	VSystemCommands sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
 	/* Number of system commands in packet */
 	unsigned short				sys_cmd_count;
-
-#if 0
-	/* Union of supported node commands stored in fixed length array */
-	union {
-		struct Generic_Cmd				cmd;
-		/* Node Commands */
-		struct Node_Create_Cmd			node_create;
-		struct Node_Destroy_Cmd			node_destroy;
-		struct Node_Subscribe_Cmd		node_subscribe;
-		struct Node_Unsubscribe_Cmd		node_unsubscribe;
-		/* TagGroup Commands */
-		struct TagGroup_Create_Cmd		taggroup_create;
-	} node_cmd[MAX_NODE_COMMAND_COUNT];
-
-	/* Number of node commands in packet */
-	unsigned short						node_cmd_count;
-#endif
-
 	/* Pointer to the received buffer, where are stored node commands */
-	uint8								*data;
-	uint16								data_size;
+	uint8						*data;
+	uint16						data_size;
 
 } VPacket;
 
@@ -230,17 +205,8 @@ typedef struct VMessageHeader {
 typedef struct VMessage {
 	/* Verse message header */
 	struct VMessageHeader		header;
-	/* List of System Commands: Negotiate Commands */
-	union {
-		struct Generic_Cmd					cmd;
-		struct User_Authentication_Request	ua_req;
-		struct User_Authentication_Failure	ua_fail;
-		struct User_Authentication_Success	ua_succ;
-		struct Negotiate_Cmd				change_l_cmd;
-		struct Negotiate_Cmd				change_r_cmd;
-		struct Negotiate_Cmd				confirm_l_cmd;
-		struct Negotiate_Cmd				confirm_r_cmd;
-	} sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
+	/* Array of unions of system commands */
+	VSystemCommands sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
 } VMessage;
 
 /* Network address of the peer */
@@ -260,24 +226,25 @@ typedef struct IO_CTX {
 	struct VNetworkAddress	peer_addr;		/* Address of peer (other side of communication) */
 	char 					*buf;			/* Buffer for incoming/outgoing packet/message */
 	ssize_t					buf_size;		/* Size of received/sent packet/message */
-	int						sockfd;			/* Socket */
+	int						sockfd;			/* UDP/TCP/WebSocket socket */
 	unsigned char			flags;			/* Flags for sending and receiving context */
 	unsigned short			mtu;			/* MTU of connection discovered with PMTU */
+#ifdef WITH_OPENSSL
 	/* Security */
-#ifdef WITH_KERBEROS
-	krb5_ccache				krb5_cc;		/* Kerberos credentials cache */
-	krb5_auth_context		krb5_auth_ctx;	/* Kerberos authentication contex */
-	krb5_ticket				*krb5_ticket;	/* Kerberos ticket */
-#endif
 	SSL						*ssl;
 	BIO						*bio;
-
+#endif
+#ifdef WITH_KERBEROS
+	krb5_ccache 		krb5_cc;		/* Kerberos credentials cache */
+	krb5_auth_context	krb5_auth_ctx;	/* Kerberos authentication contex */
+	krb5_ticket 		*krb5_ticket;	/* Kerberos ticket */
+#endif
 } IO_CTX;
 
 /* Structure for storing data from parsed URL */
 typedef struct VURL {
 	char		*scheme;				/* Scheme of URL */
-	char		dgram_protocol;			/* Datagrame transport protocol */
+	char		transport_protocol;		/* Transport protocol used for data exchange */
 	char		security_protocol;		/* Security protocol */
 	char		ip_ver;					/* Version of IP */
 	char		*node;					/* Hostname or IP address */
@@ -286,14 +253,15 @@ typedef struct VURL {
 
 int v_parse_url(const char *str, struct VURL *url);
 void v_print_url(const int level, struct VURL *url);
+void v_clear_url(struct VURL *url);
 
 int v_exponential_backoff(const int steps);
 #ifdef WITH_KERBEROS
 int v_krb5_read(struct IO_CTX *io_ctx, krb5_context krb5_ctx, krb5_error_code *error_num);
 int v_krb5_write(struct IO_CTX *io_ctx, krb5_context krb5_ctx, krb5_error_code *error_num);
 #endif
-int v_SSL_read(struct IO_CTX *io_ctx, int *error_num);
-int v_SSL_write(struct IO_CTX *io_ctx, int *error_num);
+int v_tcp_read(struct IO_CTX *io_ctx, int *error_num);
+int v_tcp_write(struct IO_CTX *io_ctx, int *error_num);
 
 int v_receive_packet(struct IO_CTX *io_ctx, int *error_num);
 int v_send_packet(struct IO_CTX *io_ctx, int *error_num);

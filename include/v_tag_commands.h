@@ -1,5 +1,4 @@
 /*
- * $Id$
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -53,7 +52,7 @@ struct Generic_Cmd *v_tag_destroy_create(const uint32 node_id,
 struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 		const uint16 taggroup_id,
 		const uint16 tag_id,
-		const uint8 type,
+		const uint8 data_type,
 		const uint8 count,
 		const void *value);
 

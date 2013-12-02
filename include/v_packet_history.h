@@ -1,5 +1,4 @@
 /*
- * $Id: v_packet_history.h 896 2011-07-30 19:50:03Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

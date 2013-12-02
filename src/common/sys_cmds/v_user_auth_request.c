@@ -1,5 +1,4 @@
 /*
- * $Id$
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -114,6 +113,7 @@ int v_raw_unpack_user_auth_request(const char *buffer, ssize_t buffer_size, stru
 
 	/* Unpack length of username */
 	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &username_len);
+
 	/* Check for zero username length */
 	if(username_len==0) {
 		v_print_log(VRS_PRINT_WARNING, "Zero length of username\n.");

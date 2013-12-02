@@ -1,5 +1,4 @@
 /*
- * $Id: vs_main.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -61,6 +60,8 @@
 #define AUTH_METHOD_LDAP					3
 #define AUTH_METHOD_LDAP_LOAD_AT_LOGIN		4
 
+#define DATA_SEMAPHORE_NAME					"/data_sem"
+
 /**
  * States of Verse server
  */
@@ -90,7 +91,7 @@ typedef struct VSData {
 	struct VSNode		*scene_node;				/* Pointer at parent of all scene nodes (node_id=3) */
 	/* Thread staff */
 	pthread_mutex_t		mutex;						/* Connection threads needs create avatar nodes occasionally */
-	sem_t				sem;						/* Semaphore used for notification data thread (some data were added to the queue) */
+	sem_t				*sem;						/* Semaphore used for notification data thread (some data were added to the queue) */
 } VSData;
 
 /* Verse Server Context */
@@ -99,7 +100,8 @@ typedef struct VS_CTX {
 	unsigned short 		max_connection_attempts;	/* Maximum number of connection attempts from one address:port */
 	unsigned short 		max_sessions;				/* Maximum number of connected clients */
 	unsigned short		max_sockets;				/* Maximum number of sockets server can create */
-	unsigned short 		port;						/* Port number which server is listening on */
+	unsigned short 		tcp_port;					/* TCP port number which server is listening on */
+	unsigned short		ws_port;					/* WebSocket TCP port number */
 	int					stream_protocol;			/* Transport protocol for listening (Only TCP is supported now) */
 	char				dgram_protocol;				/* Flag with datagrame protocol supported for data exchange (Only UDP now) */
 	char				security_protocol;			/* Flag with security protocol supported for data exchange (Only None and DTLS now)*/
@@ -111,12 +113,15 @@ typedef struct VS_CTX {
 	/* Data for connections */
 	unsigned short 		connected_clients;			/* Number of connected clients */
 	struct VSession		**vsessions;				/* List of sessions and session with connection attempts */
+	unsigned int		in_queue_max_size;			/* Default value of max size of incoming queue */
+	unsigned int		out_queue_max_size;			/* Default value of max size of outgoing queue */
 	/* Ports for connections */
 	unsigned short		port_low;					/* The lowest port number in port range */
 	unsigned short		port_high;					/* The highest port number in port range */
 	struct VS_Port		*port_list;					/* List of free ports used for communication with clients */
 	/* Data for packet receiving */
-	struct IO_CTX 		io_ctx;						/* Verse context for sending and receiving (connection attempts) */
+	struct IO_CTX 		tcp_io_ctx;					/* Verse context for TCP connection attempts */
+	struct IO_CTX		ws_io_ctx;					/* Verse context for WebSocket connection attempts */
 	/* SSL context */
 	SSL_CTX				*tls_ctx;					/* SSL context for main secured TCP TLS socket */
 	SSL_CTX				*dtls_ctx;					/* SSL context for secured UDP DTLS connections (shared with all connections) */
@@ -138,11 +143,13 @@ typedef struct VS_CTX {
 	unsigned char		cc_meth;					/* Allowed methods of Congestion Control */
 	unsigned char		fc_meth;					/* Allowed methods of Flow Control */
 	unsigned char		rwin_scale;					/* Scale of Flow Control Window */
+	unsigned char		cmd_cmpr;					/* Prefered command compression */
 	/* User authentication */
 	char				auth_type;					/* Type of user authentication */
 	char				*csv_user_file;				/* CSV file with definition of user account */
 	struct VListBase	users;						/* Linked list of users */
 	struct VSUser		*other_users;				/* The pointer at fake user other_users */
+	struct VSUser		*super_user;				/* The pointer at fake user of super user */
 	unsigned char		default_perm;				/* Default permissions for other users */
 	char				*ldap_hostname;				/* LDAP server */
 	char				*ldap_user;					/* LDAP Verse user */
@@ -153,7 +160,11 @@ typedef struct VS_CTX {
 	/* Data shared at verse server */
 	struct VSData		data;
 	pthread_t			data_thread;				/* Data thread */
+	pthread_t			cli_thread;					/* Thread with simple CLI interface */
 	pthread_attr_t		data_thread_attr;			/* The attribute of data thread */
+	/* WebSocket thread */
+	pthread_t			websocket_thread;			/* WebSocket thread */
+	pthread_attr_t		websocket_thread_attr;		/* The attribute of WebSocket thread*/
 } VS_CTX;
 
 #endif

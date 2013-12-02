@@ -1,5 +1,4 @@
 /*
- * $Id: v_fake_commands.h 1288 2012-08-05 20:34:43Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -227,17 +226,17 @@ void v_Connect_Terminate_destroy(struct Connect_Terminate_Cmd **conn_term);
 
 
 void v_fake_user_auth_print(const unsigned char level, struct User_Authenticate_Cmd *user_auth);
-void v_User_Authenticate_init(struct User_Authenticate_Cmd *user_auth,
+void v_user_auth_init(struct User_Authenticate_Cmd *user_auth,
 		const char *username,
 		uint8 auth_meth_count,
 		uint8 *methods,
 		const char *data);
-struct User_Authenticate_Cmd *v_User_Authenticate_create(const char *username,
+struct User_Authenticate_Cmd *v_user_auth_create(const char *username,
 		uint8 auth_meth_count,
 		uint8 *methods,
 		const char *data);
-void v_User_Authenticate_clear(struct User_Authenticate_Cmd *user_auth);
-void v_User_Authenticate_destroy(struct User_Authenticate_Cmd **user_auth);
+void v_user_auth_clear(struct User_Authenticate_Cmd *user_auth);
+void v_user_auth_destroy(struct User_Authenticate_Cmd **user_auth);
 
 
 /* Node_Create_Ack */

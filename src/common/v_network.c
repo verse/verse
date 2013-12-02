@@ -1,5 +1,4 @@
 /*
- * $Id:
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -34,10 +33,13 @@
  *
  */
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-
-
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -48,8 +50,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
-
-#include "verse.h"
+#include <assert.h>
 
 #ifdef WITH_KERBEROS
 #include <krb5.h>
@@ -102,16 +103,24 @@ int v_parse_url(const char *str, struct VURL *url)
 		/* printf("\t%s\n", &str[str_pos]);*/
 	}
 
-	/* There has to be "udp" protocol, because only UDP is supported now  */
+	/* There has to be "udp" or "tcp" or "wss" protocol  */
 	if(strncmp(&str[str_pos], "udp", strlen("udp"))==0) {
-		url->dgram_protocol = VRS_DGRAM_TP_UDP;
+		url->transport_protocol = VRS_TP_UDP;
 		str_pos += strlen("udp");
+		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "tcp", strlen("tcp"))==0) {
+		url->transport_protocol = VRS_TP_TCP;
+		str_pos += strlen("tcp");
+		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "web", strlen("web"))==0) {
+		url->transport_protocol = VRS_TP_WEBSOCKET;
+		str_pos += strlen("web");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else {
 		return 0;
 	}
 
-	/* There has to be '-' after "udp" string */
+	/* There has to be '-' after "udp" or "tcp" string */
 	if(str[str_pos]!='-') {
 		return 0;
 	} else {
@@ -119,14 +128,18 @@ int v_parse_url(const char *str, struct VURL *url)
 		/* printf("\t%s\n", &str[str_pos]);*/
 	}
 
-	/* There could be "none" or "dtls" string */
+	/* There could be "none" or "dtls" or "tls" string */
 	if(strncmp(&str[str_pos], "none", strlen("none"))==0) {
-		url->security_protocol = VRS_DGRAM_SEC_NONE;
+		url->security_protocol = VRS_SEC_DATA_NONE;
 		str_pos += strlen("none");
 		/*printf("\t%s\n", &str[str_pos]);*/
 	} else if(strncmp(&str[str_pos], "dtls", strlen("dtls"))==0) {
-		url->security_protocol = VRS_DGRAM_SEC_DTLS;
+		url->security_protocol = VRS_SEC_DATA_TLS;
 		str_pos += strlen("dtls");
+		/*printf("\t%s\n", &str[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "tls", strlen("tls"))==0) {
+		url->security_protocol = VRS_SEC_DATA_TLS;
+		str_pos += strlen("tls");
 		/*printf("\t%s\n", &str[str_pos]);*/
 	} else {
 		return 0;
@@ -178,20 +191,42 @@ void v_print_url(const int level, struct VURL *url)
 {
 	v_print_log(level, "URL:\n");
 	v_print_log_simple(level, "\tscheme: %s\n", url->scheme);
-	if(url->dgram_protocol==VRS_DGRAM_TP_UDP) {
+	if(url->transport_protocol==VRS_TP_UDP) {
 		v_print_log_simple(level, "\tdgram_protocol: UDP\n");
 	} else {
 		v_print_log_simple(level, "\tdgram_protocol: unknow\n");
 	}
-	if(url->security_protocol==VRS_DGRAM_SEC_NONE) {
+	if(url->security_protocol==VRS_SEC_DATA_NONE) {
 		v_print_log_simple(level, "\tsecurity_protocol: NONE\n");
-	} else if(url->security_protocol==VRS_DGRAM_SEC_DTLS) {
+	} else if(url->security_protocol==VRS_SEC_DATA_TLS) {
 		v_print_log_simple(level, "\tsecurity_protocol: DTLS\n");
 	} else {
 		v_print_log_simple(level, "\tsecurity_protocol: unknown\n");
 	}
 	v_print_log_simple(level, "\tnode: %s\n", url->node);
 	v_print_log_simple(level, "\tservice: %s\n", url->service);
+}
+
+void v_clear_url(struct VURL *url)
+{
+	url->transport_protocol = 0;
+	url->security_protocol = 0;
+	url->ip_ver = 0;
+
+	if(url->scheme != NULL) {
+		free(url->scheme);
+		url->scheme = NULL;
+	}
+
+	if(url->node != NULL) {
+		free(url->node);
+		url->node = NULL;
+	}
+
+	if(url->service != NULL) {
+		free(url->service);
+		url->service = NULL;
+	}
 }
 
 /**
@@ -525,6 +560,7 @@ void v_print_addr(const unsigned char level, const struct VNetworkAddress *addr)
 		v_print_log_simple(level, "%s ", str_addr);
 	}
 }
+
 #ifdef WITH_KERBEROS
 int v_krb5_set_addrs_ipv4(krb5_context ctx, krb5_auth_context auth_ctx,
 		struct sockaddr_in *local, struct sockaddr_in *remote, krb5_error_code *err)
@@ -759,16 +795,11 @@ int v_krb5_write(struct IO_CTX *io_ctx, krb5_context krb5_ctx,
 	return ret;
 }
 #endif
-/* Read data form SSL connection to the IO_CTX. Return number of bytes read
- * from the SSL connection. When some error occurs, then error code is stored
- * in error_num */
-int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
+#ifdef WITH_OPENSSL
+static int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
 {
 	io_ctx->buf_size = SSL_read(io_ctx->ssl, io_ctx->buf, MAX_PACKET_SIZE);
 
-	/**
-	 * TODO: setting real address
-	 */
 	if( io_ctx->buf_size > 0 ) {
 		*error_num = 0;
 		return io_ctx->buf_size;
@@ -797,17 +828,32 @@ int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
 
 	return 0;
 }
+#endif
 
+/* Read data form SSL connection to the IO_CTX. Return number of bytes read
+ * from the SSL connection. When some error occurs, then error code is stored
+ * in error_num */
+int v_tcp_read(struct IO_CTX *io_ctx, int *error_num)
+{
+#ifdef WITH_OPENSSL
+	return v_SSL_read(io_ctx, error_num);
+#else
+	if( (io_ctx->buf_size = recv(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0)) == -1) {
+		*error_num = errno;
+		v_print_log(VRS_PRINT_ERROR, "recv(): %s\n", strerror(*error_num));
+		return 0;
+	}
+	return io_ctx->buf_size;
+#endif
+}
+
+#ifdef WITH_OPENSSL
 /* Write data form IO_CTX into SSL connection. Return number of bytes written
  * to the SSL connection. When some error occurs, then error code is stored
  * in error_num */
-int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
+static int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
 {
 	int ret;
-
-	/**
-	 * TODO: Setting real address
-	 */
 
 	ret = SSL_write(io_ctx->ssl, io_ctx->buf, io_ctx->buf_size);
 	if(ret > 0) {
@@ -836,79 +882,106 @@ int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
 
 	return 0;
 }
+#endif
+
+/**
+ * \brief This function tries to send data over secured or unsecured connection
+ */
+int v_tcp_write(struct IO_CTX *io_ctx, int *error_num)
+{
+#ifdef WITH_OPENSSL
+	return v_SSL_write(io_ctx, error_num);
+#else
+	int ret;
+	if((ret = send(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0)) == -1) {
+		if(error_num!=NULL) *error_num = errno;
+		v_print_log(VRS_PRINT_ERROR, "send(%d, %p, %d, 0): %s\n",
+				io_ctx->sockfd, (void*)io_ctx->buf, io_ctx->buf_size, strerror(errno));
+		return 0;
+	} else {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "send() %d bytes\n", ret);
+	}
+	return ret;
+#endif
+}
 
 /* Receive Verse packet through unsecured UDP socket. */
 int v_receive_packet(struct IO_CTX *io_ctx, int *error_num)
 {
-	unsigned int addr_len;
-
+	unsigned int addr_len = 0;
 	*error_num = 0;
 
-	if(io_ctx->flags & SOCKET_CONNECTED) {
-		if(io_ctx->flags & SOCKET_SECURED) {
+#ifdef WITH_OPENSSL
+	if(io_ctx->flags & SOCKET_SECURED) {
 again:
-			io_ctx->buf_size = SSL_read(io_ctx->ssl, io_ctx->buf, MAX_PACKET_SIZE);
-			if( io_ctx->buf_size > 0 ) {
-				*error_num = 0;
+		io_ctx->buf_size = SSL_read(io_ctx->ssl, io_ctx->buf, MAX_PACKET_SIZE);
+		if( io_ctx->buf_size > 0 ) {
+			*error_num = 0;
+			return 1;
+		} else if(io_ctx->buf_size <= 0) {
+			/* Get error code from SSL */
+			int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
+			if(error == SSL_ERROR_NONE) {
 				return 1;
-			} else if(io_ctx->buf_size <= 0) {
-				/* Get error code from SSL */
-				int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
-				if(error == SSL_ERROR_NONE) {
-					return 1;
-				} else if(error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
-					goto again;
-				} else if(error==SSL_ERROR_ZERO_RETURN) {
-					/* When error is SSL_ERROR_ZERO_RETURN, then DTLS sent some
-					 * packet, that didn't contain application data */
-					return 1;
-				}
-				ERR_print_errors_fp(stderr);
-				*error_num = error;
-				/* Print debug */
-				v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_read() buf_size: %d, error: %d\n",
-						__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
-				return 0;
+			} else if(error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
+				goto again;
+			} else if(error==SSL_ERROR_ZERO_RETURN) {
+				/* When error is SSL_ERROR_ZERO_RETURN, then DTLS sent some
+				 * packet, that didn't contain application data */
+				return 1;
 			}
-
+			ERR_print_errors_fp(stderr);
+			*error_num = error;
+			/* Print debug */
+			v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_read() buf_size: %d, error: %d\n",
+					__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
 			return 0;
-		} else {
+		}
+
+		return 0;
+	} else {
+#endif
+		if (io_ctx->flags & SOCKET_CONNECTED) {
 			/* Try to receive packet from connected socket */
-			if( (io_ctx->buf_size=recv(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0)) == -1) {
+			if( (io_ctx->buf_size = recv(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0)) == -1) {
 				*error_num = errno;
 				v_print_log(VRS_PRINT_ERROR, "recv(): %s\n", strerror(*error_num));
 				return -1;
 			}
-		}
-		return 1;
-	} else {
-		/* Try to receive packet from unconnected socket */
-		if( io_ctx->host_addr.ip_ver == IPV4 ) {
-			addr_len = sizeof(io_ctx->peer_addr.addr.ipv4);
-			io_ctx->peer_addr.ip_ver = IPV4;
-			if( (io_ctx->buf_size=recvfrom(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv4), &addr_len)) == -1) {
-				*error_num = errno;
-				v_print_log(VRS_PRINT_ERROR, "recvfrom(): %s\n", strerror(*error_num));
+			return 1;
+		} else {
+			/* Try to receive packet from unconnected socket */
+			if( io_ctx->host_addr.ip_ver == IPV4 ) {
+				addr_len = sizeof(io_ctx->peer_addr.addr.ipv4);
+				io_ctx->peer_addr.ip_ver = IPV4;
+				io_ctx->buf_size = recvfrom(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv4), &addr_len);
+				if(io_ctx->buf_size == -1) {
+					*error_num = errno;
+					v_print_log(VRS_PRINT_ERROR, "recvfrom(): %s\n", strerror(*error_num));
+					return -1;
+				}
+				return 1;
+			}
+			else if( io_ctx->host_addr.ip_ver == IPV6 ) {
+				addr_len = sizeof(io_ctx->peer_addr.addr.ipv6);
+				io_ctx->peer_addr.ip_ver = IPV6;
+				io_ctx->buf_size = recvfrom(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv6), &addr_len);
+				if(io_ctx->buf_size == -1) {
+					*error_num = errno;
+					v_print_log(VRS_PRINT_ERROR, "recvfrom(): %s\n", strerror(*error_num));
+					return -1;
+				}
+				return 1;
+			} else {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Unsupported address type %d\n", io_ctx->host_addr.ip_ver);
+				io_ctx->buf_size = 0;
 				return -1;
 			}
-			return 1;
 		}
-		else if( io_ctx->host_addr.ip_ver == IPV6 ) {
-			addr_len = sizeof(io_ctx->peer_addr.addr.ipv6);
-			io_ctx->peer_addr.ip_ver = IPV6;
-			if( (io_ctx->buf_size=recvfrom(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv6), &addr_len)) == -1) {
-				*error_num = errno;
-				v_print_log(VRS_PRINT_ERROR, "recvfrom(): %s\n", strerror(*error_num));
-				return -1;
-			}
-			return 1;
-		}
-		else {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Unsupported address type %d\n", io_ctx->host_addr.ip_ver);
-			io_ctx->buf_size = 0;
-			return -1;
-		}
+#ifdef WITH_OPENSSL
 	}
+#endif
+
 	return -1;
 
 }
@@ -916,67 +989,71 @@ again:
 /* Send Verse packet through unsecured UDP socket. */
 int v_send_packet(struct IO_CTX *io_ctx, int *error_num)
 {
-	if(error_num!=NULL) *error_num = 0;
+	int ret;
+	if(error_num != NULL) *error_num = 0;
 
-	if(io_ctx->flags & SOCKET_CONNECTED) {
-		int ret;
-		if(io_ctx->flags & SOCKET_SECURED) {
+#ifdef WITH_OPENSSL
+	if(io_ctx->flags & SOCKET_SECURED) {
 again:
-			ret = SSL_write(io_ctx->ssl, io_ctx->buf, io_ctx->buf_size);
-			if(ret > 0) {
-				if(ret != io_ctx->buf_size) {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_write() buf_size: %d != ret: %d\n",
-							__FUNCTION__, __LINE__, io_ctx->buf_size, ret);
-				} else {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "SSL_write() %d bytes\n", ret);
-				}
-				if(error_num!=NULL) *error_num = 0;
+		ret = SSL_write(io_ctx->ssl, io_ctx->buf, io_ctx->buf_size);
+		if(ret > 0) {
+			if(ret != io_ctx->buf_size) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_write() buf_size: %d != ret: %d\n",
+						__FUNCTION__, __LINE__, io_ctx->buf_size, ret);
+			} else {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "SSL_write() %d bytes\n", ret);
+			}
+			if(error_num != NULL) *error_num = 0;
+			return SEND_PACKET_SUCCESS;
+		} else if(ret <= 0) {
+			int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
+			if(error == SSL_ERROR_NONE) {
 				return SEND_PACKET_SUCCESS;
-			} else if(ret <= 0) {
-				int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
-				if(error == SSL_ERROR_NONE) {
-					return SEND_PACKET_SUCCESS;
-				} else if(error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
-					goto again;
-				}
-				ERR_print_errors_fp(stderr);
-				if(error_num!=NULL) *error_num = error;
-				v_print_log(VRS_PRINT_ERROR, "%s:%d SSL_write(%p, %p, %d): %d\n",
-						__FUNCTION__, __LINE__,
-						(void*)io_ctx->ssl, (void*)io_ctx->buf, io_ctx->buf_size,
-						error);
-				return SEND_PACKET_ERROR;
+			} else if(error == SSL_ERROR_WANT_READ || error == SSL_ERROR_WANT_WRITE) {
+				goto again;
 			}
-		}
-		if((ret = send(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0)) == -1) {
-			if(error_num!=NULL) *error_num = errno;
-			v_print_log(VRS_PRINT_ERROR, "send(%d, %p, %d, 0): %s\n",
-					io_ctx->sockfd, (void*)io_ctx->buf, io_ctx->buf_size, strerror(errno));
+			ERR_print_errors_fp(stderr);
+			if(error_num != NULL) *error_num = error;
+			v_print_log(VRS_PRINT_ERROR, "%s:%d SSL_write(%p, %p, %d): %d\n",
+					__FUNCTION__, __LINE__,
+					(void*)io_ctx->ssl, (void*)io_ctx->buf, io_ctx->buf_size,
+					error);
 			return SEND_PACKET_ERROR;
-		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "send() %d bytes\n", ret);
 		}
-		return SEND_PACKET_SUCCESS;
 	} else {
-		if(io_ctx->host_addr.ip_ver==IPV4) {
-			if(sendto(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv4), sizeof(io_ctx->peer_addr.addr.ipv4)) == -1) {
-				if(error_num!=NULL) *error_num = errno;
-				v_print_log(VRS_PRINT_ERROR, "sendto(): %s\n", strerror(errno));
+#endif
+		if (io_ctx->flags & SOCKET_CONNECTED) {
+			if((ret = send(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0)) == -1) {
+				if(error_num != NULL) *error_num = errno;
+				v_print_log(VRS_PRINT_ERROR, "send(%d, %p, %d, 0): %s\n",
+						io_ctx->sockfd, (void*)io_ctx->buf, io_ctx->buf_size, strerror(errno));
+				return SEND_PACKET_ERROR;
+			} else {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "send() %d bytes\n", ret);
+			}
+		} else {
+			if(io_ctx->host_addr.ip_ver==IPV4) {
+				if(sendto(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv4), sizeof(io_ctx->peer_addr.addr.ipv4)) == -1) {
+					if(error_num!=NULL) *error_num = errno;
+					v_print_log(VRS_PRINT_ERROR, "sendto(): %s\n", strerror(errno));
+					return SEND_PACKET_ERROR;
+				}
+				return SEND_PACKET_SUCCESS;
+			} else if(io_ctx->host_addr.ip_ver==IPV6) {
+				if(sendto(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv6), sizeof(io_ctx->peer_addr.addr.ipv6)) == -1) {
+					if(error_num!=NULL) *error_num = errno;
+					v_print_log(VRS_PRINT_ERROR, "sendto(): %s\n", strerror(errno));
+					return SEND_PACKET_ERROR;
+				}
+				return SEND_PACKET_SUCCESS;
+			} else {
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Unsupported address type %d\n", io_ctx->host_addr.ip_ver);
 				return SEND_PACKET_ERROR;
 			}
-			return SEND_PACKET_SUCCESS;
-		} else if(io_ctx->host_addr.ip_ver==IPV6) {
-			if(sendto(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0, (struct sockaddr*)&(io_ctx->peer_addr.addr.ipv6), sizeof(io_ctx->peer_addr.addr.ipv6)) == -1) {
-				if(error_num!=NULL) *error_num = errno;
-				v_print_log(VRS_PRINT_ERROR, "sendto(): %s\n", strerror(errno));
-				return SEND_PACKET_ERROR;
-			}
-			return SEND_PACKET_SUCCESS;
 		}
-
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Unsupported address type %d\n", io_ctx->host_addr.ip_ver);
-		return SEND_PACKET_ERROR;
+#ifdef WITH_OPENSSL
 	}
+#endif
 
 	return SEND_PACKET_SUCCESS;
 }

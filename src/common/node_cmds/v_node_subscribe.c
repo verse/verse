@@ -1,5 +1,4 @@
 /*
- * $Id: v_node_subscribe.c 1267 2012-07-23 19:10:28Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *

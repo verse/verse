@@ -1,5 +1,4 @@
 /*
- * $Id: vs_layer.c 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -49,7 +48,6 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 		uint16 type)
 {
 	struct VSLayer *layer = calloc(1, sizeof(struct VSLayer));
-	struct VSLayerValue value;
 
 	if(layer == NULL) {
 		return NULL;
@@ -66,7 +64,7 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 
 	v_hash_array_init(&layer->values,
 				HASH_MOD_65536,
-				(char*)&(value.id) - (char*)&(value),
+				offsetof(VSLayerValue, id),
 				sizeof(uint32));
 
 	/* When parent layer is not NULL, then add this layer to the linked list
@@ -129,6 +127,35 @@ void vs_layer_destroy(struct VSNode *node, struct VSLayer *layer)
 	/* Destroy this layer itself */
 	v_hash_array_remove_item(&node->layers, layer);
 	free(layer);
+}
+
+/**
+ * \brief This function unsubscribe client from the layer
+ */
+int vs_layer_unsubscribe(struct VSLayer *layer, struct VSession *vsession)
+{
+	struct VSEntitySubscriber	*layer_subscriber;
+
+	/* Try to find layer subscriber */
+	layer_subscriber = layer->layer_subs.first;
+	while(layer_subscriber != NULL) {
+		if(layer_subscriber->node_sub->session->session_id == vsession->session_id) {
+			break;
+		}
+		layer_subscriber = layer_subscriber->next;
+	}
+
+	/* Client has to be subscribed to the layer */
+	if(layer_subscriber == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to the layer (id: %d)\n",
+								__FUNCTION__, layer->id);
+		return 0;
+	}
+
+	/* Remove client from the list of subscribers */
+	v_list_free_item(&layer->layer_subs, layer_subscriber);
+
+	return 1;
 }
 
 /**
@@ -723,7 +750,6 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSLayer *layer;
-	struct VSEntitySubscriber *layer_subscriber;
 
 	uint32 node_id = UINT32(layer_unsubscribe_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_unsubscribe_cmd->data[UINT32_SIZE]);
@@ -746,26 +772,7 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Try to find layer subscriber */
-	layer_subscriber = layer->layer_subs.first;
-	while(layer_subscriber != NULL) {
-		if(layer_subscriber->node_sub->session->session_id == vsession->session_id) {
-			break;
-		}
-		layer_subscriber = layer_subscriber->next;
-	}
-
-	/* Client has to be subscribed to the layer */
-	if(layer_subscriber == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to the layer (id: %d) in node (id: %d)\n",
-								__FUNCTION__, layer_id, node_id);
-		return 0;
-	}
-
-	/* Remove client from the list of subscribers */
-	v_list_free_item(&layer->layer_subs, layer_subscriber);
-
-	return 1;
+	return vs_layer_unsubscribe(layer, vsession);
 }
 
 

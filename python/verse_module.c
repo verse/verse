@@ -1,5 +1,4 @@
 /*
- * $Id: verse_module.c 1360 2012-10-18 20:25:04Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -38,6 +37,10 @@
 #include <structmember.h>
 #include <assert.h>
 
+#if PY_MAJOR_VERSION >= 3
+#include <bytesobject.h>
+#endif
+
 #include "verse.h"
 #include "verse_types.h"
 
@@ -46,9 +49,11 @@
 static PyObject *VerseError;
 
 
+#if PY_MAJOR_VERSION >= 3
 /* The module doc string */
 PyDoc_STRVAR(verse__doc__,
 "Python Verse module that enables communication with Verse server");
+#endif
 
 /* Object for session */
 typedef struct session_SessionObject {
@@ -78,13 +83,13 @@ static struct PyMemberDef Session_members[] = {
 
 /**
  * \brief Generic default callback function that print function name,
- * session ID, keywords and arguments
+ * session ID and arguments
  */
 static PyObject *_print_callback_arguments(const char *func_name, PyObject *self, PyObject *args)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
-	printf("%s(): session_id: %d\n", &func_name[8], session->session_id);
-	printf("arguments: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf("\n");
+	printf("default %s(session_id: %d, ", &func_name[7], session->session_id);
+	printf("args: "); PyObject_Print(args, stdout, Py_PRINT_RAW); printf(")\n");
 	Py_RETURN_NONE;
 }
 
@@ -102,7 +107,7 @@ static void cb_c_receive_layer_unset_value(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_unset_value", "(IHI)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_unset_value", "(IHI)",
 				node_id, layer_id, item_id);
 	return;
 }
@@ -195,7 +200,7 @@ static void cb_c_receive_layer_set_value(const uint8_t session_id,
 			}
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
-		PyObject_CallMethod((PyObject*)session, "receive_layer_set_value", "(IHIO)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_set_value", "(IHIO)",
 				node_id, layer_id, item_id, tuple_values);
 	}
 	return;
@@ -225,7 +230,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 	}
 
 	/* Check if value is tuple */
-	if(!PyTuple_Check(tuple_values)) {
+	if(tuple_values == NULL || !PyTuple_Check(tuple_values)) {
 		PyErr_SetString(VerseError, "Value is not tuple");
 		return NULL;
 	}
@@ -420,7 +425,7 @@ static void cb_c_receive_layer_unsubscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_unsubscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_unsubscribe", "(IHII)",
 				node_id, layer_id, version, crc32);
 	return;
 }
@@ -468,7 +473,7 @@ static void cb_c_receive_layer_subscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_subscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_subscribe", "(IHII)",
 				node_id, layer_id, version, crc32);
 	return;
 }
@@ -515,7 +520,7 @@ static void cb_c_receive_layer_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_destroy", "(IH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_destroy", "(IH)",
 				node_id, layer_id);
 	return;
 }
@@ -564,7 +569,7 @@ static void cb_c_receive_layer_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_layer_create", "(IHHBBH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_layer_create", "(IHHBBH)",
 				node_id, parent_layer_id, layer_id, data_type, count, custom_type);
 	return;
 }
@@ -601,7 +606,7 @@ static PyObject *Session_send_layer_create(PyObject *self, PyObject *args, PyObj
 
 
 /* Tag Set Value */
-static PyObject *Session_receive_tag_set_value(PyObject *self, PyObject *args)
+static PyObject *Session_receive_tag_set_values(PyObject *self, PyObject *args)
 {
 	return _print_callback_arguments(__FUNCTION__, self, args);
 }
@@ -666,42 +671,28 @@ static void cb_c_receive_tag_set_value(const uint8_t session_id,
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
 
-		PyObject_CallMethod((PyObject*)session, "receive_tag_set_value", "(IHHO)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_set_values", "(IHHO)",
 				node_id, taggroup_id, tag_id, tuple_values);
 	}
 	return;
 }
 
-static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyObject *kwds)
+static PyObject *_send_tag_set_tuple(session_SessionObject *session,
+		uint8_t prio,
+		uint32_t node_id,
+		uint16_t taggroup_id,
+		uint16_t tag_id,
+		uint8_t data_type,
+		PyObject *tuple_values)
 {
-	session_SessionObject *session = (session_SessionObject *)self;
-	uint8_t prio;
-	uint32_t node_id;
-	uint16_t taggroup_id;
-	uint16_t tag_id;
-	uint8_t data_type;
 	uint8_t count;
 	void *values = NULL;
-	PyObject *tuple_values;
 	PyObject *py_value;
 	PyObject *tmp;
 	Py_ssize_t size;
 	long l;
 	double d;
 	int i, ret;
-	static char *kwlist[] = {"prio", "node_id", "taggroup_id", "tag_id", "data_type", "values", NULL};
-
-	/* Parse arguments */
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIHHBO", kwlist,
-			&prio, &node_id, &taggroup_id, &tag_id, &data_type, &tuple_values)) {
-		return NULL;
-	}
-
-	/* Check if value is tuple */
-	if(!PyTuple_Check(tuple_values)) {
-		PyErr_SetString(VerseError, "Value is not tuple");
-		return NULL;
-	}
 
 	size = PyTuple_Size(tuple_values);
 	if(!(size>0 && size <=4)) {
@@ -717,8 +708,15 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -740,8 +738,15 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -763,8 +768,15 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -786,8 +798,15 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		for(i=0; i<count; i++) {
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+#else
+				if(!PyInt_Check(py_value)) {
+#endif
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -805,7 +824,10 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -824,7 +846,10 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -842,7 +867,10 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					char err_message[256];
+					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+							py_value->ob_type->tp_name);
+					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
@@ -862,13 +890,25 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 		}
 		py_value = PyTuple_GetItem(tuple_values, 0);
 		if(py_value != NULL) {
+#if PY_MAJOR_VERSION >= 3
 			if(!PyUnicode_Check(py_value)) {
-				PyErr_SetString(VerseError, "Wrong type of tuple item");
+#else
+			if(!PyString_Check(py_value) && !PyUnicode_Check(py_value)) {
+#endif
+				char err_message[256];
+				sprintf(err_message, "Tuple item type is not str. Item type is: %s",
+						py_value->ob_type->tp_name);
+				PyErr_SetString(VerseError, err_message);
 				return NULL;
 			}
 		}
+#if PY_MAJOR_VERSION >= 3
 		tmp = PyUnicode_AsEncodedString(py_value, "utf-8", "Error: encoding string");
 		values = PyBytes_AsString(tmp);
+#else
+		(void)tmp;
+		values = PyString_AsString(py_value);
+#endif
 		break;
 	default:
 		PyErr_SetString(VerseError, "Unsupported value type");
@@ -893,12 +933,41 @@ static PyObject *Session_send_tag_set_value(PyObject *self, PyObject *args, PyOb
 	Py_RETURN_NONE;
 }
 
+static PyObject *Session_send_tag_set_values(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	session_SessionObject *session = (session_SessionObject *)self;
+	uint8_t prio;
+	uint32_t node_id;
+	uint16_t taggroup_id;
+	uint16_t tag_id;
+	uint8_t data_type;
+	PyObject *values;
+	static char *kwlist[] = {"prio", "node_id", "taggroup_id", "tag_id", "data_type", "values", NULL};
+
+	/* Parse arguments */
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIHHBO", kwlist,
+			&prio, &node_id, &taggroup_id, &tag_id, &data_type, &values)) {
+		return NULL;
+	}
+
+	/* Check if value is tuple */
+	if(values != NULL && PyTuple_Check(values)) {
+		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, values);
+	} else {
+		PyErr_SetString(VerseError, "Value is not tuple");
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
 
 /* Tag Destroy */
 static PyObject *Session_receive_tag_destroy(PyObject *self, PyObject *args)
 {
 	return _print_callback_arguments(__FUNCTION__, self, args);
 }
+
 
 static void cb_c_receive_tag_destroy(const uint8_t session_id,
 		const uint32_t node_id,
@@ -907,7 +976,7 @@ static void cb_c_receive_tag_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_tag_destroy", "(IHH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_destroy", "(IHH)",
 				node_id, taggroup_id, tag_id);
 	return;
 }
@@ -957,7 +1026,7 @@ static void cb_c_receive_tag_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_tag_create", "(IHHBBH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_tag_create", "(IHHBBH)",
 				node_id, taggroup_id, tag_id, data_type, count, custom_type);
 	return;
 }
@@ -1007,7 +1076,7 @@ static void cb_c_receive_taggroup_unsubscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_unsubscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_unsubscribe", "(IHII)",
 				node_id, taggroup_id, version, crc32);
 	return;
 }
@@ -1055,7 +1124,7 @@ static void cb_c_receive_taggroup_subscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_subscribe", "(IHII)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_subscribe", "(IHII)",
 				node_id, taggroup_id, version, crc32);
 	return;
 }
@@ -1102,7 +1171,7 @@ static void cb_c_receive_taggroup_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_destroy", "(IH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_destroy", "(IH)",
 				node_id, taggroup_id);
 	return;
 }
@@ -1148,7 +1217,7 @@ static void cb_c_receive_taggroup_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_taggroup_create", "(IHH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_taggroup_create", "(IHH)",
 				node_id, taggroup_id, custom_type);
 	return;
 }
@@ -1193,7 +1262,7 @@ static void cb_c_receive_node_unlock(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_unlock", "(II)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_unlock", "(II)",
 				node_id, avatar_id);
 	return;
 }
@@ -1237,7 +1306,7 @@ static void cb_c_receive_node_lock(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_lock", "(II)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_lock", "(II)",
 				node_id, avatar_id);
 	return;
 }
@@ -1281,7 +1350,7 @@ static void cb_c_receive_node_owner(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_owner", "(IH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_owner", "(IH)",
 				node_id, user_id);
 	return;
 }
@@ -1327,7 +1396,7 @@ static void cb_c_receive_node_perm(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_perm", "(IHB)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_perm", "(IHB)",
 				node_id, user_id, perm);
 	return;
 }
@@ -1373,7 +1442,7 @@ static void cb_c_receive_node_link(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_link", "(II)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_link", "(II)",
 				parent_node_id, child_node_id);
 	return;
 }
@@ -1447,7 +1516,7 @@ static void cb_c_receive_node_unsubscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_unsubscribe", "(III)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_unsubscribe", "(III)",
 				node_id, version, crc32);
 	return;
 }
@@ -1493,7 +1562,7 @@ static void cb_c_receive_node_subscribe(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_subscribe", "(III)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_subscribe", "(III)",
 				node_id, version, crc32);
 	return;
 }
@@ -1504,17 +1573,18 @@ static PyObject *Session_send_node_subscribe(PyObject *self, PyObject *args, PyO
 	uint8_t prio;
 	uint32_t node_id;
 	uint32_t version;
+	uint32_t crc32;
 	int ret;
-	static char *kwlist[] = {"prio", "node_id", "version", NULL};
+	static char *kwlist[] = {"prio", "node_id", "version", "crc32", NULL};
 
 	/* Parse arguments */
-	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BII", kwlist,
-			&prio, &node_id, &version)) {
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIII", kwlist,
+			&prio, &node_id, &version, &crc32)) {
 		return NULL;
 	}
 
 	/* Call C API function */
-	ret = vrs_send_node_subscribe(session->session_id, prio, node_id, version);
+	ret = vrs_send_node_subscribe(session->session_id, prio, node_id, version, crc32);
 
 	/* Check if calling function was successful */
 	if(ret != VRS_SUCCESS) {
@@ -1537,7 +1607,7 @@ static void cb_c_receive_node_destroy(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_destroy", "(I)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_destroy", "(I)",
 				node_id);
 	return;
 }
@@ -1583,7 +1653,7 @@ static void cb_c_receive_node_create(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_node_create", "(IIHH)",
+		PyObject_CallMethod((PyObject*)session, "_receive_node_create", "(IIHH)",
 				node_id, parent_id, user_id, custom_type);
 	return;
 }
@@ -1661,7 +1731,7 @@ static void cb_c_receive_connect_accept(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_connect_accept", "(HI)", user_id, avatar_id);
+		PyObject_CallMethod((PyObject*)session, "_receive_connect_accept", "(HI)", user_id, avatar_id);
 	return;
 }
 
@@ -1680,7 +1750,7 @@ static void cb_c_receive_connect_terminate(const uint8_t session_id,
 {
 	session_SessionObject *session = session_list[session_id];
 	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "receive_connect_terminate", "(B)", error_num);
+		PyObject_CallMethod((PyObject*)session, "_receive_connect_terminate", "(B)", error_num);
 	return;
 }
 
@@ -1736,9 +1806,9 @@ static void cb_c_receive_user_authenticate(const uint8_t session_id,
 
 	if(session != NULL) {
 		if(username==NULL) {
-			PyObject_CallMethod((PyObject*)session, "receive_user_authenticate", "(sO)", "", tuple_methods);
+			PyObject_CallMethod((PyObject*)session, "_receive_user_authenticate", "(sO)", "", tuple_methods);
 		} else {
-			PyObject_CallMethod((PyObject*)session, "receive_user_authenticate", "(sO)", username, tuple_methods);
+			PyObject_CallMethod((PyObject*)session, "_receive_user_authenticate", "(sO)", username, tuple_methods);
 		}
 	}
 
@@ -1815,7 +1885,7 @@ static PyObject *Session_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	session_SessionObject *self;
 
-	if(0) {
+	if(1) {
 		printf("Session_new(): type: %p, args: %p, kwds: %p\n",
 			(void*)type, (void*)args, (void*)kwds);
 	}
@@ -1856,8 +1926,7 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 	static char *kwlist[] = {"hostname", "service", "flags", NULL};
 
 	if (! PyArg_ParseTupleAndKeywords(args, kwds, "|OOB", kwlist,
-			&_hostname, &_service,
-			&flags))
+			&_hostname, &_service, &flags))
 	{
 		return -1;
 	}
@@ -1897,16 +1966,24 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 	vrs_register_receive_layer_set_value(cb_c_receive_layer_set_value);
 	vrs_register_receive_layer_unset_value(cb_c_receive_layer_unset_value);
 
+#if PY_MAJOR_VERSION >= 3
 	tmp1 = PyUnicode_AsEncodedString(_hostname, "utf-8", "Error: encoding string");
 	hostname = PyBytes_AsString(tmp1);
 	tmp2 = PyUnicode_AsEncodedString(_service, "utf-8", "Error: encoding string");
 	service = PyBytes_AsString(tmp2);
+#else
+	hostname = PyString_AsString(_hostname);
+	service = PyString_AsString(_service);
+#endif
+
 
 	/* Send user connect request to the server */
 	if(hostname != NULL && service != NULL) {
 		ret = vrs_send_connect_request(hostname, service, flags, &session_id);
+#if PY_MAJOR_VERSION >= 3
 		Py_XDECREF(tmp1);
 		Py_XDECREF(tmp2);
+#endif
 
 		if(ret != VRS_SUCCESS) {
 			PyErr_SetString(VerseError, "Unable to send connect request");
@@ -1928,30 +2005,29 @@ static int Session_init(session_SessionObject *self, PyObject *args, PyObject *k
 	}
 
 	if(_service != NULL) {
-		tmp1 = self->service;
+		tmp2 = self->service;
 		Py_INCREF(_service);
 		self->service = _service;
-		Py_XDECREF(tmp1);
+		Py_XDECREF(tmp2);
 	}
-
 
 	return 0;
 }
 
 static PyMethodDef Session_methods[] = {
 		/* Session commands */
-		{"receive_connect_accept",
+		{"_receive_connect_accept",
 				(PyCFunction)Session_receive_connect_accept,
 				METH_VARARGS,
-				"receive_connect_accept(self, user_id, avatar_id) -> None\n\n"
+				"_receive_connect_accept(self, user_id, avatar_id) -> None\n\n"
 				"Callback function that is called, when connection with server is established\n"
 				"user_id:	int ID of user node that represent connected user\n"
 				"avatar_id:	int ID of avatar node that represent connected client"
 		},
-		{"receive_connect_terminate",
+		{"_receive_connect_terminate",
 				(PyCFunction)Session_receive_connect_terminate,
 				METH_VARARGS,
-				"receive_connect_terminate(self, error) -> None\n\n"
+				"_receive_connect_terminate(self, error) -> None\n\n"
 				"Callback function that is called, when connection with server is terminated\n"
 				"error:	int code of reason for termination of connection by server"
 		},
@@ -1962,10 +2038,10 @@ static PyMethodDef Session_methods[] = {
 				"Send connect terminate command to the server\n"
 				"error:	int code of reason for termination of connection by client"
 		},
-		{"receive_user_authenticate",
+		{"_receive_user_authenticate",
 				(PyCFunction)Session_receive_user_authenticate,
 				METH_VARARGS,
-				"receive_user_authenticate(self, username, methods) -> None\n\n"
+				"_receive_user_authenticate(self, username, methods) -> None\n\n"
 				"Callback function that is called, when server requests user authentication\n"
 				"username:	string of client's username\n"
 				"methods:	tuple of supported authentication methods"
@@ -1998,7 +2074,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node create command to the server"
 		},
-		{"receive_node_create",
+		{"_receive_node_create",
 				(PyCFunction)Session_receive_node_create,
 				METH_VARARGS,
 				"Callback function for node create command received from the server"
@@ -2008,7 +2084,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node destroy command to the server"
 		},
-		{"receive_node_destroy",
+		{"_receive_node_destroy",
 				(PyCFunction)Session_receive_node_destroy,
 				METH_VARARGS,
 				"Callback function for node destroy command received from the server"
@@ -2018,7 +2094,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node subscribe command to the server"
 		},
-		{"receive_node_subscribe",
+		{"_receive_node_subscribe",
 				(PyCFunction)Session_receive_node_subscribe,
 				METH_VARARGS,
 				"Callback function for node subscribe command received from the server"
@@ -2028,7 +2104,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node unsubscribe command to the server"
 		},
-		{"receive_node_unsubscribe",
+		{"_receive_node_unsubscribe",
 				(PyCFunction)Session_receive_node_unsubscribe,
 				METH_VARARGS,
 				"Callback function for node unsubscribe command received from server"
@@ -2043,7 +2119,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node link command to the server"
 		},
-		{"receive_node_link",
+		{"_receive_node_link",
 				(PyCFunction)Session_receive_node_link,
 				METH_VARARGS | METH_KEYWORDS,
 				"Callback function for node link command received from server"
@@ -2053,7 +2129,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node perm command to the server"
 		},
-		{"receive_node_perm",
+		{"_receive_node_perm",
 				(PyCFunction)Session_receive_node_perm,
 				METH_VARARGS,
 				"Callback function for node perm command received from server"
@@ -2063,7 +2139,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node owner command to the server"
 		},
-		{"receive_node_owner",
+		{"_receive_node_owner",
 				(PyCFunction)Session_receive_node_owner,
 				METH_VARARGS,
 				"Callback function for node owner command received from server"
@@ -2073,7 +2149,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node lock command to the server"
 		},
-		{"receive_node_lock",
+		{"_receive_node_lock",
 				(PyCFunction)Session_receive_node_lock,
 				METH_VARARGS,
 				"Callback function for node lock command received from server"
@@ -2083,7 +2159,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send node unlock command to the server"
 		},
-		{"receive_node_unlock",
+		{"_receive_node_unlock",
 				(PyCFunction)Session_receive_node_unlock,
 				METH_VARARGS,
 				"Callback function for node unlock command received from server"
@@ -2094,7 +2170,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup create command to the server"
 		},
-		{"receive_taggroup_create",
+		{"_receive_taggroup_create",
 				(PyCFunction)Session_receive_taggroup_create,
 				METH_VARARGS,
 				"Callback function for taggroup create command received from server"
@@ -2104,7 +2180,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup destroy command to the server"
 		},
-		{"receive_taggroup_destroy",
+		{"_receive_taggroup_destroy",
 				(PyCFunction)Session_receive_taggroup_destroy,
 				METH_VARARGS,
 				"Callback function for taggroup destroy command received from server"
@@ -2114,7 +2190,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup subscribe command to the server"
 		},
-		{"receive_taggroup_subscribe",
+		{"_receive_taggroup_subscribe",
 				(PyCFunction)Session_receive_taggroup_subscribe,
 				METH_VARARGS,
 				"Callback function for taggroup subscribe command received from server"
@@ -2124,7 +2200,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send taggroup unsubscribe command to the server"
 		},
-		{"receive_taggroup_unsubscribe",
+		{"_receive_taggroup_unsubscribe",
 				(PyCFunction)Session_receive_taggroup_unsubscribe,
 				METH_VARARGS,
 				"Callback function for taggroup subscribe command received from server"
@@ -2135,7 +2211,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send tag create command to the server"
 		},
-		{"receive_tag_create",
+		{"_receive_tag_create",
 				(PyCFunction)Session_receive_tag_create,
 				METH_VARARGS,
 				"Callback function for tag create command received from server"
@@ -2145,20 +2221,20 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send tag destroy command to the server"
 		},
-		{"receive_tag_destroy",
+		{"_receive_tag_destroy",
 				(PyCFunction)Session_receive_tag_destroy,
 				METH_VARARGS,
 				"Callback function for tag destroy command received from server"
 		},
-		{"send_tag_set_value",
-				(PyCFunction)Session_send_tag_set_value,
+		{"send_tag_set_values",
+				(PyCFunction)Session_send_tag_set_values,
 				METH_VARARGS | METH_KEYWORDS,
-				"Send tag set value command to the server"
+				"Send tag set values command to the server"
 		},
-		{"receive_tag_set_value",
-				(PyCFunction)Session_receive_tag_set_value,
+		{"_receive_tag_set_values",
+				(PyCFunction)Session_receive_tag_set_values,
 				METH_VARARGS,
-				"Callback function for tag set value command received from server"
+				"Callback function for tag set values command received from server"
 		},
 		/* Layer commands */
 		{"send_layer_create",
@@ -2166,7 +2242,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer create command to the server"
 		},
-		{"receive_layer_create",
+		{"_receive_layer_create",
 				(PyCFunction)Session_receive_layer_create,
 				METH_VARARGS,
 				"Callback function for layer create command received from server"
@@ -2176,7 +2252,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer destroy command to the server"
 		},
-		{"receive_layer_destroy",
+		{"_receive_layer_destroy",
 				(PyCFunction)Session_receive_layer_destroy,
 				METH_VARARGS,
 				"Callback function for layer destroy command received from server"
@@ -2186,7 +2262,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer subscribe command to the server"
 		},
-		{"receive_layer_subscribe",
+		{"_receive_layer_subscribe",
 				(PyCFunction)Session_receive_layer_subscribe,
 				METH_VARARGS,
 				"Callback function for layer subscribe command received from server"
@@ -2196,7 +2272,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer unsubscribe command to the server"
 		},
-		{"receive_layer_unsubscribe",
+		{"_receive_layer_unsubscribe",
 				(PyCFunction)Session_receive_layer_unsubscribe,
 				METH_VARARGS,
 				"Callback function for layer unsubscribe command received from server"
@@ -2206,7 +2282,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer set value command to the server"
 		},
-		{"receive_layer_set_value",
+		{"_receive_layer_set_value",
 				(PyCFunction)Session_receive_layer_set_value,
 				METH_VARARGS,
 				"Callback function for layer set value command received from server"
@@ -2216,7 +2292,7 @@ static PyMethodDef Session_methods[] = {
 				METH_VARARGS | METH_KEYWORDS,
 				"Send layer unset value command to the server"
 		},
-		{"receive_layer_unset_value",
+		{"_receive_layer_unset_value",
 				(PyCFunction)Session_receive_layer_unset_value,
 				METH_VARARGS,
 				"Callback function for layer unset value command received from server"
@@ -2280,7 +2356,7 @@ static PyTypeObject session_SessionType = {
 
 /* The function doc string for callback_update */
 PyDoc_STRVAR(set_debug_level__doc__,
-		"set_debug_level(level) -> none\n\n"
+		"set_debug_level(level) -> None\n\n"
 		"This method set debug level of this client");
 
 /* This function set debug level of python client */
@@ -2313,15 +2389,58 @@ static PyObject *verse_set_debug_level(PyObject *self, PyObject *args, PyObject 
 	return result;
 }
 
-/* Table of methods */
+
+/* The function doc string for callback_update */
+PyDoc_STRVAR(set_client_info__doc__,
+		"set_client_info(name, version) -> None\n\n"
+		"This method set name and version of client");
+
+/* This function set debug level of python client */
+static PyObject *verse_set_client_info(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *result = NULL;
+	char *name, *version;
+	int ret;
+	static char *kwlist[] = {"name", "version", NULL};
+
+	(void)self;
+
+	/* Parse arguments */
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|ss", kwlist,
+			&name, &version)) {
+		return NULL;
+	}
+
+	ret = vrs_set_client_info(name, version);
+
+	/* Check if command was calling function was successful */
+	if(ret != VRS_SUCCESS) {
+		PyErr_SetString(VerseError, "Unable to set client info");
+		return NULL;
+	}
+
+	Py_INCREF(Py_None);
+	result = Py_None;
+
+	return result;
+}
+
+/* Table of module methods */
 static PyMethodDef VerseMethods[] = {
 	{"set_debug_level",
 			(PyCFunction)verse_set_debug_level,
 			METH_VARARGS | METH_KEYWORDS,
 			set_debug_level__doc__
 	},
+	{"set_client_info",
+			(PyCFunction)verse_set_client_info,
+			METH_VARARGS | METH_KEYWORDS,
+			set_client_info__doc__
+	},
 	{NULL, NULL, 0, NULL}
 };
+
+#if PY_MAJOR_VERSION >= 3
 
 /* Module definition */
 static struct PyModuleDef verse_module = {
@@ -2336,18 +2455,36 @@ static struct PyModuleDef verse_module = {
 	NULL			/* Not needed */
 };
 
+#endif
+
 /* Initialization of module */
+#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC PyInit_verse(void)
+#else
+void initverse(void)
+#endif
 {
 	PyObject *module;
 
 	if (PyType_Ready(&session_SessionType) < 0)
+#if PY_MAJOR_VERSION >= 3
 		return NULL;
+#else
+		return;
+#endif
 
+#if PY_MAJOR_VERSION >= 3
 	module = PyModule_Create(&verse_module);
+#else
+	module = Py_InitModule("verse", VerseMethods);
+#endif
 
 	if(module == NULL) {
+#if PY_MAJOR_VERSION >= 3
 		return NULL;
+#else
+		return;
+#endif
 	}
 
 	/* Add error object to verse module */
@@ -2362,17 +2499,25 @@ PyMODINIT_FUNC PyInit_verse(void)
 	/* Add constants to verse module */
 	PyModule_AddIntConstant(module, "VERSION", VRS_VERSION);
 
+	/* Timeout in seconds */
 	PyModule_AddIntConstant(module, "TIMEOUT", VRS_TIMEOUT);
 
+	/* Debug levels */
 	PyModule_AddIntConstant(module, "PRINT_NONE", VRS_PRINT_NONE);
 	PyModule_AddIntConstant(module, "PRINT_INFO", VRS_PRINT_INFO);
 	PyModule_AddIntConstant(module, "PRINT_ERROR", VRS_PRINT_ERROR);
 	PyModule_AddIntConstant(module, "PRINT_WARNING", VRS_PRINT_WARNING);
 	PyModule_AddIntConstant(module, "PRINT_DEBUG_MSG", VRS_PRINT_DEBUG_MSG);
 
-	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_DGRAM_SEC_NONE);
-	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_DGRAM_SEC_DTLS);
+	/* Flags used in connect request (verse.Session) */
+	PyModule_AddIntConstant(module, "DGRAM_SEC_NONE", VRS_SEC_DATA_NONE);
+	PyModule_AddIntConstant(module, "DGRAM_SEC_DTLS", VRS_SEC_DATA_TLS);
+	PyModule_AddIntConstant(module, "TP_UDP", VRS_TP_UDP);
+	PyModule_AddIntConstant(module, "TP_TCP", VRS_TP_TCP);
+	PyModule_AddIntConstant(module, "CMD_CMPR_NONE", VRS_CMD_CMPR_NONE);
+	PyModule_AddIntConstant(module, "CMD_CMPR_ADDR_SHARE", VRS_CMD_CMPR_ADDR_SHARE);
 
+	/* Error constant used, when connection with server is closed */
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_UNKNOWN", VRS_CONN_TERM_HOST_UNKNOWN);
 	PyModule_AddIntConstant(module, "CONN_TERM_HOST_DOWN", VRS_CONN_TERM_HOST_DOWN);
 	PyModule_AddIntConstant(module, "CONN_TERM_SERVER_DOWN", VRS_CONN_TERM_SERVER_DOWN);
@@ -2382,11 +2527,14 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "CONN_TERM_CLIENT", VRS_CONN_TERM_CLIENT);
 	PyModule_AddIntConstant(module, "CONN_TERM_SERVER", VRS_CONN_TERM_SERVER);
 
+	/* Default priority of nodes */
 	PyModule_AddIntConstant(module, "DEFAULT_PRIORITY",	VRS_DEFAULT_PRIORITY);
 
+	/* Supported authentication types */
 	PyModule_AddIntConstant(module, "UA_METHOD_NONE", VRS_UA_METHOD_NONE);
 	PyModule_AddIntConstant(module, "UA_METHOD_PASSWORD", VRS_UA_METHOD_PASSWORD);
 
+	/* Types of values used in tags and layers */
 	PyModule_AddIntConstant(module, "VALUE_TYPE_UINT8", VRS_VALUE_TYPE_UINT8);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_UINT16", VRS_VALUE_TYPE_UINT16);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_UINT32", VRS_VALUE_TYPE_UINT32);
@@ -2396,19 +2544,50 @@ PyMODINIT_FUNC PyInit_verse(void)
 	PyModule_AddIntConstant(module, "VALUE_TYPE_REAL64", VRS_VALUE_TYPE_REAL64);
 	PyModule_AddIntConstant(module, "VALUE_TYPE_STRING8", VRS_VALUE_TYPE_STRING8);
 
+	/* Access permission flags */
+	PyModule_AddIntConstant(module, "PERM_NODE_READ", VRS_PERM_NODE_READ);
+	PyModule_AddIntConstant(module, "PERM_NODE_WRITE", VRS_PERM_NODE_WRITE);
+
+	/* ID od special nodes */
+	PyModule_AddIntConstant(module, "ROOT_NODE_ID", VRS_ROOT_NODE_ID);
+	PyModule_AddIntConstant(module, "AVATAR_PARENT_NODE_ID", VRS_AVATAR_PARENT_NODE_ID);
+	PyModule_AddIntConstant(module, "USERS_PARENT_NODE_ID", VRS_USERS_PARENT_NODE_ID);
+	PyModule_AddIntConstant(module, "SCENE_PARENT_NODE_ID", VRS_SCENE_PARENT_NODE_ID);
+
+	/* Node custom_types of specila nodes */
+	PyModule_AddIntConstant(module, "ROOT_NODE_CT", VRS_ROOT_NODE_CT);
+	PyModule_AddIntConstant(module, "AVATAR_PARENT_NODE_CT", VRS_AVATAR_PARENT_NODE_CT);
+	PyModule_AddIntConstant(module, "USERS_PARENT_NODE_CT", VRS_USERS_PARENT_NODE_CT);
+	PyModule_AddIntConstant(module, "SCENE_PARENT_NODE_CT", VRS_SCENE_PARENT_NODE_CT);
+	PyModule_AddIntConstant(module, "AVATAR_NODE_CT", VRS_AVATAR_NODE_CT);
+	PyModule_AddIntConstant(module, "AVATAR_INFO_NODE_CT", VRS_AVATAR_INFO_NODE_CT);
+	PyModule_AddIntConstant(module, "USER_NODE_CT", VRS_USER_NODE_CT);
+
+	/* User ID os special users */
+	PyModule_AddIntConstant(module, "SUPER_USER_UID", VRS_SUPER_USER_UID);
+	PyModule_AddIntConstant(module, "OTHER_USERS_UID", VRS_OTHER_USERS_UID);
+
+#if PY_MAJOR_VERSION >= 3
 	return module;
+#endif
 }
 
 /* Main function of verse module */
 int main(int argc, char *argv[])
 {
+#if PY_MAJOR_VERSION >= 3
 	PyImport_AppendInittab("verse", PyInit_verse);
+#else
+	PyImport_AppendInittab("verse", initverse);
+#endif
 
-	if(argc==0) {
-		Py_SetProgramName((wchar_t*)argv[0]);
-	} else {
-		Py_SetProgramName((wchar_t*)argv[0]);
-	}
+	(void)argc;
+
+#if PY_MAJOR_VERSION >= 3
+	Py_SetProgramName((wchar_t*)argv[0]);
+#else
+	Py_SetProgramName(argv[0]);
+#endif
 
 	Py_Initialize();
 

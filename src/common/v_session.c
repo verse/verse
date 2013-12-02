@@ -1,5 +1,4 @@
 /*
- * $Id: v_session.c 1128 2012-03-16 12:24:02Z jiri $
  * 
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -52,12 +51,19 @@ void v_init_session(struct VSession *vsession)
 	vsession->conv.appdata_ptr = NULL;
 	vsession->conv.conv = NULL;
 #endif
+	vsession->usr_auth_att = 0;
 	vsession->in_queue = NULL;
 	vsession->out_queue = NULL;
 	vsession->host_url = NULL;
 	vsession->peer_cookie.str = NULL;
 	vsession->host_cookie.str = NULL;
 	vsession->avatar_id = -1;
+	vsession->flags = 0;
+	vsession->fps_host = DEFAULT_FPS;	/* Default value */
+	vsession->fps_peer = DEFAULT_FPS;	/* Default value */
+	vsession->tmp_flags = 0;
+	vsession->client_name = NULL;
+	vsession->client_version = NULL;
 }
 
 void v_destroy_session(struct VSession *vsession)
@@ -104,5 +110,13 @@ void v_destroy_session(struct VSession *vsession)
 	if(vsession->host_cookie.str != NULL) {
 		free(vsession->host_cookie.str);
 		vsession->host_cookie.str = NULL;
+	}
+	if(vsession->client_name != NULL) {
+		free(vsession->client_name);
+		vsession->client_name = NULL;
+	}
+	if(vsession->client_version != NULL) {
+		free(vsession->client_version);
+		vsession->client_version = NULL;
 	}
 }

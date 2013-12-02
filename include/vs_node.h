@@ -1,5 +1,4 @@
 /*
- * $Id: vs_node.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -80,20 +79,19 @@ typedef struct VSNode {
 	uint8					state;			/* Node state */
 } VSNode;
 
-/* Avatar staff */
-int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
-		struct VSession *session);
-int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
-		struct VSession *session);
-long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx, uint16 user_id);
+struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
+		struct VSNode *parent_node,
+		struct VSUser *owner,
+		uint32 node_id,
+		uint16 custom_type);
+
+void vs_node_init(struct VSNode *node);
 
 struct VSNode *vs_node_find(struct VS_CTX *vs_ctx, uint32 node_id);
 
 int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node,
 		struct VSNode *avatar_node);
-
-int vs_nodes_init(struct VS_CTX *vs_ctx);
 
 int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,

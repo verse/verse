@@ -1,5 +1,4 @@
 /*
- * $Id: v_history.c 1288 2012-08-05 20:34:43Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -105,9 +104,11 @@ void v_packet_history_destroy(struct VPacket_History *history)
 	v_list_free(&history->packets);
 
 	/* Free commands in hashed linked lists */
-	for(cmd_id=0; cmd_id<=MAX_CMD_ID; cmd_id++) {
+	for(cmd_id=0; cmd_id <= MAX_CMD_ID; cmd_id++) {
 		if(history->cmd_hist[cmd_id] != NULL) {
 			v_cmd_queue_destroy(history->cmd_hist[cmd_id]);
+			free(history->cmd_hist[cmd_id]);
+			history->cmd_hist[cmd_id] = NULL;
 		}
 	}
 }
@@ -323,6 +324,9 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 				/* Bucket has to include some data */
 				assert(sent_cmd->vbucket->data!=NULL);
 
+				/* Decrease total size of commands that were sent and wasn't acknowladged yet*/
+				dgram_conn->sent_size -= v_cmd_size(cmd);
+
 				/* Put fake command for create/destroy commands at verse server */
 				if(vs_ctx != NULL) {
 					struct VSession *vsession = CTX_current_session(C);
@@ -406,7 +410,7 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 	/* When pure ack packet caused adding some fake commands to the queue, then
 	 * poke server data thread */
 	if( (vs_ctx != NULL) && (is_fake_cmd_received == 1) && (r_packet->data == NULL)) {
-		sem_post(&vs_ctx->data.sem);
+		sem_post(vs_ctx->data.sem);
 	}
 
 	return ret;
@@ -594,14 +598,26 @@ int v_ack_nak_history_add_cmd(struct AckNakHistory *history, struct Ack_Nak_Cmd 
 /* Initialize history of ACK and NAK commands */
 int v_ack_nak_history_init(struct AckNakHistory *history)
 {
-	if( (history->cmds = (struct Ack_Nak_Cmd*)malloc(sizeof(struct Ack_Nak_Cmd)*INIT_ACK_NAK_HISTORY_SIZE)) == NULL) {
-		history->count = 0;
-		history->len = 0;
-		return 0;
-	} else {
-		history->count = 0;
-		history->len = INIT_ACK_NAK_HISTORY_SIZE;
+	if(history->cmds == NULL) {
+		if( (history->cmds = (struct Ack_Nak_Cmd*)malloc(sizeof(struct Ack_Nak_Cmd)*INIT_ACK_NAK_HISTORY_SIZE)) != NULL) {
+			history->count = 0;
+			history->len = INIT_ACK_NAK_HISTORY_SIZE;
+		} else {
+			history->count = 0;
+			history->len = 0;
+			return 0;
+		}
 	}
 	return 1;
 }
 
+/* Free allocated space for history of ack nak commands */
+void v_ack_nak_history_clear(struct AckNakHistory *history)
+{
+	if(history->cmds != NULL) {
+		free(history->cmds);
+		history->cmds = NULL;
+		history->count = 0;
+		history->len = 0;
+	}
+}

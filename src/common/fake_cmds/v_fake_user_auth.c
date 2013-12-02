@@ -1,5 +1,4 @@
 /*
- * $Id$
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -85,7 +84,7 @@ void v_fake_user_auth_print(const unsigned char level, struct User_Authenticate_
 /**
  * \brief This function initialize members of structure for User_Authenticate command
  */
-void v_User_Authenticate_init(struct User_Authenticate_Cmd *user_auth,
+void v_user_auth_init(struct User_Authenticate_Cmd *user_auth,
 		const char *username,
 		uint8 auth_meth_count,
 		uint8 *methods,
@@ -126,21 +125,21 @@ void v_User_Authenticate_init(struct User_Authenticate_Cmd *user_auth,
 /**
  * \brief this function creates new structure of User_Authenticate command
  */
-struct User_Authenticate_Cmd *v_User_Authenticate_create(const char *username,
+struct User_Authenticate_Cmd *v_user_auth_create(const char *username,
 		uint8 auth_meth_count,
 		uint8 *methods,
 		const char *data)
 {
     struct User_Authenticate_Cmd *user_auth = NULL;
     user_auth = (struct User_Authenticate_Cmd*)calloc(1, sizeof(struct User_Authenticate_Cmd));
-    v_User_Authenticate_init(user_auth, username, auth_meth_count, methods, data);
+    v_user_auth_init(user_auth, username, auth_meth_count, methods, data);
     return user_auth;
 }
 
 /**
  * \brief This function clear members of structure for User_Authenticate command
  */
-void v_User_Authenticate_clear(struct User_Authenticate_Cmd *user_auth)
+void v_user_auth_clear(struct User_Authenticate_Cmd *user_auth)
 {
     if(user_auth != NULL) {
     	if(user_auth->username != NULL) {
@@ -165,10 +164,10 @@ void v_User_Authenticate_clear(struct User_Authenticate_Cmd *user_auth)
 /**
  * \brief This function destroy User_Authenticate command
  */
-void v_User_Authenticate_destroy(struct User_Authenticate_Cmd **user_auth)
+void v_user_auth_destroy(struct User_Authenticate_Cmd **user_auth)
 {
 	if(user_auth != NULL) {
-		v_User_Authenticate_clear(*user_auth);
+		v_user_auth_clear(*user_auth);
 		free(*user_auth);
 		*user_auth = NULL;
 	}

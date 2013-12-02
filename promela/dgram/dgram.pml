@@ -1,5 +1,4 @@
 /**
- * $Id: dgram.pml 734 2011-01-13 14:28:56Z jiri $
  *
  * This PROMELA program simulates and helps to verify the datagrame
  * connection of Verse protocol.

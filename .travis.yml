@@ -1,9 +1,20 @@
-before_script:
-  - echo "yes" | sudo add-apt-repository ppa:markhannon/ppa
-  - sudo apt-get update
-  - sudo apt-get install iniparser
+branches:
+  only:
+    - master
+before_install:
+  - sudo apt-get install -qq check
+  - sudo pip install cpp-coveralls --use-mirrors
 language: c
 compiler:
   - gcc
   - clang
-script: mkdir build && cd build && cmake ../ && make && make install
+before_script:
+  - mkdir build
+  - cd build
+  - cmake ../ -DCMAKE_BUILD_TYPE=Debug
+script:
+  - make
+after_script:
+  - make test
+  - cd ../
+  - if [ ${CC} = "gcc" ]; then coveralls --build-root "./build" --repo_token bo22n7hMuiuN2gDuqVwCNkwHMAPhBk9pe --exclude python --exclude stub --exclude doc --exclude unittest; fi

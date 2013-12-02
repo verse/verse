@@ -1,5 +1,4 @@
 /*
- * $Id: v_out_queue.c 1360 2012-10-18 20:25:04Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -454,14 +453,18 @@ struct Generic_Cmd *v_out_queue_pop(struct VOutQueue *out_queue,
 				 * maximum. */
 				if(*len != 0) {
 					if(*len < *queue_cmd->len) {
-						*count = v_cmd_count(cmd, *len, *queue_cmd->share);
-						/* FIXME: compute length and count correctly, when command is added to the queue */
-						*count = ((*count) > (*queue_cmd->counter)) ? *queue_cmd->counter : *count;
-						/* Is enough space in buffer to unpack this command? */
-						if(*count==0) {
+						if (count != NULL) {
+							*count = v_cmd_count(cmd, *len, *queue_cmd->share);
+							/* FIXME: compute length and count correctly, when command is added to the queue */
+							*count = ((*count) > (*queue_cmd->counter)) ? *queue_cmd->counter : *count;
+							/* Is enough space in buffer to unpack this command? */
+							if(*count == 0) {
+								can_pop_cmd = 0;
+							}
+							*len = v_cmds_len(cmd, *count, *queue_cmd->share, 0);
+						} else {
 							can_pop_cmd = 0;
 						}
-						*len = v_cmds_len(cmd, *count, *queue_cmd->share, 0);
 					} else {
 						*len = *queue_cmd->len;
 					}
@@ -558,7 +561,7 @@ struct Generic_Cmd *v_out_queue_pop(struct VOutQueue *out_queue,
 /**
  * \brief This function initialize queue for outgoing commands
  */
-int v_out_queue_init(struct VOutQueue *out_queue)
+int v_out_queue_init(struct VOutQueue *out_queue, int max_size)
 {
 	int id, prio, res;
 	real32 r_prio;
@@ -572,6 +575,8 @@ int v_out_queue_init(struct VOutQueue *out_queue)
 
 	out_queue->count = 0;
 	out_queue->size = 0;
+
+	out_queue->max_size = max_size;
 
 	out_queue->max_prio = VRS_DEFAULT_PRIORITY;
 	out_queue->min_prio = VRS_DEFAULT_PRIORITY;
@@ -609,7 +614,7 @@ struct VOutQueue *v_out_queue_create(void)
 	struct VOutQueue *out_queue = (struct VOutQueue *)malloc(sizeof(struct VOutQueue));
 
 	if(out_queue!=NULL) {
-		if( v_out_queue_init(out_queue) != 1) {
+		if( v_out_queue_init(out_queue, OUT_QUEUE_DEFAULT_MAX_SIZE) != 1) {
 			free(out_queue);
 			out_queue = NULL;
 		}

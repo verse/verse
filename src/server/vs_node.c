@@ -1,5 +1,4 @@
 /*
- * $Id: vs_node.c 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -23,6 +22,8 @@
  *
  */
 
+#include <assert.h>
+
 #include "verse_types.h"
 
 #include "v_list.h"
@@ -31,12 +32,14 @@
 
 #include "vs_main.h"
 #include "vs_node.h"
+#include "vs_sys_nodes.h"
 #include "vs_node_access.h"
 #include "vs_link.h"
 #include "vs_entity.h"
 #include "vs_taggroup.h"
 #include "vs_tag.h"
 #include "vs_layer.h"
+
 #include "v_fake_commands.h"
 
 static int vs_node_send_destroy(struct VSNode *node);
@@ -55,7 +58,7 @@ static int vs_node_prio(struct VSession *vsession,
 	/* Is client subscribed to this node? */
 	node_subscriber = node->node_subs.first;
 	while(node_subscriber != NULL) {
-		if(node_subscriber->session == vsession) {
+		if(node_subscriber->session->session_id == vsession->session_id) {
 			break;
 		}
 		node_subscriber = node_subscriber->next;
@@ -88,11 +91,13 @@ static int vs_node_unsubscribe(struct VSNode *node,
 {
 	struct VSNode *child_node;
 	struct VSLink *link;
-	struct VBucket *tg_bucket;
+	struct VBucket *tg_bucket, *layer_bucket;
 	struct VSTagGroup *tg;
-	struct VSNodeSubscriber *_node_subscriber;
+	struct VSLayer *layer;
+	struct VSNodeSubscriber *_node_subscriber, *_next_node_subscriber;
 	struct VSEntityFollower *node_follower;
 	struct VSEntityFollower	*taggroup_follower;
+	struct VSEntityFollower	*layer_follower;
 
 	/* Unsubscribe from all child nodes */
 	link = node->children_links.first;
@@ -101,12 +106,13 @@ static int vs_node_unsubscribe(struct VSNode *node,
 
 		_node_subscriber = child_node->node_subs.first;
 		while(_node_subscriber != NULL) {
-			if(_node_subscriber->session == node_subscriber->session) {
+			_next_node_subscriber = _node_subscriber->next;
+			if(_node_subscriber->session->session_id == node_subscriber->session->session_id) {
 				/* Unsubscribe from child node */
 				vs_node_unsubscribe(child_node, _node_subscriber, level+1);
 				break;
 			}
-			_node_subscriber = _node_subscriber->next;
+			_node_subscriber = _next_node_subscriber;
 		}
 
 		link = link->next;
@@ -122,7 +128,7 @@ static int vs_node_unsubscribe(struct VSNode *node,
 
 		/* Remove client from the list of TagGroup followers */
 		taggroup_follower = tg->tg_folls.first;
-		while(taggroup_follower!=NULL) {
+		while(taggroup_follower != NULL) {
 			if(taggroup_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
 				v_list_free_item(&tg->tg_folls, taggroup_follower);
 				break;
@@ -133,15 +139,34 @@ static int vs_node_unsubscribe(struct VSNode *node,
 		tg_bucket = tg_bucket->next;
 	}
 
-	/* TODO: Unsubscribe from all layers */
+	/* Unsubscribe client from all layers */
+	layer_bucket = node->layers.lb.first;
+	while(layer_bucket != NULL) {
+		layer = (struct VSLayer*)layer_bucket->data;
+
+		/* Remove client from the list of Layer subscribers */
+		vs_layer_unsubscribe(layer, node_subscriber->session);
+
+		/* Remove client from the list of Layer followers */
+		layer_follower = layer->layer_folls.first;
+		while(layer_follower != NULL) {
+			if(layer_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
+				v_list_free_item(&layer->layer_folls, layer_follower);
+				break;
+			}
+			layer_follower = layer_follower->next;
+		}
+		layer_bucket = layer_bucket->next;
+	}
 
 	if(level > 0) {
 		/* Remove this session from list of followers too */
 		node_follower = node->node_folls.first;
 		while(node_follower != NULL) {
-			if(node_follower->node_sub->session == node_subscriber->session) {
+			if(node_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
 				/* Remove client from list of clients, that knows about this node */
-				printf("\t>>>Removing session: %d from list of node: %d followers<<<\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Removing session: %d from the list of node: %d followers\n",
 						node_subscriber->session->session_id, node->id);
 				v_list_free_item(&node->node_folls, node_follower);
 				break;
@@ -150,8 +175,6 @@ static int vs_node_unsubscribe(struct VSNode *node,
 		}
 	}
 
-	printf(">>>Removing session: %d from list of node: %d subscribers<<<\n",
-			node_subscriber->session->session_id, node->id);
 	/* Finally remove this session from list of node subscribers */
 	v_list_free_item(&node->node_subs, node_subscriber);
 
@@ -186,9 +209,10 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	v_list_add_tail(&node->node_subs, node_subscriber);
 
 	/* TODO: send node_subscribe with version and commands with difference
-	 * between this version and current state, when versioning will be supported */
+	 * between this version and current state, when versing will be supported */
 	if(version != 0) {
-		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versioning is not supported yet\n", version);
+		v_print_log(VRS_PRINT_WARNING,
+				"Version: %d != 0, versing is not supported yet\n", version);
 	}
 
 	/* Send node_perm commands to the new subscriber */
@@ -207,7 +231,9 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	 * only node_perm command explaining, why user can't rest of this
 	 * node */
 	if(user_can_read == 0) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Insufficient permission to read content of the node: %d\n", node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Insufficient permission to read content of the node: %d\n",
+				node->id);
 		return 0;
 	}
 
@@ -256,18 +282,20 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 
 	/* Check if this node is in created/creating state */
 	if(!(node->state == ENTITY_CREATING || node->state == ENTITY_CREATED)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "This node: %d is in %d state\n", node->id, node->state);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"This node: %d is in %d state\n", node->id, node->state);
 		return 0;
 	}
 
 	/* Check if this command, has not been already sent */
 	node_follower = node->node_folls.first;
-	while(node_follower!=NULL) {
+	while(node_follower != NULL) {
 		if(node_follower->node_sub->session->session_id == node_subscriber->session->session_id &&
-				(node_follower->state==ENTITY_CREATING ||
-				 node_follower->state==ENTITY_CREATED))
+				(node_follower->state == ENTITY_CREATING ||
+				 node_follower->state == ENTITY_CREATED))
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Client already knows about node: %d\n", node->id);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Client already knows about node: %d\n", node->id);
 			return 0;
 		}
 		node_follower = node_follower->next;
@@ -324,11 +352,8 @@ struct VSNode *vs_node_find(struct VS_CTX *vs_ctx, uint32 node_id)
 /**
  * \brief This function initialize structure intended for storing node at server.
  */
-static void vs_node_init(struct VSNode *node)
+void vs_node_init(struct VSNode *node)
 {
-	struct VSTagGroup tg;
-	struct VSLayer layer;
-
 	node->id = 0xFFFFFFFF;
 	node->type = 0;
 
@@ -343,14 +368,14 @@ static void vs_node_init(struct VSNode *node)
 	/* Hashed linked list of TagGroups */
 	v_hash_array_init(&node->tag_groups,
 			HASH_MOD_256,
-			(char*)&tg.id - (char*)&tg,
+			offsetof(VSTagGroup, id),
 			sizeof(uint16));
 	node->last_tg_id = 0;
 
 	/* Hashed linked list of layers */
 	v_hash_array_init(&node->layers,
 			HASH_MOD_256,
-			(char*)&layer.id - (char*)&layer,
+			offsetof(VSLayer, id),
 			sizeof(uint16));
 	node->last_layer_id = 0;
 
@@ -364,6 +389,88 @@ static void vs_node_init(struct VSNode *node)
 
 	node->state = ENTITY_RESERVED;
 
+}
+
+/**
+ * \brief This function creates new VSNode at Verse server
+ */
+struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
+		struct VSNode *parent_node,
+		struct VSUser *owner,
+		uint32 node_id,
+		uint16 custom_type)
+{
+	struct VSNode *node;
+	struct VSLink *link;
+	struct VBucket *bucket;
+
+	if(! (v_hash_array_count_items(&vs_ctx->data.nodes) < VRS_MAX_COMMON_NODE_COUNT) ) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"max number: %d of nodes reached\n",
+				VRS_MAX_COMMON_NODE_COUNT);
+		return NULL;
+	}
+
+	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
+	if(node == NULL) {
+		v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+		return NULL;
+	}
+
+	vs_node_init(node);
+
+	if(node_id == VRS_RESERVED_NODE_ID) {
+		/* Try to find first free node_id. It is fast and easy, When
+		 * VRS_LAST_COMMON_NODE_ID did not reach 0xFFFFFFFF-1 value yet and not used
+		 * node_id are not reused.*/
+		node->id = vs_ctx->data.last_common_node_id + 1;
+		while( v_hash_array_find_item(&vs_ctx->data.nodes, &node) != NULL) {
+			node->id++;
+			/* Node id 0xFFFFFFFF has special purpose and node IDs in range <0, 65535>
+			 * have special purposes too (skip them) */
+			if(node->id > VRS_LAST_COMMON_NODE_ID)
+				node->id = VRS_FIRST_COMMON_NODE_ID;
+			/* TODO: implement faster finding of free node id */
+		}
+		vs_ctx->data.last_common_node_id = node->id;
+	} else {
+		node->id = node_id;
+	}
+
+	/* Create link to the parent node */
+	if(parent_node != NULL) {
+		link = vs_link_create(parent_node, node);
+		if(link == NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"link between nodes %d %d could not be created\n",
+					parent_node->id, node->id);
+			free(node);
+			return NULL;
+		}
+	} else {
+		/* This can happen only for root node */
+		assert(node_id == VRS_ROOT_NODE_ID);
+		node->parent_link = NULL;
+		node->level = 0;
+	}
+
+	/* Add node to the hashed array of all verse nodes */
+	bucket = v_hash_array_add_item(&vs_ctx->data.nodes, node, sizeof(struct VSNode));
+	if(bucket == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"node %d could not be added to the hashed list of nodes\n",
+				node->id);
+		if(node->parent_link != NULL) {
+			v_list_free_item(&parent_node->children_links, node->parent_link);
+		}
+		free(node);
+		return NULL;
+	}
+
+	node->owner = owner;
+	node->type = custom_type;
+
+	return node;
 }
 
 /**
@@ -393,11 +500,13 @@ static int vs_node_destroy(struct VS_CTX *vs_ctx, struct VSNode *node)
 			if(node->tag_groups.lb.first != NULL) {
 				vs_node_taggroups_destroy(node);
 			}
+			v_hash_array_destroy(&node->tag_groups);
 
 			/* Remove all layers */
 			if(node->layers.lb.first != NULL) {
 				vs_node_layers_destroy(node);
 			}
+			v_hash_array_destroy(&node->layers);
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Node: %d destroyed\n", node->id);
 
@@ -408,163 +517,20 @@ static int vs_node_destroy(struct VS_CTX *vs_ctx, struct VSNode *node)
 			return 1;
 		} else {
 			/* This should never happen */
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): node (id: %d) with child nodes can't be destroyed\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s(): node (id: %d) with child nodes can't be destroyed\n",
 					__FUNCTION__, node->id);
 			return 0;
 		}
 	} else {
 		/* This should never happen */
-		v_print_log(VRS_PRINT_WARNING, "%(): node (id: %d) with followers can't be destroyed\n",
+		v_print_log(VRS_PRINT_WARNING,
+				"%(): node (id: %d) with followers can't be destroyed\n",
 				__FUNCTION__, node->id);
 		return 0;
 	}
 }
 
-/**
- * \brief This function "unsubscribe" avatar from all nodes (node subscription
- * and node data subscription). It removes avatar from all lists of followers.
- * It also remove all node locks.
- */
-int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
-		struct VSession *session)
-{
-	struct VBucket *node_bucket, *tg_bucket, *tag_bucket, *layer_bucket;
-	struct VSNode *node;
-	struct VSTagGroup *tg;
-	struct VSTag *tag;
-	struct VSLayer *layer;
-	struct VSNodeSubscriber *node_subscriber;
-	struct VSEntitySubscriber *tg_subscriber, *layer_subscriber;
-	struct VSEntityFollower *node_follower, *tg_follower, *tag_follower, *layer_follower;
-	int was_locked;
-
-	/* TODO: It is necessary to go through all nodes now. :-/
-	 * Do this more efficient; e.g.: every session could have list of
-	 * subscribed nodes. */
-	node_bucket = vs_ctx->data.nodes.lb.first;
-	while(node_bucket != NULL) {
-		node = (struct VSNode*)node_bucket->data;
-		was_locked = 0;
-
-		/* Does client know about this node */
-		node_follower = node->node_folls.first;
-		while(node_follower != NULL) {
-			if(node_follower->node_sub->session->session_id == session->session_id) {
-				/* Remove client from list of clients, that knows about this node */
-				v_list_free_item(&node->node_folls, node_follower);
-
-				/* Continue with next node */
-				break;
-
-			}
-			node_follower = node_follower->next;
-		}
-
-		/* Was node locked by this client? */
-		if(node->lock.session == session) {
-			was_locked = 1;
-			node->lock.session = NULL;
-		}
-
-		/* Is client subscribed to this node? */
-		node_subscriber = node->node_subs.first;
-		while(node_subscriber != NULL) {
-			if(node_subscriber->session->session_id == session->session_id) {
-				v_list_free_item(&node->node_subs, node_subscriber);
-				if(was_locked == 0) {
-					/* No need to go through other subscribers */
-					break;
-				}
-			} else {
-				if(was_locked == 1) {
-					vs_node_send_unlock(node_subscriber, session, node);
-				}
-			}
-			node_subscriber = node_subscriber->next;
-		}
-
-		/* Remove client from list of tag_group subscribers */
-		tg_bucket = node->tag_groups.lb.first;
-		while(tg_bucket != NULL) {
-			tg = (struct VSTagGroup*)tg_bucket->data;
-			tg_follower = tg->tg_folls.first;
-			while(tg_follower != NULL) {
-				if(tg_follower->node_sub->session->session_id == session->session_id) {
-					/* Remove client from list of clients, that knows about this node */
-					v_list_free_item(&tg->tg_folls, tg_follower);
-
-					/* When client knows to this tag_group, then it's possibly
-					 * subscribed to this tag_group */
-					tg_subscriber = tg->tg_subs.first;
-					while(tg_subscriber != NULL) {
-						if(tg_subscriber->node_sub->session->session_id == session->session_id) {
-							/* Remove client from list of clients, that are subscribed to this tag_group */
-							v_list_free_item(&tg->tg_subs, tg_subscriber);
-							/* No need to go through other tag_groups */
-							break;
-						}
-						tg_subscriber = tg_subscriber->next;
-					}
-					/* Continue with next tag_group */
-					break;
-				}
-				tg_follower = tg_follower->next;
-			}
-
-			/* Go through all Tags and remove client from list of tag followers */
-			tag_bucket = tg->tags.lb.first;
-			while(tag_bucket != NULL) {
-				tag = (struct VSTag*)tag_bucket->data;
-
-				tag_follower = tag->tag_folls.first;
-				while(tag_follower != NULL) {
-					if(tag_follower->node_sub->session->session_id == session->session_id) {
-						v_list_free_item(&tag->tag_folls, tag_follower);
-						break;
-					}
-					tag_follower = tag_follower->next;
-				}
-				tag_bucket = tag_bucket->next;
-			}
-
-			tg_bucket = tg_bucket->next;
-		}
-
-		/* Remove client from layer followers and subscribers,
-		 * when layers will be implemented */
-		layer_bucket = node->layers.lb.first;
-		while(layer_bucket != NULL) {
-			layer = (struct VSLayer*)layer_bucket->data;
-
-			/* Remove client from layer follower */
-			layer_follower = layer->layer_folls.first;
-			while(layer_follower != NULL) {
-				if(layer_follower->node_sub->session->session_id == session->session_id) {
-					v_list_free_item(&layer->layer_folls, layer_follower);
-					break;
-				}
-				layer_follower = layer_follower->next;
-			}
-
-			/* Remove client from layer subscriber */
-			layer_subscriber = layer->layer_subs.first;
-			while(layer_subscriber != NULL) {
-				if(layer_subscriber->node_sub->session->session_id == session->session_id) {
-					v_list_free_item(&layer->layer_subs, layer_subscriber);
-					break;
-				}
-				layer_subscriber = layer_subscriber->next;
-			}
-
-			layer_bucket = layer_bucket->next;
-		}
-
-
-		node_bucket = node_bucket->next;
-	}
-
-	return 1;
-}
 
 /**
  * \brief This function destroy branch of nodes
@@ -588,11 +554,9 @@ int vs_node_destroy_branch(struct VS_CTX *vs_ctx,
 		link = next_link;
 	}
 
-	v_list_free(&node->children_links);
-
 	node_follower = node->node_folls.first;
 	if(node_follower != NULL && send == 1) {
-		/* Send node_destroy command to all subscribers of this node */
+		/* Send node_destroy command to all clients that knows about this node */
 		ret = vs_node_send_destroy(node);
 
 		/* Own node will be destroyed, when verse server receive confirmation
@@ -604,144 +568,6 @@ int vs_node_destroy_branch(struct VS_CTX *vs_ctx,
 	}
 
 	return ret;
-}
-
-/**
- * \brief This function sends Node_Destroy command of avatar node and all its
- * child nodes. Own avatar node could be removed from server, when there is
- * no subscriber to this node or verse server has received confirmation of
- * receiving node_destroy command from all subscribers.
- */
-int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
-		struct VSession *session)
-{
-	struct VSNode *avatar_node;
-
-	avatar_node = vs_node_find(vs_ctx, session->avatar_id);
-	if(avatar_node != NULL) {
-		return vs_node_destroy_branch(vs_ctx, avatar_node, 1);
-	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): avatar node (id: %d) not found\n",
-				__FUNCTION__, session->avatar_id);
-	}
-	session->avatar_id = -1;
-
-	return 0;
-}
-
-/**
- * \brief This function creates new node representing avatar.
- */
-long int vs_node_new_avatar_node(struct VS_CTX *vs_ctx, uint16 user_id)
-{
-	struct VSNode *avatar_parent, *node;
-	struct VSUser *super_user, *other_users, *user;
-	struct VSLink *link;
-	struct VBucket *bucket;
-	long int avatar_id = -1;
-	uint32 count;
-
-	if((count = v_hash_array_count_items(&vs_ctx->data.nodes)) > VRS_MAX_COMMON_NODE_COUNT) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Limit of nodes reached: %d\n", VRS_MAX_COMMON_NODE_COUNT);
-		goto end;
-	}
-
-	/* Trie to find parent of avatar nodes */
-	if((avatar_parent = vs_ctx->data.avatar_node) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Parent of node avatars: %d does not exist\n", VRS_AVATAR_PARENT_NODE_ID);
-		goto end;
-	}
-
-	/* Try to find fake user for super user */
-	if((super_user = vs_user_find(vs_ctx, VRS_SUPER_USER_UID)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "super_user: %d not found\n", VRS_SUPER_USER_UID);
-		goto end;
-	}
-
-	/* Try to find fake user for other users */
-	if((other_users = vs_user_find(vs_ctx, VRS_OTHER_USERS_UID)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "other_users: %d not found\n", VRS_SUPER_USER_UID);
-		goto end;
-	}
-
-	/* Try to find user connected with this avatar */
-	if((user = vs_user_find(vs_ctx, user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "User with this ID: %d not found\n", user_id);
-		goto end;
-	}
-
-	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-	vs_node_init(node);
-
-	/* Try to find first free node_id. It is fast and easy, When
-	 * VRS_LAST_COMMON_NODE_ID did not reach 0xFFFFFFFF-1 value yet and not used
-	 * node_id are not reused.
-	 * TODO: implement faster finding of free node id */
-	node->id = vs_ctx->data.last_common_node_id + 1;
-	while( v_hash_array_find_item(&vs_ctx->data.nodes, &node) != NULL) {
-		node->id++;
-		/* Node id 0xFFFFFFFF has special purpose and node IDs in range <0, 65535>
-		 * have special purposes too (skip them) */
-		if(node->id > VRS_LAST_COMMON_NODE_ID)
-			node->id = VRS_FIRST_COMMON_NODE_ID;
-	}
-	vs_ctx->data.last_common_node_id = node->id;
-
-	link = vs_link_create(avatar_parent, node);
-
-	if(link != NULL) {
-		bucket = v_hash_array_add_item(&vs_ctx->data.nodes, node, sizeof(struct VSNode));
-		if(bucket == NULL) {
-			free(node);
-			node = NULL;
-		} else {
-			struct VSNodePermission *perm;
-			struct VSNodeSubscriber *node_subscriber;
-
-			node->owner = super_user;
-
-			/* Set access permissions for user connected with this avatar */
-			perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-			perm->user = user;
-			perm->permissions = VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE;
-			v_list_add_tail(&node->permissions, perm);
-
-			/* Set access permissions for other users */
-			perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-			perm->user = other_users;
-			perm->permissions = VRS_PERM_NODE_READ;
-			v_list_add_tail(&node->permissions, perm);
-
-			/* Send node_create to all subscribers of parent of avatar nodes */
-			node_subscriber = avatar_parent->node_subs.first;
-
-			if(node_subscriber != NULL) {
-				/* When there is at least one client subscribed, then we have
-				 * to mark this node as 'creating' and wait for confirmation
-				 * of receiving node_create command from all clients */
-				node->state = ENTITY_CREATING;
-			} else {
-				/* When there is no client subscribed, then this node could be
-				 * marked as created directly */
-				node->state = ENTITY_CREATED;
-			}
-
-			/* Send node_create to all subscribers of parent node */
-			while(node_subscriber) {
-				vs_node_send_create(node_subscriber, node, NULL);
-				node_subscriber = node_subscriber->next;
-			}
-
-			avatar_id = node->id;
-		}
-	} else {
-		free(node);
-		node = NULL;
-	}
-end:
-
-	return avatar_id;
 }
 
 /**
@@ -781,11 +607,13 @@ static int vs_node_send_destroy(struct VSNode *node)
 				node_follower->state = ENTITY_DELETING;
 				ret = 1;
 			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "node_destroy (id: %d) wasn't added to the queue\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"node_destroy (id: %d) wasn't added to the queue\n",
 						node->id);
 			}
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Can't delete node %d, because it isn't in CREATED state\n");
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Can't delete node %d, because it isn't in CREATED state\n");
 		}
 		node_follower = node_follower->next;
 	}
@@ -797,460 +625,71 @@ end:
 }
 
 /**
- * \brief This function creates new node at verse server
+ * \brief This function creates new node at verse server, when client sent
+ * node_create command.
  */
 static struct VSNode *vs_node_new(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		const uint16 type)
 {
 	struct VSNode *node = NULL;
+	struct VSNode find_node, *avatar_node;
+	struct VSUser *owner;
+	struct VBucket *bucket;
+	struct VSNodePermission *perm;
+	struct VSNodeSubscriber *node_subscriber;
 
-	if(v_hash_array_count_items(&vs_ctx->data.nodes) < VRS_MAX_COMMON_NODE_COUNT) {
-		struct VSNode find_node, *avatar_node;
-		struct VSLink *link;
-		struct VSUser *owner;
-		struct VBucket *bucket;
-
-		/* Try to find avatar node to be able to create initial link to
-		 * avatar node (initial parent of new created node) */
-		find_node.id = vsession->avatar_id;
-		bucket = v_hash_array_find_item(&vs_ctx->data.nodes, &find_node);
-		if(bucket != NULL) {
-			avatar_node = (struct VSNode*)bucket->data;
-		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->avatar_id: %d not found\n", vsession->avatar_id);
-			goto end;
-		}
-
-		/* Try to find owner of the new node */
-		if((owner = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->user_id: %d not found\n", vsession->user_id);
-			goto end;
-		}
-
-		node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-		vs_node_init(node);
-
-		/* Try to find first free node_id. It is fast and easy, When
-		 * VRS_LAST_COMMON_NODE_ID did not reach 0xFFFFFFFF-1 value yet and not used
-		 * node_id are not reused.
-		 * TODO: implement faster finding of free node id */
-		node->id = vs_ctx->data.last_common_node_id + 1;
-		while( v_hash_array_find_item(&vs_ctx->data.nodes, node) != NULL) {
-			node->id++;
-
-			/* Node id 0xFFFFFFFF has special purpose and node IDs in range <0, 65535>
-			 * have special purposes too (skip them) */
-			if(node->id > VRS_LAST_COMMON_NODE_ID)
-				node->id = VRS_FIRST_COMMON_NODE_ID;
-		}
-		vs_ctx->data.last_common_node_id = node->id;
-
-		node->type = type;
-
-		link = vs_link_create(avatar_node, node);
-
-		if(link != NULL) {
-			bucket = v_hash_array_add_item(&vs_ctx->data.nodes, node, sizeof(struct VSNode));
-			if(bucket == NULL) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "link between nodes %d %d could not be created\n",
-									avatar_node->id, node->id);
-				free(node);
-				node = NULL;
-			} else {
-				struct VSNodePermission *perm;
-				struct VSNodeSubscriber *node_subscriber;
-
-				node->owner = owner;
-
-				/* Set initial state of this node */
-				node->state = ENTITY_CREATING;
-
-				/* Find node representing fake user other_users */
-				if( vs_ctx->other_users != NULL) {
-					/* Set access permissions for other users */
-					perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-					perm->user = vs_ctx->other_users;
-
-					/* TODO: implement default session permissions and use them,
-					 * when are available */
-
-					perm->permissions = vs_ctx->default_perm;
-					v_list_add_tail(&node->permissions, perm);
-				}
-
-				/* Send node_create to all subscribers of avatar node data */
-				node_subscriber = avatar_node->node_subs.first;
-				while(node_subscriber) {
-					vs_node_send_create(node_subscriber, node, avatar_node);
-					node_subscriber = node_subscriber->next;
-				}
-			}
-		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "link between nodes %d %d could not be created\n",
-					avatar_node->id, node->id);
-			free(node);
-			node = NULL;
-		}
-
+	/* Try to find avatar node to be able to create initial link to
+	 * avatar node (initial parent of new created node) */
+	find_node.id = vsession->avatar_id;
+	bucket = v_hash_array_find_item(&vs_ctx->data.nodes, &find_node);
+	if(bucket != NULL) {
+		avatar_node = (struct VSNode*)bucket->data;
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "max number: %d of nodes reached\n", VRS_MAX_COMMON_NODE_COUNT);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"vsession->avatar_id: %d not found\n", vsession->avatar_id);
+		goto end;
 	}
+
+	/* Try to find owner of the new node */
+	if((owner = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"vsession->user_id: %d not found\n", vsession->user_id);
+		goto end;
+	}
+
+	/* Try to create new verse node */
+	if( (node = vs_node_create(vs_ctx, avatar_node, owner, VRS_RESERVED_NODE_ID, type)) == NULL) {
+		goto end;
+	}
+
+	/* Set initial state of this node */
+	node->state = ENTITY_CREATING;
+
+	/* Find node representing fake user other_users */
+	if( vs_ctx->other_users != NULL) {
+		/* Set access permissions for other users */
+		perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
+		perm->user = vs_ctx->other_users;
+
+		/* TODO: implement default session permissions and use them,
+		 * when are available */
+
+		perm->permissions = vs_ctx->default_perm;
+		v_list_add_tail(&node->permissions, perm);
+	}
+
+	/* Send node_create to all subscribers of avatar node data */
+	node_subscriber = avatar_node->node_subs.first;
+	while(node_subscriber) {
+		vs_node_send_create(node_subscriber, node, avatar_node);
+		node_subscriber = node_subscriber->next;
+	}
+
 
 end:
 
 	return node;
-}
-
-/**
- * \brief This function initialize list of all nodes shared at server
- */
-static void vs_node_list_init(struct VS_CTX *vs_ctx)
-{
-	struct VSNode node;
-
-	v_hash_array_init(&vs_ctx->data.nodes,
-			HASH_MOD_65536,
-			(char*)&node.id - (char*)&node,
-			sizeof(uint32));
-}
-
-/**
- * \brief This function create parent node for all scenes
- */
-static struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx)
-{
-	struct VSNodePermission *perm;
-	struct VSUser *user, *super_user;
-	struct VSNode *node = NULL;
-
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
-	/* Create node, that is used as parent of scene nodes */
-	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-	if(node != NULL) {
-		struct VSLink *link;
-
-		vs_node_init(node);
-
-		node->id = VRS_SCENE_PARENT_NODE_ID;
-		node->level = 1;
-		node->owner = super_user;
-		node->parent_link = NULL;
-		node->state = ENTITY_CREATED;
-
-		/* Create link to the root node */
-		link = vs_link_create(vs_ctx->data.root_node, node);
-
-		if(link != NULL) {
-			node->parent_link = link;
-
-			/* Create permission for other users. Other users can only read
-			 * parent of scene nodes. It means, that they can subscribe to
-			 * this node and get list of scenes shared at this server. */
-			perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-			perm->user = vs_ctx->other_users;
-			perm->permissions = VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE;
-			v_list_add_tail(&node->permissions, perm);
-
-			/* Add node to the hashed linked list of nodes */
-			v_hash_array_add_item(&vs_ctx->data.nodes, (void*)node, sizeof(struct VSNode));
-		} else {
-			free(node);
-			node = NULL;
-		}
-	}
-
-	return node;
-}
-
-/**
- * \brief This function creates user node for the user
- */
-static struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
-		struct VSUser *user)
-{
-	struct VSNode *node = NULL;
-	struct VSNodePermission *perm;
-	struct VSUser *tmp_user, *super_user;
-
-	/* Find superuser user */
-	tmp_user = vs_ctx->users.first;
-	while(tmp_user != NULL) {
-		if(tmp_user->user_id == VRS_SUPER_USER_UID) {
-			super_user = tmp_user;
-			break;
-		}
-		tmp_user = tmp_user->next;
-	}
-
-	if(vs_ctx->data.user_node != NULL) {
-		/* Create node, that is used as parent of user nodes */
-		node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-		if(node != NULL) {
-			struct VSLink *link;
-
-			vs_node_init(node);
-
-			node->id = user->user_id;
-			node->level = 2;
-			node->owner = super_user;
-			node->parent_link = NULL;
-			node->state = ENTITY_CREATED;
-
-			/* Create link to the parent of user nodes */
-			link = vs_link_create(vs_ctx->data.user_node, node);
-
-			if(link != NULL) {
-				node->parent_link = link;
-
-				/* Create permission for other users. Other users can only read
-				 * user nodes. It means, that they can subscribe to this node
-				 * and get some basic information about this user. */
-				perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-				perm->user = vs_ctx->other_users;
-				perm->permissions = VRS_PERM_NODE_READ;
-				v_list_add_tail(&node->permissions, perm);
-
-				/* Add node to the hashed linked list of nodes */
-				v_hash_array_add_item(&vs_ctx->data.nodes, (void*)node, sizeof(struct VSNode));
-			} else {
-				free(node);
-				node = NULL;
-			}
-		}
-	}
-
-	return node;
-}
-
-/**
- * \brief This function creates parent node for all user nodes
- */
-static struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
-{
-	struct VSUser *user, *super_user;
-	struct VSNodePermission *perm;
-	struct VSNode *node = NULL;
-
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
-	/* Create node, that is used as parent of user nodes */
-	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-	if(node != NULL) {
-		struct VSLink *link;
-
-		vs_node_init(node);
-
-		node->id = VRS_USERS_PARENT_NODE_ID;
-		node->level = 1;
-		node->owner = super_user;
-		node->parent_link = NULL;
-		node->state = ENTITY_CREATED;
-
-		/* Create link to the root node */
-		link = vs_link_create(vs_ctx->data.root_node, node);
-
-		if(link != NULL) {
-			node->parent_link = link;
-
-			/* Create permission for other users. Other users can only read
-			 * parent of user nodes. It means, that they can subscribe to
-			 * this node and get list of users IDs. */
-			perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-			perm->user = vs_ctx->other_users;
-			perm->permissions = VRS_PERM_NODE_READ;
-			v_list_add_tail(&node->permissions, perm);
-
-			/* Add node to the hashed linked list of nodes */
-			v_hash_array_add_item(&vs_ctx->data.nodes, (void*)node, sizeof(struct VSNode));
-		} else {
-			free(node);
-			node = NULL;
-		}
-	}
-
-	return node;
-}
-
-/**
- * \brief This function create node that is parent of all avatar nodes
- */
-static struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
-{
-	struct VSNodePermission *perm;
-	struct VSUser *user, *super_user;
-	struct VSNode *node = NULL;
-
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
-	/* Create node, that is used as parent of avatar nodes */
-	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-	if(node != NULL) {
-		struct VSLink *link;
-
-		vs_node_init(node);
-
-		node->id = VRS_AVATAR_PARENT_NODE_ID;
-		node->level = 1;
-		node->owner = super_user;
-		node->parent_link = NULL;
-		node->state = ENTITY_CREATED;
-
-		/* Create link to the root node */
-		link = vs_link_create(vs_ctx->data.root_node, node);
-
-		if(link != NULL) {
-			node->parent_link = link;
-
-			/* Create permission for other users. Other users can only read
-			 * parent of avatar nodes. It means, that they can subscribe to
-			 * this node and get list of logged in verse clients. */
-			perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-			perm->user = vs_ctx->other_users;
-			perm->permissions = VRS_PERM_NODE_READ;
-			v_list_add_tail(&node->permissions, perm);
-
-			/* Add node to the hashed linked list of nodes */
-			v_hash_array_add_item(&vs_ctx->data.nodes, (void*)node, sizeof(struct VSNode));
-		} else {
-			free(node);
-			node = NULL;
-		}
-	}
-
-	return node;
-}
-
-/**
- * \brief This function creates root node of node tree
- */
-static struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx)
-{
-	struct VSNodePermission *perm;
-	struct VSUser *user, *super_user;
-	struct VSNode *node = NULL;
-
-	/* Find superuser user */
-	user = vs_ctx->users.first;
-	while(user != NULL) {
-		if(user->user_id == VRS_SUPER_USER_UID) {
-			super_user = user;
-			break;
-		}
-		user = user->next;
-	}
-
-	/* Create root node */
-	node = (struct VSNode*)calloc(1, sizeof(struct VSNode));
-
-	if(node != NULL) {
-		vs_node_init(node);
-
-		node->id = VRS_ROOT_NODE_ID;
-		node->level = 0;
-		node->parent_link = NULL;
-		node->owner = super_user;
-		node->state = ENTITY_CREATED;
-
-		/* Create permission for other users. Other users can only read root node.
-		 * It means, that they can subscribe to this node. */
-		perm = (struct VSNodePermission *)calloc(1, sizeof(struct VSNodePermission));
-		perm->user = vs_ctx->other_users;
-		perm->permissions = VRS_PERM_NODE_READ;
-
-		v_list_add_tail(&node->permissions, perm);
-
-		/* Add node to the hashed linked list of nodes */
-		v_hash_array_add_item(&vs_ctx->data.nodes, (void*)node, sizeof(struct VSNode));
-	}
-
-	return node;
-}
-
-/**
- * \brief This function create basic nodes at verse server.
- *
- * This function creates root node, parent of avarar nodes, parent of user nodes
- * and parent of scene nodes.
- */
-int vs_nodes_init(struct VS_CTX *vs_ctx)
-{
-	struct VSNode *node;
-	struct VSUser *user;
-	int ret = -1;
-
-	vs_node_list_init(vs_ctx);
-
-	vs_ctx->data.last_common_node_id = VRS_FIRST_COMMON_NODE_ID;
-
-	node = vs_create_root_node(vs_ctx);
-	if(node != NULL) {
-		vs_ctx->data.root_node = node;
-
-		node = vs_create_avatar_parent(vs_ctx);
-		if(node != NULL) {
-			vs_ctx->data.avatar_node = node;
-		}
-
-		node = vs_create_user_parent(vs_ctx);
-		if(node != NULL) {
-			vs_ctx->data.user_node = node;
-		}
-
-		node = vs_create_scene_parent(vs_ctx);
-		if(node != NULL) {
-			vs_ctx->data.scene_node = node;
-		}
-	}
-
-	if( vs_ctx->data.root_node != NULL &&
-			vs_ctx->data.avatar_node != NULL &&
-			vs_ctx->data.user_node != NULL &&
-			vs_ctx->data.scene_node != NULL)
-	{
-		ret = 1;
-
-		/* Create user nodes */
-		user = vs_ctx->users.first;
-		while(user != NULL) {
-			vs_create_user_node(vs_ctx, user);
-			user = user->next;
-		}
-	} else {
-		/* TODO: free not NULL nodes */
-	}
-
-	return ret;
 }
 
 /**
@@ -1274,7 +713,8 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -1282,20 +722,21 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 	/* Is client subscribed to this node? */
 	node_subscriber = node->node_subs.first;
 	while(node_subscriber != NULL) {
-		if(node_subscriber->session == vsession) {
+		if(node_subscriber->session->session_id == vsession->session_id) {
 			break;
 		}
 		node_subscriber = node_subscriber->next;
 	}
 
 	/* When client is subscribed to this node, then change node priority */
-	if(node_subscriber!= NULL) {
-		/* TODO: change priority for all child nodes */
+	if(node_subscriber != NULL) {
 		node_subscriber->prio = prio;
+		/* Change priority for this node and all child nodes */
 		vs_node_prio(vsession, node, prio);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to this node (id: %d)\n",
-						__FUNCTION__, node_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() client not subscribed to this node (id: %d)\n",
+				__FUNCTION__, node_id);
 		return 0;
 	}
 
@@ -1322,11 +763,12 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* TODO: when versioning will be supported, then compute crc32, save data to
+	/* TODO: when versing will be supported, then compute crc32, save data to
 	 * the disk and send node_unsubscribe command to the client with version number
 	 * and crc32 */
 	if(version != 0) {
-		v_print_log(VRS_PRINT_WARNING, "Version: %d != 0, versioning is not supported yet\n", version);
+		v_print_log(VRS_PRINT_WARNING,
+				"Version: %d != 0, versing is not supported yet\n", version);
 	}
 
 	/* Node has to be created */
@@ -1334,7 +776,7 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		/* Is client subscribed to this node? */
 		node_subscriber = node->node_subs.first;
 		while(node_subscriber != NULL) {
-			if(node_subscriber->session == vsession) {
+			if(node_subscriber->session->session_id == vsession->session_id) {
 				break;
 			}
 			node_subscriber = node_subscriber->next;
@@ -1342,12 +784,14 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		if(node_subscriber!= NULL) {
 			return vs_node_unsubscribe(node, node_subscriber, 0);
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to this node (id: %d)\n",
-							__FUNCTION__, node_id);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() client not subscribed to this node (id: %d)\n",
+					__FUNCTION__, node_id);
 			return 0;
 		}
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -1382,7 +826,8 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 		node_subscriber = node->node_subs.first;
 		while(node_subscriber != NULL) {
 			if(node_subscriber->session->session_id == vsession->session_id) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client %d is already subscribed to the node (id: %d)\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"%s() client %d is already subscribed to the node (id: %d)\n",
 						__FUNCTION__, vsession->session_id, node->id);
 				return 0;
 			}
@@ -1391,7 +836,8 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 
 		return vs_node_subscribe(vs_ctx, vsession, node, version);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -1422,6 +868,7 @@ int vs_handle_node_destroy_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	/* Remove corresponding follower from the list of followers */
 	node_follower = node->node_folls.first;
 	while(node_follower != NULL) {
 		next_node_follower = node_follower->next;
@@ -1462,7 +909,8 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
@@ -1475,7 +923,8 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 
 	/* Is this user owner of this node? */
 	if(user != node->owner) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
 				vsession->user_id, node->id);
 		return 0;
 	}
@@ -1511,7 +960,7 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 	while(node_follower != NULL) {
 		if(node_follower->node_sub->session->session_id == vsession->session_id) {
 
-			if(node_follower->state==ENTITY_CREATING) {
+			if(node_follower->state == ENTITY_CREATING) {
 				node_follower->state = ENTITY_CREATED;
 
 				/* If the node is in state DELETING, then send to the client command
@@ -1522,21 +971,24 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 					struct Generic_Cmd *node_destroy_cmd = v_node_destroy_create(node->id);
 
 					/* Push this command to the outgoing queue */
-					if ( node_destroy_cmd!= NULL &&
+					if ( node_destroy_cmd != NULL &&
 							v_out_queue_push_tail(node_follower->node_sub->session->out_queue,
 									node_follower->node_sub->prio,
-									node_destroy_cmd) == 1) {
+									node_destroy_cmd) == 1)
+					{
 						node_follower->state = ENTITY_DELETING;
 					} else {
-						v_print_log(VRS_PRINT_DEBUG_MSG, "node_destroy (id: %d) wasn't added to the queue\n",
+						v_print_log(VRS_PRINT_DEBUG_MSG,
+								"node_destroy (id: %d) wasn't added to the queue\n",
 								node->id);
 					}
 				}
 			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "node %d isn't in CREATING state\n");
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"node %d isn't in CREATING state\n");
 			}
 		} else {
-			if(node_follower->state!=ENTITY_CREATED) {
+			if(node_follower->state != ENTITY_CREATED) {
 				all_created = 0;
 			}
 		}
@@ -1561,7 +1013,7 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	uint16 user_id = UINT16(node_create->data[0]);
 	uint32 parent_id = UINT32(node_create->data[UINT16_SIZE]);
 	uint32 node_id = UINT32(node_create->data[UINT16_SIZE+UINT32_SIZE]);
-	uint16 type = UINT16(node_create->data[UINT16_SIZE+UINT32_SIZE+UINT32_SIZE]);
+	uint16 custom_type = UINT16(node_create->data[UINT16_SIZE+UINT32_SIZE+UINT32_SIZE]);
 
 	/* Client has to send node_create command with node_id equal to
 	 * the value 0xFFFFFFFF */
@@ -1585,7 +1037,15 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	if(vs_node_new(vs_ctx, vsession, type) != NULL) {
+	/* Client has to send node_create command with custom_type bigger or
+	 * equal 32, because lower values are reserved for special nodes */
+	if( custom_type < 32 ) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() custom_type: %d is smaller then 32\n",
+				__FUNCTION__, custom_type);
+		return 0;
+	}
+
+	if(vs_node_new(vs_ctx, vsession, custom_type) != NULL) {
 		return 1;
 	} else {
 		return 0;

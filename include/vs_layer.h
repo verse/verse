@@ -1,5 +1,4 @@
 /*
- * $Id: vs_layer.h 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -72,6 +71,9 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 
 int vs_layer_send_destroy(struct VSNode *node,
 		struct VSLayer *layer);
+
+int vs_layer_unsubscribe(struct VSLayer *layer,
+		struct VSession *vsession);
 
 int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,

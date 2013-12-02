@@ -1,5 +1,4 @@
 /*
- * $Id: vc_main.h 1293 2012-08-09 09:02:01Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -38,7 +37,7 @@
 #define VC_MAIN_H
 
 #include <openssl/ssl.h>
-
+#include <sys/types.h>
 #include <stdio.h>
 
 #include "verse_types.h"
@@ -184,11 +183,16 @@ typedef struct VC_CTX {
 	uint32					session_counter;			/**< Counter of sessions used for unique session_id */
 	/* SSL context */
 	SSL_CTX					*tls_ctx;					/**< SSL context for main secured TCP TLS socket */
-	SSL_CTX					*dtls_ctx;					/**< SSL context for secured UDP DTLS connections (shared with all connections) */
+	SSL_CTX					*dtls_ctx;
 #ifdef WITH_KERBEROS
 	/* Kerberos */
 	unsigned short			use_kerberos;				/** Will be kerberos use? O no 1 yes */
-#endif
+#endif					/**< SSL context for secured UDP DTLS connections (shared with all connections) */
+	/* Information about client */
+	char					*client_name;
+	char					*client_version;
+	/* Synchronization */
+	pthread_mutex_t			mutex;
 } VC_CTX;
 
 /* Function prototypes */

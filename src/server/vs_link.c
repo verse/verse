@@ -1,5 +1,4 @@
 /*
- * $Id: vs_link.c 1348 2012-09-19 20:08:18Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -22,6 +21,8 @@
  * Contributor(s): Jiri Hnidek <jiri.hnidek@tul.cz>.
  *
  */
+
+#include <assert.h>
 
 #include "verse_types.h"
 
@@ -78,6 +79,9 @@ struct VSLink *vs_link_create(struct VSNode *parent, struct VSNode *child)
 {
 	struct VSLink *link = NULL;
 
+	assert(parent != NULL);
+	assert(child != NULL);
+
 	link = (struct VSLink*)malloc(sizeof(struct VSLink));
 
 	if( link != NULL ) {
@@ -87,7 +91,8 @@ struct VSLink *vs_link_create(struct VSNode *parent, struct VSNode *child)
 		child->parent_link = link;
 		child->level = parent->level + 1;
 	} else {
-		v_print_log(VRS_PRINT_WARNING, "Could not create link between %d and %d, not enough memory\n",
+		v_print_log(VRS_PRINT_WARNING,
+				"Could not create link between %d and %d, not enough memory\n",
 				parent->id, child->id);
 	}
 
@@ -174,28 +179,32 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 
 	/* Parent node has to be created */
 	if(! (parent_node->state == ENTITY_CREATED || parent_node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, __LINE__, parent_node->id, parent_node->state);
 		return 0;
 	}
 
 	/* Test if client doesn't want to recreate existing link */
 	if( parent_node == old_parent_node) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d link between nodes (parent_node_id: %d) (child_node_id: %d) already exists\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d link between nodes (parent_id: %d) (child_id: %d) already exists\n",
 				__FUNCTION__, __LINE__, parent_node->id, child_node->id);
 		return 0;
 	}
 
 	/* Is user owner of parent node or can user write to parent node? */
 	if(vs_node_can_write(vs_ctx, vsession, parent_node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d user: %s can't write to parent node: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d user: %s can't write to parent node: %d\n",
 				__FUNCTION__, __LINE__, user->username, parent_node->id);
 		return 0;
 	}
 
 	/* Test, if new link could be created */
 	if(vs_link_test_nodes(parent_node, child_node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d node: %d can't be child of node: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d node: %d can't be child of node: %d\n",
 				__FUNCTION__, __LINE__, child_node->id, parent_node->id);
 		return 0;
 	}

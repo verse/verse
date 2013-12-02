@@ -1,5 +1,4 @@
 /*
- * $Id: v_layer_commands.h 1331 2012-09-14 07:21:35Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -63,7 +62,7 @@ struct Generic_Cmd *v_layer_unsubscribe_create(const uint32 node_id,
 struct Generic_Cmd *v_layer_set_value_create(const uint32 node_id,
 		const uint16 layer_id,
 		const uint32 item_id,
-		const uint8 value_type,
+		const uint8 data_type,
 		const uint8 count,
 		const void *value);
 

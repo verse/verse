@@ -1,5 +1,4 @@
 /*
- * $Id: v_out_queue.h 1267 2012-07-23 19:10:28Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -58,6 +57,8 @@
 #define OUT_QUEUE_ADD_TAIL	1
 #define OUT_QUEUE_ADD_HEAD	2
 
+#define OUT_QUEUE_DEFAULT_MAX_SIZE 1048576
+
 /**
  * Structure storing information about outgoing command waiting in the outgoing
  * queue
@@ -92,6 +93,7 @@ typedef struct VOutQueue {
 	struct VPrioOutQueue	*queues[MAX_PRIORITY+1];
 	struct VCommandQueue	*cmds[MAX_CMD_ID+1];
 	uint32					size;			/**< Size of stored commands in bytes */
+	uint32					max_size;		/**< Maximal allowed size of commands stored in this queue */
 	uint32					count;			/**< Count of stored commands */
 	uint8					max_prio;		/**< Maximal used priority queue */
 	uint8					min_prio;		/**< Minimal used priority queue */
@@ -99,7 +101,7 @@ typedef struct VOutQueue {
 	real32					r_prio_sum_low;	/**< Summary of all real priorities <DEFAULT_PRIO-1, MIN_PRIO> */
 } VOutQueue;
 
-int	v_out_queue_init(struct VOutQueue *out_queue);
+int	v_out_queue_init(struct VOutQueue *out_queue, int max_size);
 struct VOutQueue *v_out_queue_create(void);
 void v_out_queue_destroy(struct VOutQueue **out_queue);
 

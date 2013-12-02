@@ -1,5 +1,4 @@
 /*
- * $Id: vs_auth_csv.c 1360 2012-10-18 20:25:04Z jiri $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
@@ -70,7 +69,7 @@ int vs_csv_auth_user(struct vContext *C, const char *username, const char *pass)
 int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 {
 	int raw = 0, col, prev_comma, next_comma;
-	int ret = 0;
+	int ret = 0, usr_count = 0;
 	FILE *file;
 
 	if(vs_ctx->csv_user_file != NULL) {
@@ -79,14 +78,11 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 			struct VSUser *new_user, *user;
 			char line[LINE_LEN], *tmp;
 
-			vs_ctx->users.first = NULL;
-			vs_ctx->users.last = NULL;
-
 			raw = 0;
 			while( fgets(line, LINE_LEN-2, file) != NULL) {
 				/* First line has to have following structure:
 				 * username,password,UID,real name */
-				if(raw==0) {
+				if(raw == 0) {
 					if(strncmp(&line[0], "username", 8) != 0) break;
 					if(strncmp(&line[9], "password", 8) != 0) break;
 					if(strncmp(&line[18], "UID", 3) != 0) break;
@@ -96,26 +92,27 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 
 					/* username */
 					prev_comma = next_comma = 0;
-					for(col=0; col<LINE_LEN && line[col]!=','; col++) {}
+					for(col=0; col < LINE_LEN && line[col] != ','; col++) {}
 					next_comma = col;
 					new_user->username = strndup(&line[prev_comma], next_comma-prev_comma);
 					prev_comma = next_comma+1;
 
 					/* password */
-					for(col=prev_comma; col<LINE_LEN && line[col]!=','; col++) {}
+					for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
 					next_comma = col;
 					new_user->password = strndup(&line[prev_comma], next_comma-prev_comma);
 					prev_comma = next_comma+1;
 
 					/* user id */
-					for(col=prev_comma; col<LINE_LEN && line[col]!=','; col++) {}
+					for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
 					next_comma = col;
 					tmp = strndup(&line[prev_comma], next_comma-prev_comma);
 					sscanf(tmp, "%d", (int*)&new_user->user_id);
+					free(tmp);
 					prev_comma = next_comma+1;
 
 					/* real name */
-					for(col=prev_comma; col<LINE_LEN && line[col]!='\n'; col++) {}
+					for(col=prev_comma; col < LINE_LEN && line[col] != '\n'; col++) {}
 					next_comma = col;
 					new_user->realname = strndup(&line[prev_comma], next_comma-prev_comma);
 
@@ -125,11 +122,13 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					/* Check uniqueness of username and user id */
 					user = vs_ctx->users.first;
 					while(user != NULL) {
+						/* User ID */
 						if(user->user_id == new_user->user_id) {
 							v_print_log(VRS_PRINT_WARNING, "User %s could not be added to list of user, because user %s has same user ID: %d\n",
 									new_user->username, user->username, user->user_id);
 							break;
 						}
+						/* Username */
 						if( strcmp(user->username, new_user->username) == 0) {
 							v_print_log(VRS_PRINT_WARNING, "User %s could not be added to list of user, because user ID: %d has the same name\n",
 									new_user->username, user->user_id);
@@ -138,24 +137,41 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 						user = user->next;
 					}
 
-					if(user == NULL) {
-						v_list_add_tail(&vs_ctx->users, (void*)new_user);
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Added: username: %s, ID: %d, realname: %s\n",
-								new_user->username, new_user->user_id, new_user->realname);
-					} else {
+					/* Check correctness of User ID */
+					if(!(new_user->user_id >= MIN_USER_ID && new_user->user_id <= MAX_USER_ID)) {
+						v_print_log(VRS_PRINT_WARNING, "User ID: %d of user: %s not in valid range (%d-%d)\n",
+								new_user->user_id, new_user->username, MIN_USER_ID, MAX_USER_ID);
 						free(new_user);
+					} else {
+						if(user == NULL) {
+							v_list_add_tail(&vs_ctx->users, (void*)new_user);
+							v_print_log(VRS_PRINT_DEBUG_MSG, "Added: username: %s, ID: %d, realname: %s\n",
+									new_user->username, new_user->user_id, new_user->realname);
+							usr_count++;
+						} else {
+							free(new_user);
+						}
 					}
 
 				}
 				raw++;
 			}
-			ret = 1;
 			fclose(file);
+
+			if(usr_count > 0) {
+				ret = 1;
+				v_print_log(VRS_PRINT_DEBUG_MSG, "%d user account loaded from file: %s\n",
+							usr_count, vs_ctx->csv_user_file);
+			} else {
+				ret = 0;
+				v_print_log(VRS_PRINT_ERROR, "No valid user account loaded from file: %s\n",
+						vs_ctx->csv_user_file);
+			}
+		} else {
+			v_print_log(VRS_PRINT_ERROR, "Could not open file: %s\n",
+						vs_ctx->csv_user_file);
 		}
 	}
-
-	v_print_log(VRS_PRINT_DEBUG_MSG, "%d user account loaded from file: %s\n",
-			raw-1, vs_ctx->csv_user_file);
 
 	return ret;
 }

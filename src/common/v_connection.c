@@ -1,5 +1,4 @@
 /*
- * $Id: v_connection.c 1267 2012-07-23 19:10:28Z jiri $
  *
  * ***** BEGIN BSD LICENSE BLOCK *****
  *
@@ -40,6 +39,11 @@
 #include <time.h>
 #include <pthread.h>
 #include <unistd.h>
+#ifdef WITH_OPENSSL
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
 
 #include "verse.h"
 
@@ -64,43 +68,47 @@ int v_conn_dgram_handle_sys_cmds(struct vContext *C, const unsigned short state_
 {
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
-	int i, r, ret = 1;
+	int cmd_rank, r, ret = 1;
 
 	/* Parse system commands (not ACK and NAK messages ... these are proccessed separately) */
-	for(i=0; r_packet->sys_cmd[i].cmd.id!=CMD_RESERVED_ID && i < MAX_SYSTEM_COMMAND_COUNT; i++) {
-		switch (r_packet->sys_cmd[i].cmd.id) {
+	for(cmd_rank=0;
+			r_packet->sys_cmd[cmd_rank].cmd.id != CMD_RESERVED_ID &&
+					cmd_rank < MAX_SYSTEM_COMMAND_COUNT;
+			cmd_rank++)
+	{
+		switch (r_packet->sys_cmd[cmd_rank].cmd.id) {
 		case CMD_ACK_ID:
 			break;
 		case CMD_NAK_ID:
 			break;
 		case CMD_CHANGE_L_ID:
 			if(dgram_conn->state[state_id].CHANGE_L_cb) {
-				r = dgram_conn->state[state_id].CHANGE_L_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CHANGE_L_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		case CMD_CHANGE_R_ID:
 			if(dgram_conn->state[state_id].CHANGE_R_cb) {
-				r = dgram_conn->state[state_id].CHANGE_R_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CHANGE_R_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		case CMD_CONFIRM_L_ID:
 			if(dgram_conn->state[state_id].CONFIRM_L_cb) {
-				r = dgram_conn->state[state_id].CONFIRM_L_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CONFIRM_L_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
 			if(dgram_conn->state[state_id].CONFIRM_R_cb) {
-				r = dgram_conn->state[state_id].CONFIRM_R_cb(C, &r_packet->sys_cmd[i].cmd);
+				r = dgram_conn->state[state_id].CONFIRM_R_cb(C, &r_packet->sys_cmd[cmd_rank].cmd);
 				ret = (ret==0)?0:r;
 			}
 			break;
 		default:
 			/* Unknown command ID */
 			if(is_log_level(VRS_PRINT_WARNING)) {
-				v_print_log(VRS_PRINT_WARNING, "Unknown system command ID: %d\n", r_packet->sys_cmd[i].cmd.id);
+				v_print_log(VRS_PRINT_WARNING, "Unknown system command ID: %d\n", r_packet->sys_cmd[cmd_rank].cmd.id);
 			}
 			break;
 		}
@@ -184,12 +192,13 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 	dgram_conn->srtt = 0;
 	dgram_conn->rwin_host = 0xFFFFFFFF;	/* Default value */
 	dgram_conn->rwin_peer = 0xFFFFFFFF;	/* Default value */
+	dgram_conn->sent_size = 0;
 	dgram_conn->rwin_host_scale = 0;	/* rwin_host is >> by this value for outgoing packet */
 	dgram_conn->rwin_peer_scale = 0;	/* rwin_host is << by this value for incomming packet */
-	dgram_conn->cwin = 0xFFFF;			/* TODO: Congestion Control */
-	dgram_conn->fps_host = DEFAULT_FPS;	/* Default value */
-	dgram_conn->fps_peer = DEFAULT_FPS;	/* Default value */
-	dgram_conn->tmp_flags = 0;
+	dgram_conn->cwin = 0xFFFFFFFF;		/* TODO: Congestion Control */
+	/* Command compression */
+	dgram_conn->host_cmd_cmpr = CMPR_RESERVED;
+	dgram_conn->peer_cmd_cmpr = CMPR_RESERVED;
 	/* Initialize array of ACK and NAK commands, that are sent to the peer */
 	v_ack_nak_history_init(&dgram_conn->ack_nak);
 	/* Initialize history of sent packets */
@@ -223,12 +232,9 @@ void v_conn_dgram_destroy(struct VDgramConn *dgram_conn)
 		dgram_conn->io_ctx.buf = NULL;
 	}
 
-	if(dgram_conn->ack_nak.cmds!=NULL) {
-		free(dgram_conn->ack_nak.cmds);
-		dgram_conn->ack_nak.cmds = NULL;
-	}
-
 	v_packet_history_destroy(&dgram_conn->packet_history);
+
+	v_ack_nak_history_clear(&dgram_conn->ack_nak);
 
 	close(dgram_conn->io_ctx.sockfd);
 }
@@ -244,27 +250,16 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 		v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
 	}
 
+#ifdef WITH_OPENSSL
+	if(dgram_conn->io_ctx.bio != NULL) {
+		BIO_vfree(dgram_conn->io_ctx.bio);
+		dgram_conn->io_ctx.bio = NULL;
+	}
+#endif
+
 	close(dgram_conn->io_ctx.sockfd);
 
 	v_conn_dgram_init(dgram_conn);
-}
-
-/**
- * \brief This function lock connection, compare state of connection with
- * the state, unlock it and return result of comparing.
- * \return This function returns 1, when state of connection is equal to the
- * state, otherwise it returns 0.
- */
-int v_conn_stream_cmp_state(struct VStreamConn *stream_conn, unsigned short state)
-{
-	int ret = 0;
-
-	pthread_mutex_lock(&stream_conn->mutex);
-	if(stream_conn->host_state == state)
-		ret = 1;
-	pthread_mutex_unlock(&stream_conn->mutex);
-
-	return ret;
 }
 
 /**
@@ -293,6 +288,9 @@ void v_conn_stream_init(struct VStreamConn *stream_conn)
 	memset(&(stream_conn->peer_address), 0, sizeof(VNetworkAddress));
 	/* Initialize connection mutex */
 	pthread_mutex_init(&stream_conn->mutex, NULL);
+	/* Initialize offsets */
+	stream_conn->sent_data_offset = 0;
+	stream_conn->pushed_data_offset = 0;
 }
 
 void v_conn_stream_destroy(struct VStreamConn *stream_conn)

@@ -15,6 +15,7 @@ set (libverse_src
 		common/v_connection.c
 		common/v_common.c
 		common/v_commands.c
+		common/v_stream.c
 		common/sys_cmds/v_user_auth_success.c
 		common/sys_cmds/v_user_auth_request.c
 		common/sys_cmds/v_user_auth_failure.c
@@ -74,35 +75,44 @@ set (server_src
 		server/vs_tag.c
 		server/vs_node.c
 		server/vs_node_access.c
+		server/vs_sys_nodes.c
 		server/vs_main.c
 		server/vs_link.c
 		server/vs_layer.c
 		server/vs_data.c
-		server/vs_config.c
 		server/vs_auth_csv.c
+		server/vs_handshake.c
 		server/vs_auth_ldap.c)
-		
+
 
 include_directories (../include)
-include_directories (${INIPARSER_INCLUDE_DIRS})
-include_directories (${OPENSSL_INCLUDE_DIR})
+
+
+# Make build flags compiler specific for libverse.so
+if (CMAKE_COMPILER_IS_GNUCC)
+    set (CMAKE_C_FLAGS "-D_REETRANT -fPIC -Wall -Wextra -pedantic -Wno-long-long")
+	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0 --coverage")
+	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
+		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3 -fno-strict-aliasing")
+	endif ()
+endif (CMAKE_COMPILER_IS_GNUCC)
+
+# When OpenSSL is enabled
+if (OPENSSL_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
+    include_directories (${OPENSSL_INCLUDE_DIR})
+endif (OPENSSL_FOUND)
 
 if (LDAP_FOUND)
+	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_LDAP")
 	include_directories (${LDAP_INCLUDE_DIR})
 endif (LDAP_FOUND)
 
 if (KERBEROS_FOUND)
+	set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_KERBEROS")
 	include_directories (${KERBEROS_INCLUDE_DIR})
 endif (KERBEROS_FOUND)
-
-# Make build flags compiler specific
-if (CMAKE_COMPILER_IS_GNUCC)
-	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-		set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -fPIC -Wall -Wextra -pedantic -O0")
-	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-		set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -fPIC -Wall -Wextra -pedantic -O3")
-	endif ()
-endif (CMAKE_COMPILER_IS_GNUCC)
 
 # Set up shared verse library (libverse.so)
 add_library (verse_shared_lib SHARED ${libverse_src})
@@ -111,38 +121,66 @@ set_target_properties (verse_shared_lib PROPERTIES
 		SOVERSION "${${PROJECT_NAME}_VERSION}.${${PROJECT_NAME}_PATCH_LEVEL}"
 		OUTPUT_NAME "verse"
 		clean_direct_output 1)
+if (OPENSSL_FOUND)
+	target_link_libraries (verse_shared_lib ${OPENSSL_LIBRARIES} )
+endif (OPENSSL_FOUND)
 
 
-# Make build flags compiler specific
+# Make build flags compiler specific for verse_server
 if (CMAKE_COMPILER_IS_GNUCC)
+    set (CMAKE_C_FLAGS "-D_REETRANT -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    	set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -Wall -Wextra -pedantic")
+   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0 --coverage")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-		set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -Wall -Wextra -pedantic")
+	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3 -fno-strict-aliasing")
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
 
 
+# Basic libraries used by verse_server
+set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
+
+
+# When OpenSSL is enabled
+if (OPENSSL_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
+endif (OPENSSL_FOUND)
+
+
+# When WSLay library is enabled
+if (WSLAY_FOUND AND OPENSSL_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${WSLAY_LIBRARIES})
+    set (server_src ${server_src} server/vs_websocket.c)
+    include_directories (${WSLAY_INCLUDE_DIR})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWSLAY")
+endif ()
+
+
+# When iniparser is used
+if (INIPARSER_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${INIPARSER_LIBRARIES})
+    set (server_src ${server_src}  server/vs_config.c)
+    include_directories (${INIPARSER_INCLUDE_DIRS})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INIPARSER")
+endif (INIPARSER_FOUND)
+
+if (LDAP_FOUND)
+	set (verse_server_libs ${verse_server_libs} ${LDAP_LIBRARIES})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_LDAP")
+endif (LDAP_FOUND)
+
+if (KERBEROS_FOUND)
+	set (verse_server_libs ${verse_server_libs} ${KERBEROS_LIBRARY})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_KERBEROS")
+endif (KERBEROS_FOUND)
 # Set up verse server executable
 add_executable (verse_server ${server_src})
 add_dependencies (verse_server verse_shared_lib)
 target_link_libraries (verse_server
-		verse_shared_lib
-		${CMAKE_THREAD_LIBS_INIT}
-		${OPENSSL_LIBRARIES}
-		${INIPARSER_LIBRARIES})
-		
-if (LDAP_FOUND)
-	target_link_libraries (verse_server
-		verse_shared_lib	
-		${LDAP_LIBRARIES})
-endif (LDAP_FOUND)
+	verse_shared_lib
+	${verse_server_libs} )
 
-if (KERBEROS_FOUND)
-	target_link_libraries (verse_server
-		verse_shared_lib	
-		${KERBEROS_LIBRARY})
-endif (KERBEROS_FOUND)
 
 # The rule to install Verse server
 install (TARGETS verse_server
@@ -154,7 +192,7 @@ install (TARGETS verse_server
 install (TARGETS verse_shared_lib
 	LIBRARY
 	CONFIGURATIONS "Debug"
-	DESTINATION lib)
+	DESTINATION lib${LIBSUFFIX})
 
 # TODO: Make building static verse library (libverse.a) optional
 #add_library (verse_static STATIC ${libverse_src})

@@ -1,10 +1,10 @@
 /**
- * $Id: user_auth.pml 709 2010-11-26 14:31:37Z jiri $
  *
  * This PROMELA program simulates and helps to verify the user
  * authentication used in Verse protocol over TCP/TLS connection.
  *
  * author: Jiri Hnidek <jiri.hnidek@tul.cz>
+ *
  */
 
 #define UNVALID_USER		0
