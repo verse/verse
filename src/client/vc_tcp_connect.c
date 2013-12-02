@@ -755,7 +755,7 @@ static int vc_USRAUTH_krb_loop(struct vContext *C, struct User_Authenticate_Cmd 
 		printf("%c[%dm", 27, 0);
 	}
 
-	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+	/*buffer_pos = VERSE_MESSAGE_HEADER_SIZE;*/
 
 	/* Wait VERSE_TIMEOUT seconds for the respond from the server */
 	FD_ZERO(&set);
@@ -768,7 +768,7 @@ static int vc_USRAUTH_krb_loop(struct vContext *C, struct User_Authenticate_Cmd 
 	if( (ret = select(stream_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__, __LINE__, strerror(errno));
 		return 0;
-		/* Was event on the TCP socket of this session */
+	/* Was event on the TCP socket of this session */
 	} else if(ret>0 && FD_ISSET(stream_conn->io_ctx.sockfd, &set)) {
 		buffer_pos = 0;
 

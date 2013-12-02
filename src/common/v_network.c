@@ -662,7 +662,7 @@ int v_krb5_set_addrs_ipv6(krb5_context ctx, krb5_auth_context auth_ctx,
 int v_krb5_read(struct IO_CTX *io_ctx, krb5_context krb5_ctx,
 		krb5_error_code *error_num)
 {
-	int ret;
+	int ret = 0;
 	unsigned char pkt_buf[MAX_PACKET_SIZE];
 	krb5_data packet, message;
 
@@ -711,13 +711,15 @@ int v_krb5_read(struct IO_CTX *io_ctx, krb5_context krb5_ctx,
 
 
 	packet.data = (krb5_pointer) pkt_buf;
-	io_ctx->buf_size = packet.length = ret;
+	packet.length = ret;
 	*error_num = krb5_rd_priv(krb5_ctx, io_ctx->krb5_auth_ctx, &packet, &message, NULL);
 	if (*error_num) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_rd_priv %d: %s\n", *error_num,
 				krb5_get_error_message(krb5_ctx, *error_num));
 		return io_ctx->buf_size = 0;
 	}
+
+	io_ctx->buf_size = message.length;
 	io_ctx->buf = message.data;
 
 	return io_ctx->buf_size;

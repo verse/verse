@@ -950,23 +950,23 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 
 	/* Do user authentication */
 	if ((user_id = vs_krb_make_user(C, u_name)) != -1) {
-		long int avatar_id;
+        long int avatar_id;
 
-		pthread_mutex_lock(&vs_ctx->data.mutex);
-		avatar_id = vs_create_avatar_node(vs_ctx, vsession, user_id);;
-		pthread_mutex_unlock(&vs_ctx->data.mutex);
+        pthread_mutex_lock(&vs_ctx->data.mutex);
+        avatar_id = vs_create_avatar_node(vs_ctx, vsession, user_id);
+        pthread_mutex_unlock(&vs_ctx->data.mutex);
 
-		if (avatar_id == -1) {
-			v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
-			return 0;
-		}
+        if(avatar_id == -1) {
+                v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
+                return 0;
+        }
 
-		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+        buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
-		/* Save user_id to the session and send it in
-		 * connect_accept command */
-		vsession->user_id = user_id;
-		vsession->avatar_id = avatar_id;
+        /* Save user_id to the session and send it in
+         * connect_accept command */
+        vsession->user_id = user_id;
+        vsession->avatar_id = avatar_id;
 
         s_message->sys_cmd[cmd_rank].ua_succ.id = CMD_USER_AUTH_SUCCESS;
         s_message->sys_cmd[cmd_rank].ua_succ.user_id = user_id;
@@ -993,7 +993,6 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 
         s_message->header.len = io_ctx->buf_size = buffer_pos;
         s_message->header.version = VRS_VERSION;
-
         /* Pack header to the beginning of the buffer */
         v_pack_message_header(s_message, io_ctx->buf);
 
