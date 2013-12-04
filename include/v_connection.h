@@ -45,7 +45,6 @@
 #include "v_history.h"
 #include "v_context.h"
 
-#ifdef WITH_KERBEROS
 /* Kerberos using */
 #define NO_KERBEROS					0
 #define USE_KERBEROS				1
@@ -170,10 +169,6 @@ typedef struct VStreamConn {
 	/* Addresses */
 	struct VNetworkAddress	peer_address;		/* Address of peer and port number */
 	struct VNetworkAddress	host_address;		/* Address of host and port number */
-	/* Security */
-#ifdef WITH_KERBEROS
-	krb5_context			krb5_ctx;			/* Kerberos library context */
-#endif
 	/* Flow control */
 	int						socket_buffer_size;	/* Size of socket buffer */
 	int						sent_data_offset;	/* Offset of data poped from TCP stack */

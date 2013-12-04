@@ -188,7 +188,6 @@ int vs_TLS_teardown(struct vContext *C)
 	return 1;
 }
 #endif
-
 #ifdef WITH_KERBEROS
 /**
  * \brief Establishing Kerberos connection, verifies clients credentials
@@ -228,24 +227,30 @@ int vs_kerberos_auth(struct vContext *C, char **u_name){
         packet.length = len;
         packet.data = (krb5_pointer) buffer;
 
-        io_ctx->krb5_auth_ctx = NULL;
-        io_ctx->krb5_ticket = NULL;
+        /*io_ctx->krb5_auth_ctx = NULL;
+        io_ctx->krb5_ticket = NULL;*/
+
+        io_ctx->krb5_auth_ctx = vs_ctx->tcp_io_ctx.krb5_auth_ctx;
+        io_ctx->krb5_ctx = vs_ctx->tcp_io_ctx.krb5_ctx;
+        io_ctx->krb5_ticket = vs_ctx->tcp_io_ctx.krb5_ticket;
+        io_ctx->krb5_keytab = vs_ctx->tcp_io_ctx.krb5_keytab;
+        /*io_ctx->use_kerberos = USE_KERBEROS;*/
 
         /* Check authentication info */
-        if ((krb5err = krb5_rd_req(vs_ctx->krb5_ctx,
+        if ((krb5err = krb5_rd_req(io_ctx->krb5_ctx,
                         (krb5_auth_context *) &io_ctx->krb5_auth_ctx, &packet,
-                        vs_ctx->krb5_principal, vs_ctx->krb5_keytab,
+                        io_ctx->krb5_principal, io_ctx->krb5_keytab,
                         NULL, (krb5_ticket **) &io_ctx->krb5_ticket))) {
                 v_print_log(VRS_PRINT_ERROR, "krb5_rd_req %d: %s\n", (int) krb5err,
-                                krb5_get_error_message(vs_ctx->krb5_ctx, krb5err));
+                                krb5_get_error_message(io_ctx->krb5_ctx, krb5err));
                 return 0;
         }
         /* Get user name */
-        if ((krb5err = krb5_unparse_name(vs_ctx->krb5_ctx,
+        if ((krb5err = krb5_unparse_name(io_ctx->krb5_ctx,
                         io_ctx->krb5_ticket->enc_part2->client, &client_principal))) {
                 v_print_log(VRS_PRINT_ERROR, "krb5_unparse_name %d: %s\n",
                                 (int) krb5err,
-                                krb5_get_error_message(vs_ctx->krb5_ctx, krb5err));
+                                krb5_get_error_message(io_ctx->krb5_ctx, krb5err));
                 return 0;
         }
         v_print_log(VRS_PRINT_DEBUG_MSG, "Got authentication info from %s\n", client_principal);
@@ -941,12 +946,86 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VSession *vsession = CTX_current_session(C);
+	struct VMessage *r_message = CTX_r_message(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	int i, cmd_rank = 0, ret = 0;
+	int i, cmd_rank = 0, client_name_proposed = 0, client_version_proposed = 0;
 	unsigned short buffer_pos = 0;
-	krb5_error_code error;
+	int user_id, error_num;
 
-	int user_id;
+    /* Reset content of received message */
+    memset(r_message, 0, sizeof(struct VMessage));
+
+    /* Unpack Verse message header */
+    buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
+
+    /* Unpack all system commands */
+    buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
+
+    v_print_receive_message(C);
+
+    for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
+            switch(r_message->sys_cmd[i].cmd.id) {
+            case CMD_CHANGE_L_ID:
+                    /* Client could propose client name and version */
+                    if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
+                            if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+                                    /* Only first proposed client name will be used */
+                                    vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+                                    client_name_proposed = 1;
+                            }
+                    } else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
+                            if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+                                    /* Only first proposed client name will be used */
+                                    vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+                                    client_version_proposed = 1;
+                            }
+                    }
+                    break;
+            default:
+                    v_print_log(VRS_PRINT_WARNING,
+                                    "This command id: %d is not supported in this state\n",
+                                    r_message->sys_cmd[i].cmd.id);
+                    break;
+            }
+    }
+
+    buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+
+	/* Send confirmation about client name */
+	if (client_name_proposed == 1) {
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID,
+				FTR_CLIENT_NAME, vsession->client_name, NULL);
+	}
+
+	/* Send confirmation about client version only in situation, when
+	 * client proposed client name too */
+	if (client_version_proposed == 1) {
+		if (client_name_proposed == 1) {
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++,
+					CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+					vsession->client_version, NULL);
+		} else {
+			/* Client version without client name is not allowed */
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++,
+					CMD_CONFIRM_L_ID, FTR_CLIENT_VERSION,
+					NULL);
+		}
+	}
+
+    buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
+
+    s_message->header.len = io_ctx->buf_size = buffer_pos;
+    s_message->header.version = VRS_VERSION;
+    /* Pack header to the beginning of the buffer */
+    v_pack_message_header(s_message, io_ctx->buf);
+
+    v_print_send_message(C);
+
+    v_tcp_write(io_ctx, &error_num);
+
+    buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+    cmd_rank = 0;
+    memset(s_message, 0, sizeof(struct VMessage));
 
 	/* Do user authentication */
 	if ((user_id = vs_krb_make_user(C, u_name)) != -1) {
@@ -960,8 +1039,6 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
                 v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
                 return 0;
         }
-
-        buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
         /* Save user_id to the session and send it in
          * connect_accept command */
@@ -998,15 +1075,8 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 
         v_print_send_message(C);
 
-		/* Send command to the client */
-		if ((ret = v_krb5_write(io_ctx, vs_ctx->krb5_ctx, &error)) <= 0) {
-			return 0;
-		} else {
-			return 1;
-		}
+        return 1;
 	} else {
-
-		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
 		s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
 		s_message->sys_cmd[0].ua_fail.count = 0;
@@ -1024,12 +1094,6 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 		v_print_send_message(C);
 
 		return 1;
-		/* Send command to the client */
-		if ((ret = v_krb5_write(io_ctx, vs_ctx->krb5_ctx, &error)) <= 0) {
-			return 0;
-		} else {
-			return 0;
-		}
 	}
 	return 0;
 }
@@ -1046,12 +1110,6 @@ int vs_handle_handshake(struct vContext *C, char *u_name)
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	int ret;
 
-#ifdef WITH_KERBEROS
-		if(CTX_server_ctx(C)->use_krb5 == USE_KERBEROS) {
-			goto using_krb;
-		}
-#endif
-
 	/* Make sure, that buffer contains at least Verse message
 	 * header. If this condition is not reached, then somebody tries
 	 * to do some very bad things! .. Close this connection. */
@@ -1060,7 +1118,7 @@ int vs_handle_handshake(struct vContext *C, char *u_name)
 				io_ctx->buf_size);
 		return -1;
 	}
-using_krb:
+
 	switch(stream_conn->host_state) {
 	case TCP_SERVER_STATE_RESPOND_METHODS:
 		ret = vs_RESPOND_methods_loop(C);

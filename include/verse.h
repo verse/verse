@@ -43,7 +43,6 @@ extern "C" {
 
 #define VERSE_H
 
-/*#define WITH_KERBEROS*/
 #include <stdint.h>
 #include <limits.h>
 

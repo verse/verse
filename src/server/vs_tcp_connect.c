@@ -138,6 +138,7 @@ void *vs_tcp_conn_loop(void *arg)
 #ifdef WITH_KERBEROS
 	if (vs_ctx->use_krb5 == USE_KERBEROS) {
 		stream_conn->host_state = TCP_SERVER_STATE_RESPOND_KRB_AUTH;
+		io_ctx->use_kerberos = USE_KERBEROS;
 
 		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
 			printf("%c[%d;%dm", 27, 1, 31);
@@ -166,12 +167,6 @@ void *vs_tcp_conn_loop(void *arg)
 		tv.tv_sec = VRS_TIMEOUT;	/* User have to send something in 30 seconds */
 		tv.tv_usec = 0;
 
-#ifdef WITH_KERBEROS
-		if(vs_ctx->use_krb5 == USE_KERBEROS) {
-			goto respond_krb;
-		}
-#endif
-
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
@@ -180,12 +175,11 @@ void *vs_tcp_conn_loop(void *arg)
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
 
 			/* Try to receive data through TCP connection */
-			if( v_tcp_read(io_ctx, &error) <= 0 ) {
+			if (v_tcp_read(io_ctx, &error) <= 0) {
 				goto end;
 			}
 			/* Handle verse handshake at TCP connection */
 #ifdef WITH_KERBEROS
-respond_krb:
 			if (vs_ctx->use_krb5 == USE_KERBEROS) {
 				if( (ret = vs_handle_handshake(C, *u_name)) == -1) {
 					goto end;
@@ -200,16 +194,10 @@ respond_krb:
 #endif
 			/* When there is something to send, then send it to peer */
 			if( ret == 1 ) {
-#ifdef WITH_KERBEROS
-				if(vs_ctx->use_krb5 != USE_KERBEROS){
-#endif
 				/* Send response message to the client */
 				if( (ret = v_tcp_write(io_ctx, &error)) <= 0) {
 					goto end;
 				}
-#ifdef WITH_KERBEROS
-				}
-#endif
 			}
 
 		} else {
@@ -823,6 +811,12 @@ static int vs_init_io_ctx(struct IO_CTX *io_ctx,
 		return -1;
 	}
 
+#ifdef WITH_KERBEROS
+	io_ctx->krb5_keytab = NULL;		/* Will use defaul keytab */
+    io_ctx->krb5_auth_ctx = NULL;
+    io_ctx->krb5_ticket = NULL;
+#endif
+
 	/* Set up flag for V_CTX of server */
 	io_ctx->flags = 0;
 
@@ -906,23 +900,23 @@ int vs_init_kerberos(VS_CTX *vs_ctx){
 	krb5_error_code krb5_err;
 
 	/* Using Kerberos */
-	krb5_err = krb5_init_context(&vs_ctx->krb5_ctx);
+	krb5_err = krb5_init_context(&vs_ctx->tcp_io_ctx.krb5_ctx);
 	if (krb5_err) {
 		v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n", krb5_err,
-				krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
+				krb5_get_error_message(vs_ctx->tcp_io_ctx.krb5_ctx, krb5_err));
 		return -1;
 	}
 	/** TODO
 	 * resolv service and domain names
 	 */
-	if ((krb5_err = krb5_sname_to_principal(vs_ctx->krb5_ctx, "localhost",
+	if ((krb5_err = krb5_sname_to_principal(vs_ctx->tcp_io_ctx.krb5_ctx, "localhost",
 			"verse",
-			KRB5_NT_SRV_HST, &vs_ctx->krb5_principal))) {
+			KRB5_NT_SRV_HST, &vs_ctx->tcp_io_ctx.krb5_principal))) {
 		v_print_log(VRS_PRINT_ERROR, "krb5_sname_to_principal: %d: %s\n",
-				krb5_err, krb5_get_error_message(vs_ctx->krb5_ctx, krb5_err));
+				krb5_err, krb5_get_error_message(vs_ctx->tcp_io_ctx.krb5_ctx, krb5_err));
 		return -1;
 	}
-	krb5_unparse_name(vs_ctx->krb5_ctx, vs_ctx->krb5_principal, &name);
+	krb5_unparse_name(vs_ctx->tcp_io_ctx.krb5_ctx, vs_ctx->tcp_io_ctx.krb5_principal, &name);
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Kerberos principal: %s\n", name);
 
 	return 1;
