@@ -45,7 +45,7 @@
 #include "vs_mongo.h"
 #endif
 
-#if WITH_INIPARSER
+#ifdef WITH_INIPARSER
 #include "vs_config.h"
 #endif
 
@@ -500,7 +500,7 @@ int main(int argc, char *argv[])
 
 #ifdef WITH_MONGODB
 	/* Try to connect to MongoDB server */
-	vs_init_mongo_conn(&vs_ctx);
+	vs_mongo_conn_init(&vs_ctx);
 #endif
 
 	/* Add superuser account to the list of users */
@@ -616,7 +616,7 @@ int main(int argc, char *argv[])
 
 #ifdef WITH_MONGODB
 	/* Try to connect to MongoDB server */
-	vs_destroy_mongo_conn(&vs_ctx);
+	vs_mongo_conn_destroy(&vs_ctx);
 #endif
 
 	/* Free Verse server context */

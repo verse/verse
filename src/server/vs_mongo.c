@@ -41,7 +41,7 @@
  *
  * \return The function return 1 on success. Otherwise it returns 0.
  */
-int vs_mongo_save_node(struct VS_CTX *vs_ctx, struct VSNode *node)
+int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 {
 	/*
 	 * TODO:
@@ -59,14 +59,14 @@ int vs_mongo_save_node(struct VS_CTX *vs_ctx, struct VSNode *node)
 /**
  * \brief This function read concrete version of node from Mongo database
  *
- * \param vs_ctx	The Verse server context
+ * \param *vs_ctx	The Verse server context
  * \param node_id	The ID of node that is requested from database
  * \param version	The number of node version that is requested from database
  *
  * \return The function returns pointer at found node. When node with requested
  * version or id is not found in databse, then NULL is returned.
  */
-struct VSNode *vs_mongo_load_node(struct VS_CTX *vs_ctx,
+struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 		uint32 node_id,
 		uint32 version)
 {
@@ -84,9 +84,39 @@ struct VSNode *vs_mongo_load_node(struct VS_CTX *vs_ctx,
 
 
 /**
+ * \brief This function save current server context to Mongo database
+ *
+ * \param[in] *session	The pointer at verse
+ */
+int vs_mongo_context_save(struct VS_CTX *vs_ctx)
+{
+	(void)vs_ctx;
+	return 1;
+}
+
+
+/**
+ * \brief This function loads current context from Mongo database
+ *
+ * This function has to be called during start of Verse server, when no client
+ * is connected yet. This function doesn't restore whole verse server context,
+ * but it only loads nodes shared in parent node of scene nodes. Thus system
+ * nodes like avatar nodes, user nodes are not loaded. Finaly there has to be
+ * basic nodes structure (nodes: 1, 2, 3).
+ *
+ * \param[in] *vs_ctx The pointer at current verse server context
+ */
+int vs_mongo_context_load(struct VS_CTX *vs_ctx)
+{
+	(void)vs_ctx;
+	return 1;
+}
+
+
+/**
  * \brief This function tries to connect to MongoDB server
  */
-int vs_init_mongo_conn(struct VS_CTX *vs_ctx)
+int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 {
 	int status;
 
@@ -139,7 +169,7 @@ int vs_init_mongo_conn(struct VS_CTX *vs_ctx)
 /**
  * \brief This function tries to destroy connection with MongoDB server
  */
-void vs_destroy_mongo_conn(struct VS_CTX *vs_ctx)
+void vs_mongo_conn_destroy(struct VS_CTX *vs_ctx)
 {
 	if(vs_ctx->mongo_conn != NULL) {
 		mongo_destroy(vs_ctx->mongo_conn);
