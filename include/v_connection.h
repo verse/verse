@@ -46,6 +46,7 @@
 #include "v_context.h"
 
 /* Kerberos using */
+#ifdef WITH_KERBEROS
 #define NO_KERBEROS					0
 #define USE_KERBEROS				1
 #endif

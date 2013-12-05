@@ -752,21 +752,26 @@ static int vc_USRAUTH_krb_loop(struct vContext *C)
 	fd_set set;
 	int i, ret, error, buffer_pos=0, auth_succ=0, cmd_rank=0;
 	krb5_error_code krb5err;
+	char *user_name;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: USRAUTH_krb\n");
 		printf("%c[%dm", 27, 0);
 	}
+	user_name = (char *) malloc(50 * sizeof(char));
 
 	/* Save username to the Verse session */
 	if ((krb5err = krb5_unparse_name(io_ctx->krb5_ctx, io_ctx->krb5_principal,
-			&vsession->username))) {
+			&user_name))) {
 		v_print_log(VRS_PRINT_ERROR, "krb5_unparse_name %d: %s\n",
 				(int) krb5err,
 				krb5_get_error_message(stream_conn->io_ctx.krb5_ctx, krb5err));
 		return 0;
 	}
+
+	vsession->username = strdup(user_name);
+	free(user_name);
 
 	/* Set up negotiate command of client name and version */
 	if (vc_ctx->client_name != NULL) {
@@ -807,7 +812,7 @@ static int vc_USRAUTH_krb_loop(struct vContext *C)
 	tv.tv_sec = VRS_TIMEOUT;
 	tv.tv_usec = 0;
 
-    /* Wait for the event on the socket */
+	/* Wait for the event on the socket */
 	if ((ret = select(io_ctx->sockfd + 1, &set, NULL, NULL, &tv)) == -1) {
 		if (is_log_level(VRS_PRINT_ERROR))
 			v_print_log(VRS_PRINT_ERROR, "select(): %s\n", strerror(errno));
@@ -829,64 +834,15 @@ static int vc_USRAUTH_krb_loop(struct vContext *C)
 			/* TODO: try to read more data from socket */
 			return 0;
 		}
-
 		/* Unpack Verse message header */
-		buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos],
-				(io_ctx->buf_size - buffer_pos), r_message);
+		buffer_pos += v_unpack_message_header(
+				&stream_conn->io_ctx.buf[buffer_pos],
+				(stream_conn->io_ctx.buf_size - buffer_pos), r_message);
 
 		/* Unpack all system commands */
-		buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos],
-				(io_ctx->buf_size - buffer_pos), r_message);
-
-		/* Print received message */
-		v_print_receive_message(C);
-
-	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Connection timed out\n");
-		return 0;
-	}
-
-	/* Wait VERSE_TIMEOUT seconds for the respond from the server */
-	FD_ZERO(&set);
-	FD_SET(stream_conn->io_ctx.sockfd, &set);
-
-	tv.tv_sec = VRS_TIMEOUT;
-	tv.tv_usec = 0;
-
-	memset(r_message, 0, sizeof(struct VMessage));
-
-	/* Wait for the event on the socket */
-	if( (ret = select(stream_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1) {
-		v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__, __LINE__, strerror(errno));
-		return 0;
-	/* Was event on the TCP socket of this session */
-	} else if(ret>0 && FD_ISSET(stream_conn->io_ctx.sockfd, &set)) {
-		buffer_pos = 0;
-
-		/* Try to receive data through kerberos connection */
-		if( v_tcp_read(&stream_conn->io_ctx, &error) <= 0 ) {
-			/* TODO: try to read more data */
-			return 0;
-		}
-
-		/* Make sure, that buffer contains at verse message header.
-		 * If this condition is not reached, then somebody tries
-		 * to do some bad things! .. Close this connection. */
-		if(stream_conn->io_ctx.buf_size < VERSE_MESSAGE_HEADER_SIZE) {
-			v_print_log(VRS_PRINT_ERROR, "Small received buffer: %d\n", stream_conn->io_ctx.buf_size);
-			/* TODO: try to read more data */
-			return 0;
-		}
-
-		/* Unpack Verse message header */
-		buffer_pos += v_unpack_message_header(&stream_conn->io_ctx.buf[buffer_pos],
-				(stream_conn->io_ctx.buf_size - buffer_pos),
-				r_message);
-
-		/* Unpack all system commands */
-		buffer_pos += v_unpack_message_system_commands(&stream_conn->io_ctx.buf[buffer_pos],
-				stream_conn->io_ctx.buf_size - buffer_pos,
-				r_message);
+		buffer_pos += v_unpack_message_system_commands(
+				&stream_conn->io_ctx.buf[buffer_pos],
+				stream_conn->io_ctx.buf_size - buffer_pos, r_message);
 
 		/* Print received message */
 		v_print_receive_message(C);
@@ -927,23 +883,21 @@ static int vc_USRAUTH_krb_loop(struct vContext *C)
 						vsession->ded.str = NULL;
 					}
 					vsession->ded.str =
-							strdup((char*) r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+							strdup(
+									(char*) r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 				}
 				break;
 			}
 		}
 
-		memset(r_message, 0, sizeof(struct VMessage));
-		memset(s_message, 0, sizeof(struct VMessage));
-
-		if(auth_succ==1)
-		return CMD_USER_AUTH_SUCCESS;
+		if (auth_succ == 1)
+			return CMD_USER_AUTH_SUCCESS;
 		else
-		return 0;
+			return 0;
 	} else {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Connection timed out\n");
 		return 0;
 	}
-
 	return 0;
 }
 #endif
@@ -1350,6 +1304,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
                 return NULL;
         }
         stream_conn->io_ctx.use_kerberos = NO_KERBEROS;
+
 #ifdef WITH_KERBEROS
 		/* Will be kerberos used? */
 		if (ctx->use_kerberos==USE_KERBEROS) {
@@ -1363,6 +1318,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			strcpy(s_name, "verse");
 			strcpy(h_name, "localhost");
 			/* Get credentials for server */
+			stream_conn->io_ctx.krb5_cc = NULL;
 			if ((krb5err = krb5_cc_default(stream_conn->io_ctx.krb5_ctx,
 									&stream_conn->io_ctx.krb5_cc))) {
 				v_print_log(VRS_PRINT_ERROR, "krb5_cc_default: %d: %s\n", krb5err,
@@ -1375,6 +1331,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			 */
 			inbuf.data = h_name;
 			inbuf.length = strlen(h_name);
+			stream_conn->io_ctx.krb5_auth_ctx = NULL;
 			if ((krb5err = krb5_mk_req(stream_conn->io_ctx.krb5_ctx,
 									&stream_conn->io_ctx.krb5_auth_ctx, 0, s_name, h_name, &inbuf,
 									stream_conn->io_ctx.krb5_cc, &packet))) {
@@ -1393,6 +1350,12 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 				v_print_log(VRS_PRINT_ERROR, "Error sending message\n");
 				return NULL;
 			}
+
+			krb5_free_data_contents(stream_conn->io_ctx.krb5_ctx, &packet);
+			free(s_name);
+			/**
+			 * TODO: Free memmory better
+			 */
 
 			/* Set rcache */
 			if ((krb5err = krb5_get_server_rcache(stream_conn->io_ctx.krb5_ctx,

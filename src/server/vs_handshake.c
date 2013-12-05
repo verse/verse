@@ -227,9 +227,6 @@ int vs_kerberos_auth(struct vContext *C, char **u_name){
         packet.length = len;
         packet.data = (krb5_pointer) buffer;
 
-        /*io_ctx->krb5_auth_ctx = NULL;
-        io_ctx->krb5_ticket = NULL;*/
-
         io_ctx->krb5_auth_ctx = vs_ctx->tcp_io_ctx.krb5_auth_ctx;
         io_ctx->krb5_ctx = vs_ctx->tcp_io_ctx.krb5_ctx;
         io_ctx->krb5_ticket = vs_ctx->tcp_io_ctx.krb5_ticket;
@@ -950,7 +947,7 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 	struct VMessage *s_message = CTX_s_message(C);
 	int i, cmd_rank = 0, client_name_proposed = 0, client_version_proposed = 0;
 	unsigned short buffer_pos = 0;
-	int user_id, error_num;
+	int user_id;
 
     /* Reset content of received message */
     memset(r_message, 0, sizeof(struct VMessage));
@@ -1011,21 +1008,6 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 					NULL);
 		}
 	}
-
-    buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
-
-    s_message->header.len = io_ctx->buf_size = buffer_pos;
-    s_message->header.version = VRS_VERSION;
-    /* Pack header to the beginning of the buffer */
-    v_pack_message_header(s_message, io_ctx->buf);
-
-    v_print_send_message(C);
-
-    v_tcp_write(io_ctx, &error_num);
-
-    buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-    cmd_rank = 0;
-    memset(s_message, 0, sizeof(struct VMessage));
 
 	/* Do user authentication */
 	if ((user_id = vs_krb_make_user(C, u_name)) != -1) {

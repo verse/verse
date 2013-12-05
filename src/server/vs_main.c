@@ -238,7 +238,6 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->data.sem = NULL;
 #ifdef WITH_KERBEROS
 	vs_ctx->use_krb5 = NO_KERBEROS; /* Not using kerberos as default */
-	/*vs_ctx->krb5_keytab = NULL;*/		/* Will use defaul keytab */
 #endif
 }
 

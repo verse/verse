@@ -665,12 +665,13 @@ int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 	unsigned char pkt_buf[MAX_PACKET_SIZE];
 	krb5_data packet, message;
 
+	/* Set up address */
 	if(io_ctx->peer_addr.ip_ver == IPV4) {
 		struct sockaddr_in addr;
 		socklen_t len;
 		/*char str[INET_ADDRSTRLEN];*/
 
-
+		/* Receive data */
 		ret = recvfrom(io_ctx->sockfd, pkt_buf, MAX_PACKET_SIZE, 0,
 				(struct sockaddr *) &addr, &len);
 		addr.sin_addr.s_addr = 0;
@@ -690,6 +691,7 @@ int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 		socklen_t len = INET6_ADDRSTRLEN;
 		/*char str[INET6_ADDRSTRLEN];*/
 
+		/* Receive data */
 		ret = recvfrom(io_ctx->sockfd, pkt_buf, MAX_PACKET_SIZE, 0,
 				(struct sockaddr *) &addr, &len);
 		addr.sin6_addr = in6addr_any;
@@ -708,8 +710,11 @@ int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 		return io_ctx->buf_size = 0;
 	}
 
+	/* Prepare encrypted data */
 	packet.data = (krb5_pointer) pkt_buf;
 	packet.length = ret;
+
+	/* Decrypt data */
 	*error_num = krb5_rd_priv(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, &packet, &message, NULL);
 	if (*error_num) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_rd_priv %d: %s\n", *error_num,
@@ -718,8 +723,7 @@ int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 	}
 
 	io_ctx->buf_size = message.length;
-	io_ctx->buf = message.data;
-
+	memcpy(io_ctx->buf, message.data, io_ctx->buf_size);
 	return io_ctx->buf_size;
 }
 
@@ -731,6 +735,7 @@ int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 	krb5_data inbuf, packet;
 	int ret;
 
+	/* Set up address */
 	if (io_ctx->peer_addr.ip_ver == IPV4) {
 		/*socklen_t len = 0;*/
 		struct sockaddr_in addr;
@@ -775,20 +780,24 @@ int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 		return 0;
 	}
 
+	/* Prepare data for encryption */
 	inbuf.length = io_ctx->buf_size;
 	inbuf.data = (krb5_pointer) io_ctx->buf;
 
+	/* Make kerberos private message */
 	*error_num = krb5_mk_priv(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, &inbuf, &packet, NULL);
 	if(*error_num){
 		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_mk_priv %d: %s\n", *error_num,
 				krb5_get_error_message(io_ctx->krb5_ctx, *error_num));
 		return /*io_ctx->buf_size =*/ 0;
 	}
+	/* Send it */
 	ret = send(io_ctx->sockfd, (char *)packet.data, (unsigned) packet.length, 0);
 	if (ret < 0) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Error sending data\n");
 		return /*io_ctx->buf_size =*/ 0;
 	}
+	/* Free memmory */
 	krb5_free_data_contents(io_ctx->krb5_ctx, &packet);
 
 	return ret;
