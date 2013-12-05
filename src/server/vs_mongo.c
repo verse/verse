@@ -87,11 +87,29 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
  * \brief This function save current server context to Mongo database
  *
  * \param[in] *session	The pointer at verse
+ *
+ * \return This function returns 1, when context was save. Otherwise it
+ * returns 0
  */
 int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 {
-	(void)vs_ctx;
-	return 1;
+	bson b_obj;
+	int ret;
+
+	/* Try to find existing "server_id" and update it, when it is different */
+	bson_init(&b_obj);
+	bson_append_new_oid( &b_obj, "_id" );
+	bson_append_string(&b_obj, "server_id", vs_ctx->hostname);
+	/* TODO: save all nodes */
+	bson_finish(&b_obj);
+
+	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b_obj, NULL);
+
+	if(ret == MONGO_OK) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 
