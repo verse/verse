@@ -908,6 +908,10 @@ static int vc_USRAUTH_krb_loop(struct vContext *C)
  */
 void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 {
+#ifdef WITH_KERBEROS
+	if (stream_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
+#ifdef WITH_OPENSSL
 	int ret;
 
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
@@ -918,23 +922,26 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 	}
 
 	switch(ret) {
-	case 1:
+		case 1:
 		/* SSL was successfully closed */
 		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was shut down.\n");
 		break;
-	case 0:
-	case -1:
-	default:
+		case 0:
+		case -1:
+		default:
 		/* some error occured */
 		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was not able to shut down.\n");
 		break;
 	}
 
 	SSL_free(stream_conn->io_ctx.ssl);
+#endif
+#ifdef WITH_KERBEROS
+	}
+#endif
 
 	close(stream_conn->io_ctx.sockfd);
 
-	/*v_conn_stream_destroy(stream_conn);*/
 }
 
 /**
