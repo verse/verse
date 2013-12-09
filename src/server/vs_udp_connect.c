@@ -843,6 +843,11 @@ static void vs_OPEN_init(struct vContext *C)
 	dgram_conn->state[UDP_SERVER_STATE_OPEN].tv_state_began.tv_sec = tv.tv_sec;
 	dgram_conn->state[UDP_SERVER_STATE_OPEN].tv_state_began.tv_usec = tv.tv_usec;
 
+#ifdef WITH_KERBEROS
+	if(dgram_conn->io_ctx.use_kerberos == USE_KERBEROS){
+		dgram_conn->io_ctx.mtu = DEFAULT_MTU;
+	} else {
+#endif
 #ifdef WITH_OPENSSL
 	/* Try to get MTU from the bio */
 	ret = BIO_ctrl(dgram_conn->io_ctx.bio, BIO_CTRL_DGRAM_QUERY_MTU, 0, NULL);
@@ -857,7 +862,9 @@ static void vs_OPEN_init(struct vContext *C)
 	(void)ret;
 	dgram_conn->io_ctx.mtu = DEFAULT_MTU;
 #endif
-
+#ifdef WITH_KERBEROS
+	}
+#endif
 	/* Add ACK command to the list of ACK NAK commands to be send to the peer */
 	ack_cmd.id = CMD_ACK_ID;
 	ack_cmd.pay_id = r_packet->header.payload_id;
@@ -1335,6 +1342,17 @@ static int vs_init_dgram_ctx(struct vContext *C)
 	/* Set all bytes of buffer for incoming packet to zero */
 	memset(dgram_conn->io_ctx.buf, 0, MAX_PACKET_SIZE);
 
+#ifdef WITH_KERBEROS
+	if (C->io_ctx->use_kerberos == USE_KERBEROS) {
+		IO_CTX *io_ctx = CTX_io_ctx(C);
+
+		dgram_conn->io_ctx.use_kerberos = io_ctx->use_kerberos;
+		dgram_conn->io_ctx.krb5_ctx = io_ctx->krb5_ctx;
+		dgram_conn->io_ctx.krb5_auth_ctx = io_ctx->krb5_auth_ctx;
+
+		/*dgram_conn->io_ctx.flags |= SOCKET_SECURED;*/
+	} else {
+#endif
 #ifdef WITH_OPENSSL
 	/* Create BIO */
 	if((dgram_conn->io_ctx.bio = BIO_new_dgram(dgram_conn->io_ctx.sockfd, BIO_NOCLOSE)) == NULL) {
@@ -1346,6 +1364,9 @@ static int vs_init_dgram_ctx(struct vContext *C)
 	if( BIO_ctrl(dgram_conn->io_ctx.bio, BIO_CTRL_DGRAM_MTU_DISCOVER, 0, NULL) < 0) {
 		v_print_log(VRS_PRINT_ERROR, "BIO_ctrl()\n");
 		return 0;
+	}
+#endif
+#ifdef WITH_KERBEROS
 	}
 #endif
 
@@ -1390,6 +1411,12 @@ void *vs_main_dgram_loop(void *arg)
 	/* Set up IO CTX */
 	CTX_io_ctx_set(C, &dgram_conn->io_ctx);
 
+#ifdef WITH_KERBEROS
+	if (dgram_conn->io_ctx.use_kerberos == USE_KERBEROS) {
+		/*dgram_conn->flags |= SOCKET_SECURED;
+		dgram_conn->io_ctx.flags |= SOCKET_SECURED;*/
+	} else {
+#endif
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	if(vsession->flags & VRS_SEC_DATA_TLS) {
 		if( vs_init_dtls_connection(C) == 0) {
@@ -1406,6 +1433,9 @@ void *vs_main_dgram_loop(void *arg)
 	dgram_conn->flags &= ~SOCKET_SECURED;
 	dgram_conn->io_ctx.flags &= ~SOCKET_SECURED;
 #endif
+#ifdef WITH_KERBEROS
+	}
+#endif
 
 	/* Packet structure for receiving */
 	r_packet = (struct VPacket*)calloc(1, sizeof(struct VPacket));
@@ -1418,6 +1448,9 @@ void *vs_main_dgram_loop(void *arg)
 	vs_LISTEN_init(C);
 
 hello:
+#ifdef WITH_KERBEROS
+	if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	/* Wait for DTLS Hello Command from client */
 	if(vsession->flags & VRS_SEC_DATA_TLS) {
@@ -1518,6 +1551,9 @@ again:
 
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Current cipher: %s\n",
 				SSL_CIPHER_get_name(SSL_get_current_cipher(dgram_conn->io_ctx.ssl)));
+	}
+#endif
+#ifdef WITH_KERBEROS
 	}
 #endif
 

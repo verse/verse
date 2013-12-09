@@ -802,6 +802,102 @@ int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num)
 
 	return ret;
 }
+
+int v_krb5_dec(struct IO_CTX *io_ctx, krb5_error_code *error_num)
+{
+	krb5_data packet, message;
+
+	/* Set up address */
+	if(io_ctx->peer_addr.ip_ver == IPV4 || io_ctx->host_addr.ip_ver == IPV4) {
+		struct sockaddr_in addr;
+
+		addr.sin_addr.s_addr = 0;
+		addr.sin_port = 0;
+		if (v_krb5_set_addrs_ipv4(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, NULL, &addr,
+				error_num) != 1) {
+			return 0;
+		}
+	} else if (io_ctx->peer_addr.ip_ver == IPV6 || io_ctx->host_addr.ip_ver == IPV6) {
+		struct sockaddr_in6 addr;
+
+		addr.sin6_addr = in6addr_any;
+		addr.sin6_port = 0;
+		if (v_krb5_set_addrs_ipv6(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, NULL, &addr,
+				error_num) != 1) {
+			return 0;
+		}
+	} else {
+		printf("Bad addrtype");
+		return 0;
+	}
+
+	/* Prepare encrypted data */
+	packet.data = (krb5_pointer) io_ctx->buf;
+	packet.length = io_ctx->buf_size;
+
+	/* Decrypt data */
+	*error_num = krb5_rd_priv(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, &packet, &message, NULL);
+	if (*error_num) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_rd_priv %d: %s\n", *error_num,
+				krb5_get_error_message(io_ctx->krb5_ctx, *error_num));
+		return 0;
+	}
+
+	io_ctx->buf_size = message.length;
+	memcpy(io_ctx->buf, message.data, io_ctx->buf_size);
+
+	return 1;
+}
+
+int v_krb5_enc(struct IO_CTX *io_ctx, krb5_error_code *error_num)
+{
+	krb5_data inbuf, packet;
+
+	/* Set up address */
+	if (io_ctx->peer_addr.ip_ver == IPV4 || io_ctx->host_addr.ip_ver == IPV4) {
+		struct sockaddr_in addr;
+
+		addr.sin_addr.s_addr = 0;
+		addr.sin_port = 0;
+		if (v_krb5_set_addrs_ipv4(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, &addr, NULL,
+				error_num) != 1) {
+			return 0;
+		}
+
+	} else if (io_ctx->peer_addr.ip_ver == IPV6 || io_ctx->host_addr.ip_ver == IPV6) {
+		struct sockaddr_in6 addr;
+
+		addr.sin6_addr = in6addr_any;
+		addr.sin6_port = 0;
+
+		if (v_krb5_set_addrs_ipv6(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, &addr, NULL,
+				error_num) != 1) {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
+
+	/* Prepare data for encryption */
+	inbuf.length = io_ctx->buf_size;
+	inbuf.data = (krb5_pointer) io_ctx->buf;
+
+	/* Make kerberos private message */
+	*error_num = krb5_mk_priv(io_ctx->krb5_ctx, io_ctx->krb5_auth_ctx, &inbuf, &packet, NULL);
+	if(*error_num){
+		v_print_log(VRS_PRINT_DEBUG_MSG, "krb5_mk_priv %d: %s\n", *error_num,
+				krb5_get_error_message(io_ctx->krb5_ctx, *error_num));
+		return 0;
+	}
+
+	io_ctx->buf_size = packet.length;
+	memcpy(io_ctx->buf, packet.data, io_ctx->buf_size);
+
+	/* Free memmory */
+	krb5_free_data_contents(io_ctx->krb5_ctx, &packet);
+
+	return 1;
+}
 #endif
 #ifdef WITH_OPENSSL
 static int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
@@ -929,6 +1025,11 @@ int v_receive_packet(struct IO_CTX *io_ctx, int *error_num)
 	unsigned int addr_len = 0;
 	*error_num = 0;
 
+#ifdef WITH_KERBEROS
+	if (io_ctx->use_kerberos == USE_KERBEROS) {
+		goto receive_packet;
+	}
+#endif
 #ifdef WITH_OPENSSL
 	if(io_ctx->flags & SOCKET_SECURED) {
 again:
@@ -959,6 +1060,9 @@ again:
 		return 0;
 	} else {
 #endif
+#ifdef WITH_KERBEROS
+receive_packet:
+#endif
 		if (io_ctx->flags & SOCKET_CONNECTED) {
 			/* Try to receive packet from connected socket */
 			if( (io_ctx->buf_size = recv(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0)) == -1) {
@@ -966,6 +1070,13 @@ again:
 				v_print_log(VRS_PRINT_ERROR, "recv(): %s\n", strerror(*error_num));
 				return -1;
 			}
+#ifdef WITH_KERBEROS
+			if (io_ctx->use_kerberos == USE_KERBEROS) {
+				if (v_krb5_dec(io_ctx, error_num) != 1) {
+					return -1;
+				}
+			}
+#endif
 			return 1;
 		} else {
 			/* Try to receive packet from unconnected socket */
@@ -978,6 +1089,13 @@ again:
 					v_print_log(VRS_PRINT_ERROR, "recvfrom(): %s\n", strerror(*error_num));
 					return -1;
 				}
+#ifdef WITH_KERBEROS
+				if (io_ctx->use_kerberos == USE_KERBEROS) {
+					if (v_krb5_dec(io_ctx, error_num) != 1) {
+						return -1;
+					}
+				}
+#endif
 				return 1;
 			}
 			else if( io_ctx->host_addr.ip_ver == IPV6 ) {
@@ -989,6 +1107,13 @@ again:
 					v_print_log(VRS_PRINT_ERROR, "recvfrom(): %s\n", strerror(*error_num));
 					return -1;
 				}
+#ifdef WITH_KERBEROS
+				if (io_ctx->use_kerberos == USE_KERBEROS) {
+					if (v_krb5_dec(io_ctx, error_num) != 1) {
+						return -1;
+					}
+				}
+#endif
 				return 1;
 			} else {
 				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Unsupported address type %d\n", io_ctx->host_addr.ip_ver);
@@ -1009,7 +1134,15 @@ int v_send_packet(struct IO_CTX *io_ctx, int *error_num)
 {
 	int ret;
 	if(error_num != NULL) *error_num = 0;
-
+#ifdef WITH_KERBEROS
+	if (io_ctx->use_kerberos == USE_KERBEROS) {
+		if (v_krb5_enc(io_ctx, error_num) != 1) {
+			return SEND_PACKET_ERROR;
+		} else {
+			goto send_packet;
+		}
+	}
+#endif
 #ifdef WITH_OPENSSL
 	if(io_ctx->flags & SOCKET_SECURED) {
 again:
@@ -1040,6 +1173,7 @@ again:
 		}
 	} else {
 #endif
+send_packet:
 		if (io_ctx->flags & SOCKET_CONNECTED) {
 			if((ret = send(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0)) == -1) {
 				if(error_num != NULL) *error_num = errno;

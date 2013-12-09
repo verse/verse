@@ -460,12 +460,18 @@ int vc_REQUEST_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_KERBEROS
+		if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
+		}
+#endif
+#ifdef WITH_KERBEROS
 		}
 #endif
 	}
@@ -604,13 +610,18 @@ int vc_PARTOPEN_loop(struct vContext *C)
 		} else if(ret == RECEIVE_PACKET_ERROR) {
 			return STATE_EXIT_ERROR;
 		}
-
+#ifdef WITH_KERBEROS
+		if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
+		}
+#endif
+#ifdef WITH_KERBEROS
 		}
 #endif
 	}
@@ -697,12 +708,18 @@ int vc_OPEN_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_KERBEROS
+		if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
+		}
+#endif
+#ifdef WITH_KERBEROS
 		}
 #endif
 	}
@@ -800,12 +817,18 @@ int vc_CLOSING_loop(struct vContext *C)
 			return STATE_EXIT_ERROR;
 		}
 
+#ifdef WITH_KERBEROS
+		if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #ifdef WITH_OPENSSL
 		if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 			/* Did server close DTLS connection? */
 			if((SSL_get_shutdown(dgram_conn->io_ctx.ssl) & SSL_RECEIVED_SHUTDOWN)) {
 				return STATE_EXIT_ERROR;
 			}
+		}
+#endif
+#ifdef WITH_KERBEROS
 		}
 #endif
 	}
@@ -1248,7 +1271,18 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	}
 
 	freeaddrinfo(result);
+#ifdef WITH_KERBEROS
+	if (C->io_ctx->use_kerberos == USE_KERBEROS) {
+		IO_CTX *io_ctx = CTX_io_ctx(C);
 
+		dgram_conn->io_ctx.use_kerberos = io_ctx->use_kerberos;
+		dgram_conn->io_ctx.krb5_ctx = io_ctx->krb5_ctx;
+		dgram_conn->io_ctx.krb5_auth_ctx = io_ctx->krb5_auth_ctx;
+
+		dgram_conn->io_ctx.mtu = DEFAULT_MTU;
+		/*dgram_conn->io_ctx.flags |= SOCKET_SECURED;*/
+	} else {
+#endif
 	/* When DTLS was negotiated, then set flag */
 	if(url.security_protocol == VRS_SEC_DATA_TLS) {
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
@@ -1283,6 +1317,9 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	}
 #else
 	dgram_conn->io_ctx.mtu = DEFAULT_MTU;
+#endif
+#ifdef WITH_KERBEROS
+	}
 #endif
 
 	/* Set up necessary flag for V_CTX (client will be able to send and receive packets only to/from server) */
@@ -1321,6 +1358,9 @@ void* vc_main_dgram_loop(void *arg)
 	CTX_current_dgram_conn_set(C, dgram_conn);
 	CTX_io_ctx_set(C, &dgram_conn->io_ctx);
 
+#ifdef WITH_KERBEROS
+	if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	/* If negotiated security is DTLS, then try to do DTLS handshake */
 	if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
@@ -1333,7 +1373,9 @@ void* vc_main_dgram_loop(void *arg)
 		}
 	}
 #endif
-
+#ifdef WITH_KERBEROS
+	}
+#endif
 	/* Packet structure for receiving */
 	r_packet = (struct VPacket*)malloc(sizeof(struct VPacket));
 	CTX_r_packet_set(C, r_packet);
@@ -1406,9 +1448,15 @@ end:
 	free(r_packet);
 	free(s_packet);
 
+#ifdef WITH_KERBEROS
+	if (dgram_conn->io_ctx.use_kerberos != USE_KERBEROS) {
+#endif
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 	if(dgram_conn->io_ctx.flags & SOCKET_SECURED) {
 		vc_destroy_dtls_connection(C);
+	}
+#endif
+#ifdef WITH_KERBEROS
 	}
 #endif
 
