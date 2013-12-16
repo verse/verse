@@ -207,7 +207,14 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 #ifdef WITH_KERBEROS
 		use_kerberos = iniparser_getstring(ini_dict, "Security:UseKerberos", NULL);
 		if(use_kerberos != NULL && strcmp(use_kerberos, "yes") == 0) {
+			char *service_name, *domain_name;
+			service_name = iniparser_getstring(ini_dict, "Security:Service", NULL);
+			domain_name = iniparser_getstring(ini_dict, "Security:Domain", NULL);
 			vs_ctx->use_krb5 = USE_KERBEROS;
+			if(domain_name != NULL)
+			vs_ctx->domain_name = strdup(domain_name);
+			if(service_name != NULL)
+			vs_ctx->service_name = strdup(service_name);
 			printf("Kerberos will be used\n");
 		}
 #endif

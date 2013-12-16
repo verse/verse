@@ -51,6 +51,7 @@
 #include "vs_udp_connect.h"
 #include "vs_auth_pam.h"
 #include "vs_auth_csv.h"
+#include "vs_auth_ldap.h"
 #include "vs_node.h"
 #include "vs_sys_nodes.h"
 
@@ -85,8 +86,10 @@ int vs_user_auth(struct vContext *C, const char *username, const char *data)
 #endif
 			break;
 		case AUTH_METHOD_LDAP:
-			/* TODO: it needs real implementation */
-			uid = -1;
+			uid = vs_ldap_auth_user(C, username, data);
+			break;
+		case AUTH_METHOD_LDAP_LOAD_AT_LOGIN:
+			uid = vs_ldap_auth_and_add_user(C, username, data);
 			break;
 	}
 
@@ -231,7 +234,6 @@ int vs_kerberos_auth(struct vContext *C, char **u_name){
         io_ctx->krb5_ctx = vs_ctx->tcp_io_ctx.krb5_ctx;
         io_ctx->krb5_ticket = vs_ctx->tcp_io_ctx.krb5_ticket;
         io_ctx->krb5_keytab = vs_ctx->tcp_io_ctx.krb5_keytab;
-        /*io_ctx->use_kerberos = USE_KERBEROS;*/
 
         /* Check authentication info */
         if ((krb5err = krb5_rd_req(io_ctx->krb5_ctx,

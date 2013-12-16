@@ -220,9 +220,6 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 #else
 	vc_ctx->dtls_ctx = NULL;
 #endif
-#ifdef WITH_KERBEROS
-	vc_ctx->use_kerberos = USE_KERBEROS;
-#endif
 
 	/* Default name and version */
 	vc_ctx->client_name = NULL;

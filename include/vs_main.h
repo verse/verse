@@ -128,6 +128,8 @@ typedef struct VS_CTX {
 #ifdef WITH_KERBEROS
 	/* Kerberos context */
 	unsigned short		use_krb5;					/* Will be kerebos used? O no 1 yes */
+	char 				*service_name;				/* Name of service for Kerberos principal */
+	char				*domain_name;				/* Domain name for Kerberos principal */
 #endif
 	/* Path to files with certificates */
 	char				*public_cert_file;			/* Path to the certificate file with public key */

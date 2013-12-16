@@ -36,6 +36,8 @@ if (LDAP_FOUND)
 endif (LDAP_FOUND)
 
 if (KERBEROS_FOUND)
+	set (verse_client_libs ${verse_client_libs} ${KERBEROS_LIBRARY})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_KERBEROS")
 	include_directories (${KERBEROS_INCLUDE_DIR})
 endif (KERBEROS_FOUND)
 

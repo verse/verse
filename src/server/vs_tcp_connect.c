@@ -906,12 +906,11 @@ int vs_init_kerberos(VS_CTX *vs_ctx){
 				krb5_get_error_message(vs_ctx->tcp_io_ctx.krb5_ctx, krb5_err));
 		return -1;
 	}
-	/** TODO
-	 * resolv service and domain names
-	 */
-	if ((krb5_err = krb5_sname_to_principal(vs_ctx->tcp_io_ctx.krb5_ctx, "localhost",
-			"verse",
-			KRB5_NT_SRV_HST, &vs_ctx->tcp_io_ctx.krb5_principal))) {
+
+	/* Set up Kerberos principal for Verse server */
+	if ((krb5_err = krb5_sname_to_principal(vs_ctx->tcp_io_ctx.krb5_ctx, vs_ctx->domain_name,
+							vs_ctx->service_name,
+							KRB5_NT_SRV_HST, &vs_ctx->tcp_io_ctx.krb5_principal))) {
 		v_print_log(VRS_PRINT_ERROR, "krb5_sname_to_principal: %d: %s\n",
 				krb5_err, krb5_get_error_message(vs_ctx->tcp_io_ctx.krb5_ctx, krb5_err));
 		return -1;

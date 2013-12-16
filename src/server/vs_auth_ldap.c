@@ -395,8 +395,8 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 					/* Successful search */
 					v_print_log(VRS_PRINT_DEBUG_MSG,
 							"LDAP search successful\n");
-					vs_ctx->users.first = NULL;
-					vs_ctx->users.last = NULL;
+					/*vs_ctx->users.first = NULL;
+					vs_ctx->users.last = NULL;*/
 
 					/* Fetching user info from LDAP message */
 					vs_add_users_from_ldap_message(vs_ctx, ldap, ldap_message);
@@ -428,76 +428,6 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 	return ret;
 }
 
-/**
- * \brief Load new user accounts from LDAP server
- * \param VS_CTX *vs_ctx	The Verse server context.
- */
-int vs_load_new_user_accounts_ldap_server(VS_CTX *vs_ctx)
-{
-	LDAP *ldap;
-	int ret = 0;
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Loading user accounts.\n");
-	/* Initialization of LDAP structure */
-	if ((ret = ldap_initialize(&ldap, vs_ctx->ldap_hostname)) == LDAP_SUCCESS) {
-		int version;
-
-		v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP initialized\n");
-		version = vs_ctx->ldap_version;
-		/* Setting LDAP version */
-		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
-				== LDAP_SUCCESS) {
-			/* Bind to LDAP server */
-			if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
-					vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
-				char *search_filter = NULL;
-				LDAPMessage *ldap_message = NULL;
-
-				v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP binded\n");
-				/* Setup search filter */
-				search_filter = strdup("objectClass=inetOrgPerson");
-				/* Sear for users in LDAP */
-				ret = ldap_search_ext_s(ldap, vs_ctx->ldap_search_base,
-						LDAP_SCOPE_SUBTREE, search_filter, NULL, 0, NULL, NULL,
-						NULL, 0, &ldap_message);
-				/* Unsuccessful search */
-				if (ret != LDAP_SUCCESS) {
-					v_print_log(VRS_PRINT_DEBUG_MSG,
-							"ldap_search_ext_s: %d: %s\n", ret,
-							ldap_err2string(ret));
-				} else {
-					/* Successful search */
-					v_print_log(VRS_PRINT_DEBUG_MSG,
-							"LDAP search successful\n");
-
-					/* Fetching user info from LDAP message */
-					vs_add_users_from_ldap_message(vs_ctx, ldap, ldap_message);
-
-					ldap_memfree(ldap_message);
-					ldap_message = NULL;
-					ret = 1;
-				}
-				/* Free memory */
-				free(search_filter);
-				search_filter = NULL;
-				/* Unbind */
-				ldap_unbind_s(ldap);
-			} else {
-				/* Unsuccessful bind */
-				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_simple_bind_s: %d: %s\n",
-						ret, ldap_err2string(ret));
-			}
-		} else {
-			/* Setting version failed */
-			v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_set_option: %d: %s\n", ret,
-					ldap_err2string(ret));
-		}
-	} else {
-		/* Initialization failed */
-		v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_initialize: %d: %s\n", ret,
-				ldap_err2string(ret));
-	}
-	return ret;
-}
 /**
  * \brief Load LDAP user accounts saved in csv file
  * \param VS_CTX *vs_ctx	The Verse server context.
@@ -506,8 +436,8 @@ int vs_load_saved_ldap_users(VS_CTX *vs_ctx)
 {
 	int ret = 1;
 
-	vs_ctx->users.first = NULL;
-	vs_ctx->users.last = NULL;
+	/*vs_ctx->users.first = NULL;
+	vs_ctx->users.last = NULL;*/
 
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Loading cached user accounts.\n");
 

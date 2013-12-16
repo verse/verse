@@ -1310,7 +1310,6 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
                 *error = VRS_CONN_TERM_ERROR;
                 return NULL;
         }
-        stream_conn->io_ctx.use_kerberos = NO_KERBEROS;
 
 #ifdef WITH_KERBEROS
 		/* Will be kerberos used? */
@@ -1319,11 +1318,15 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			if (krb5err) {
 				v_print_log(VRS_PRINT_ERROR, "krb5_init_context: %d: %s\n", krb5err,
 						krb5_get_error_message(stream_conn->io_ctx.krb5_ctx, krb5err));
+				return NULL;
 			}
-			s_name = malloc(64*sizeof(char));
-			h_name = malloc(64*sizeof(char));
-			strcpy(s_name, "verse");
-			strcpy(h_name, "localhost");
+			if((strcmp(service, "12345") == 0) || (strcmp(service, "12345") == 0)) {
+				s_name = strdup("verse");
+			} else {
+				s_name = strdup(service);
+			}
+			h_name = strdup(node);
+
 			/* Get credentials for server */
 			stream_conn->io_ctx.krb5_cc = NULL;
 			if ((krb5err = krb5_cc_default(stream_conn->io_ctx.krb5_ctx,
@@ -1333,23 +1336,18 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 				return NULL;
 			}
 
-			/**
-			 * TODO: use any hostname and any service
-			 */
 			inbuf.data = h_name;
 			inbuf.length = strlen(h_name);
 			stream_conn->io_ctx.krb5_auth_ctx = NULL;
 			if ((krb5err = krb5_mk_req(stream_conn->io_ctx.krb5_ctx,
 									&stream_conn->io_ctx.krb5_auth_ctx, 0, s_name, h_name, &inbuf,
 									stream_conn->io_ctx.krb5_cc, &packet))) {
-				printf("Error making request\n");
 				v_print_log(VRS_PRINT_ERROR,
-						"krb5_mk_req: %d: %s\t service name: %s\n", krb5err,
-						krb5_get_error_message(stream_conn->io_ctx.krb5_ctx, krb5err),
-						service);
+						"krb5_mk_req: %d: %s\n", krb5err,
+						krb5_get_error_message(stream_conn->io_ctx.krb5_ctx, krb5err));
 				return NULL;
 			}
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Got credentials for %s.\n", service);
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Got credentials for %s/%s.\n", s_name, h_name);
 
 			/* Send authentication info to server */
 			if (send(stream_conn->io_ctx.sockfd, (char *) packet.data,

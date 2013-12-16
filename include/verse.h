@@ -204,6 +204,8 @@ int vrs_set_client_info(char *name, char *version);
 
 char *vrs_strerror(const uint32_t error_num);
 
+void vrs_set_krb5_use();
+
 int vrs_send_fps(const uint8_t session_id,
 		const uint8_t prio,
 		const float fps);

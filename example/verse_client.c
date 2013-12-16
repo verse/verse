@@ -43,6 +43,7 @@
 #include <signal.h>
 #include <string.h>
 #include <stdint.h>
+#include <krb5.h>
 
 #include "verse.h"
 
@@ -875,6 +876,64 @@ static int set_debug_level(char *debug_level)
 	return 0;
 }
 
+int init_krb5_cc(){
+	krb5_ccache cc = NULL;
+	krb5_context ctx;
+	krb5_error_code err;
+	krb5_principal princ;
+	krb5_creds creds;
+	char name[64];
+	char *pass;
+
+	err = krb5_init_context(&ctx);
+	if (err) {
+		printf("krb5_init_context: %d: %s\n", err,
+				krb5_get_error_message(ctx, err));
+		return -1;
+	}
+	printf("Username: ");
+	scanf("%s", name);
+
+	err = krb5_parse_name(ctx, name, &princ);
+	if (err) {
+		printf("krb5_parse_name: %d: %s\n", err,
+				krb5_get_error_message(ctx, err));
+		return -1;
+	}
+
+	err = krb5_cc_default(ctx, &cc);
+	if (err) {
+		printf("krb5_cc_default: %d: %s\n", err,
+				krb5_get_error_message(ctx, err));
+		return -1;
+	}
+
+	err = krb5_cc_initialize(ctx, cc, princ);
+	if (err) {
+		printf("krb5_cc_initialize: %d: %s\n", err,
+				krb5_get_error_message(ctx, err));
+		return -1;
+	}
+
+	pass = getpass("Password: ");
+	err = krb5_get_init_creds_password(ctx, &creds, princ, pass, NULL, NULL, 0,
+	NULL, NULL);
+	if (err) {
+		printf("krb5_get_init_creds_password: %d: %s\n", err,
+				krb5_get_error_message(ctx, err));
+		return -1;
+	}
+
+	err = krb5_cc_store_cred(ctx, cc, &creds);
+	if (err) {
+		printf("krb5_cc_store_cred: %d: %s\n", err,
+				krb5_get_error_message(ctx, err));
+		return -1;
+	}
+
+	return 0;
+}
+
 /**
  * \brief This function print help of verse_client command (options and
  * parameters )
@@ -885,6 +944,7 @@ static void print_help(char *prog_name)
 	printf("  This program is example of Verse client\n\n");
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
+	printf("   -k               use Kerberos autentication and encryption\n");
 	printf("   -u username      username used for login at Verse server\n");
 	printf("   -p password      password used for login at Verse server\n");
 	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
@@ -915,7 +975,7 @@ int main(int argc, char *argv[])
 	/* When client was started with some arguments */
 	if(argc>1) {
 		/* Parse all options */
-		while( (opt = getopt(argc, argv, "hu:p:s:t:d:")) != -1) {
+		while( (opt = getopt(argc, argv, "hu:p:s:t:d:k")) != -1) {
 			switch(opt) {
 				case 's':
 					if(strcmp(optarg, "none") == 0) {
@@ -966,6 +1026,13 @@ int main(int argc, char *argv[])
 					ret = set_debug_level(optarg);
 					if(ret != VRS_SUCCESS) {
 						print_help(argv[0]);
+						exit(EXIT_FAILURE);
+					}
+					break;
+				case 'k':
+					vrs_set_krb5_use();
+					ret = init_krb5_cc();
+					if (ret != VRS_SUCCESS) {
 						exit(EXIT_FAILURE);
 					}
 					break;

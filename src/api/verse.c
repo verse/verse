@@ -196,6 +196,15 @@ int vrs_send_node_create(const uint8_t session_id,
 
 }
 
+/**
+ * brief This function turns on Kerberos authentication and encryption
+ */
+void vrs_set_krb5_use()
+{
+	vc_init_VC_CTX();
+	vc_ctx->use_kerberos = USE_KERBEROS;
+}
+
 
 /**
  * \brief This function register callback function for command Node_Create

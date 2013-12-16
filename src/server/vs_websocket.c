@@ -347,7 +347,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 				}
 			} else {
 
-				if( vs_handle_handshake(C) == -1 ) {
+				if( vs_handle_handshake(C, NULL) == -1 ) {
 					/* TODO: end connection */
 					return;
 				}

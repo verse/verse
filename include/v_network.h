@@ -229,7 +229,6 @@ typedef struct IO_CTX {
 	int						sockfd;			/* UDP/TCP/WebSocket socket */
 	unsigned char			flags;			/* Flags for sending and receiving context */
 	unsigned short			mtu;			/* MTU of connection discovered with PMTU */
-	unsigned short			use_kerberos;	/** Will be kerberos use? O no 1 yes */
 #ifdef WITH_OPENSSL
 	/* Security */
 	SSL						*ssl;
@@ -237,6 +236,7 @@ typedef struct IO_CTX {
 #endif
 #ifdef WITH_KERBEROS
 	/* Kerberos context */
+	unsigned short		use_kerberos;		/* Will be kerberos used? O no 1 yes */
 	krb5_keytab			krb5_keytab;		/* Kerberos keytab table */
 	krb5_principal		krb5_principal;		/* Kerberos principal */
 	krb5_context		krb5_ctx;			/* Kerberos library context */
@@ -261,10 +261,6 @@ void v_print_url(const int level, struct VURL *url);
 void v_clear_url(struct VURL *url);
 
 int v_exponential_backoff(const int steps);
-#ifdef WITH_KERBEROS
-int v_krb5_read(struct IO_CTX *io_ctx, krb5_error_code *error_num);
-int v_krb5_write(struct IO_CTX *io_ctx, krb5_error_code *error_num);
-#endif
 int v_tcp_read(struct IO_CTX *io_ctx, int *error_num);
 int v_tcp_write(struct IO_CTX *io_ctx, int *error_num);
 

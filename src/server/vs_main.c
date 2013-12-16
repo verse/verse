@@ -92,10 +92,10 @@ static int vs_reload_user_accounts(struct VS_CTX *vs_ctx)
 
 	switch (vs_ctx->auth_type) {
 	case AUTH_METHOD_CSV_FILE:
-		vs_load_new_user_accounts_csv_file(vs_ctx);
+		vs_load_user_accounts_csv_file(vs_ctx);
 		break;
 	case AUTH_METHOD_LDAP:
-		vs_load_new_user_accounts_ldap_server(vs_ctx);
+		vs_load_user_accounts_ldap_server(vs_ctx);
 		break;
 	default:
 		break;
@@ -238,6 +238,8 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->data.sem = NULL;
 #ifdef WITH_KERBEROS
 	vs_ctx->use_krb5 = NO_KERBEROS; /* Not using kerberos as default */
+	vs_ctx->service_name = strdup("verse");
+	vs_ctx->domain_name = NULL;
 #endif
 }
 

@@ -27,6 +27,5 @@
 
 int vs_csv_auth_user(struct vContext *C, const char *username, const char *pass);
 int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx);
-int vs_load_new_user_accounts_csv_file(VS_CTX *vs_ctx);
 
 #endif /* VS_AUTH_CSV_H_ */
