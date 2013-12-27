@@ -65,17 +65,31 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 					if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION,
 							&version)) == LDAP_SUCCESS) {
 						/* Bind to LDAP server */
-						if ((ret = ldap_simple_bind_s(ldap, vsuser->ldap_dn,
-								pass)) == LDAP_SUCCESS) {
+						int msgid;
+						struct berval bv;
+						ret = ldap_start_tls_s(ldap, NULL, NULL);
+						if (ret != LDAP_SUCCESS) {
+							v_print_log(VRS_PRINT_DEBUG_MSG,
+									"ldap_start_tls_s: %d: %s\n", ret,
+									ldap_err2string(ret));
+						}
+						bv.bv_len = strlen(pass);
+						bv.bv_val = malloc((bv.bv_len + 1) * sizeof(char));
+						strcpy(bv.bv_val, pass);
+						ret = ldap_sasl_bind(ldap, vsuser->ldap_dn,
+								LDAP_SASL_SIMPLE, &bv, NULL,
+								NULL, &msgid);
+						if (msgid != -1) {
 							/* Login OK */
 							uid = vsuser->user_id;
 							/* Unbind */
-							ldap_unbind_s(ldap);
+							ldap_unbind_ext(ldap, NULL, NULL);
 							break;
 						} else {
 							/* Login failed */
 							break;
 						}
+						free(bv.bv_val);
 					} else {
 						/* Setting version failed */
 						v_print_log(VRS_PRINT_DEBUG_MSG,
@@ -152,12 +166,12 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 		LDAPMessage *ldap_message)
 {
 	int count = 0;
-	char **user_cn = NULL;
+	struct berval *user_cn = NULL;
 	char *user_dn = NULL;
-	char **user_given_name = NULL;
-	char **user_sn = NULL;
+	struct berval *user_given_name = NULL;
+	struct berval *user_sn = NULL;
 	char *user_real_name = NULL;
-	char **uid_str = NULL;
+	struct berval *uid_str = NULL;
 	struct VSUser *new_user, *user;
 	LDAPMessage *ldap_entry = NULL;
 
@@ -165,25 +179,25 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 			ldap_entry = ldap_next_entry(ldap, ldap_entry)) {
 		/* username */
 		new_user = (struct VSUser*) calloc(1, sizeof(struct VSUser));
-		user_cn = (char **) ldap_get_values(ldap, ldap_entry, "cn");
-		new_user->username = *user_cn;
+		user_cn = *ldap_get_values_len(ldap, ldap_entry, "cn");
+		new_user->username = user_cn->bv_val;
 		/* DN */
 		user_dn = (char *) ldap_get_dn(ldap, ldap_entry);
 		new_user->ldap_dn = user_dn;
 		/* realname */
-		user_given_name = (char **) ldap_get_values(ldap, ldap_entry,
+		user_given_name = *ldap_get_values_len(ldap, ldap_entry,
 				"givenName");
-		user_sn = (char **) ldap_get_values(ldap, ldap_entry, "sn");
+		user_sn = *ldap_get_values_len(ldap, ldap_entry, "sn");
 		user_real_name = malloc(
-				(strlen(*user_given_name) + strlen(*user_sn) + 2)
+				(user_given_name->bv_len + user_sn->bv_len + 2)
 						* sizeof(char));
 		snprintf(user_real_name,
-				strlen(*user_given_name) + strlen(*user_sn) + 2, "%s %s",
-				*user_given_name, *user_sn);
+				user_given_name->bv_len + user_sn->bv_len + 2, "%s %s",
+				user_given_name->bv_val, user_sn->bv_val);
 		new_user->realname = user_real_name;
 		/* uid */
-		uid_str = (char **) ldap_get_values(ldap, ldap_entry, "uid");
-		sscanf(*uid_str, "%d", (int *) &new_user->user_id);
+		uid_str = *ldap_get_values_len(ldap, ldap_entry, "uid");
+		sscanf(uid_str->bv_val, "%d", (int *) &new_user->user_id);
 		/* This is real user and can login */
 		new_user->fake_user = 0;
 		/* Check uniqueness of username and user id */
@@ -221,16 +235,10 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 			free(new_user);
 		}
 		/* Free memory */
-		free(*user_given_name);
-		*user_given_name = NULL;
 		free(user_given_name);
 		user_given_name = NULL;
-		free(*user_sn);
-		*user_sn = NULL;
 		free(user_sn);
 		user_sn = NULL;
-		free(*uid_str);
-		*uid_str = NULL;
 		free(uid_str);
 		uid_str = NULL;
 		free(user_cn);
@@ -265,10 +273,20 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 		/* Setting LDAP version. */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP version %d\n", version);
 			/* Bind to LDAP server */
-			if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
-					vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
+			int msgid;
+			struct berval bv;
+
+			ret = ldap_start_tls_s(ldap, NULL, NULL);
+			if (ret != LDAP_SUCCESS) {
+				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_start_tls_s: %d: %s\n",
+						ret, ldap_err2string(ret));
+			}
+			bv.bv_len = strlen(vs_ctx->ldap_passwd);
+			bv.bv_val = vs_ctx->ldap_passwd;
+			ret = ldap_sasl_bind(ldap, vs_ctx->ldap_user, LDAP_SASL_SIMPLE, &bv,
+					NULL, NULL, &msgid);
+			if (msgid != -1) {
 				/* bind OK */
 				char *search_filter;
 				int length;
@@ -307,10 +325,10 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 				free(search_filter);
 				search_filter = NULL;
 				/* Unbind */
-				ldap_unbind_s(ldap);
+				ldap_unbind_ext(ldap, NULL, NULL);
 			} else {
 				/* Unsuccessful bind */
-				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_simple_bind_s: %d: %s\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_sasl_bind: %d: %s\n",
 						ret, ldap_err2string(ret));
 			}
 		} else {
@@ -374,8 +392,18 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
 			/* Bind to LDAP server */
-			if ((ret = ldap_simple_bind_s(ldap, vs_ctx->ldap_user,
-					vs_ctx->ldap_passwd)) == LDAP_SUCCESS) {
+			int msgid;
+			struct berval bv;
+			ret = ldap_start_tls_s(ldap, NULL, NULL);
+			if (ret != LDAP_SUCCESS){
+				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_start_tls_s: %d: %s\n", ret,
+								ldap_err2string(ret));
+			}
+			bv.bv_len = strlen(vs_ctx->ldap_passwd);
+			bv.bv_val = vs_ctx->ldap_passwd;
+			ret = ldap_sasl_bind(ldap, vs_ctx->ldap_user, LDAP_SASL_SIMPLE,
+					&bv, NULL, NULL, &msgid);
+			if (msgid != -1) {
 				LDAPMessage *ldap_message = NULL;
 				char *search_filter = NULL;
 
@@ -395,8 +423,6 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 					/* Successful search */
 					v_print_log(VRS_PRINT_DEBUG_MSG,
 							"LDAP search successful\n");
-					/*vs_ctx->users.first = NULL;
-					vs_ctx->users.last = NULL;*/
 
 					/* Fetching user info from LDAP message */
 					vs_add_users_from_ldap_message(vs_ctx, ldap, ldap_message);
@@ -409,10 +435,10 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 				free(search_filter);
 				search_filter = NULL;
 				/* Unbind */
-				ldap_unbind_s(ldap);
+				ldap_unbind_ext(ldap, NULL, NULL);
 			} else {
 				/* Unsuccessful bind */
-				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_simple_bind_s: %d: %s\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_sasl_bind: %d: %s\n",
 						ret, ldap_err2string(ret));
 			}
 		} else {
