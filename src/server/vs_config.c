@@ -153,7 +153,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		if (user_auth_method != NULL && strcmp(user_auth_method, "ldap") == 0) {
 			int ldap_version = 0;
 
-			printf("user_auth_method: %s\n", user_auth_method);
+			v_print_log(VRS_PRINT_DEBUG_MSG, "user_auth_method: %s\n", user_auth_method);
 
 			ldap_version = iniparser_getint(ini_dict, "Users:Version", 0 );
 
@@ -161,7 +161,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 				char *ldap_hostname, *ldap_DN, *ldap_pass, *ldap_base,
 						*ldap_LOS;
 
-				printf("LDAP version %d\n", ldap_version);
+				v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP version %d\n", ldap_version);
 				vs_ctx->ldap_version = ldap_version;
 
 				ldap_hostname = iniparser_getstring(ini_dict, "Users:Hostname",
@@ -179,7 +179,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 						&& ldap_pass != NULL && ldap_base != NULL ) {
 					if (strcmp(ldap_LOS, "yes") == 0) {
 						vs_ctx->auth_type = AUTH_METHOD_LDAP;
-						printf("Users will be loaded on startup.\n");
+						v_print_log(VRS_PRINT_DEBUG_MSG, "Users will be loaded on startup.\n");
 					} else {
 						char *cache_file;
 
@@ -187,8 +187,8 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 								NULL );
 						vs_ctx->auth_type = AUTH_METHOD_LDAP_LOAD_AT_LOGIN;
 						vs_ctx->created_user_file = strdup(cache_file);
-						printf("Users will be loaded at login.\n");
-						printf("File for saving user accounts: %s\n",
+						v_print_log(VRS_PRINT_DEBUG_MSG, "Users will be loaded at login.\n");
+						v_print_log(VRS_PRINT_DEBUG_MSG, "File for saving user accounts: %s\n",
 								cache_file);
 					}
 
@@ -196,9 +196,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 					vs_ctx->ldap_user = strdup(ldap_DN);
 					vs_ctx->ldap_passwd = strdup(ldap_pass);
 					vs_ctx->ldap_search_base = strdup(ldap_base);
-					printf("LDAP server hostname: %s\n", ldap_hostname);
-					printf("LDAP user DN: %s\n", ldap_DN);
-					printf("LDAP search base: %s\n", ldap_base);
+					v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP server hostname: %s\n", ldap_hostname);
+					v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP user DN: %s\n", ldap_DN);
+					v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP search base: %s\n", ldap_base);
 				}
 			}
 		}
@@ -215,7 +215,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 			vs_ctx->domain_name = strdup(domain_name);
 			if(service_name != NULL)
 			vs_ctx->service_name = strdup(service_name);
-			printf("Kerberos will be used\n");
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Kerberos will be used\n");
 		}
 #endif
 		certificate_file_name = iniparser_getstring(ini_dict, "Security:Certificate", NULL);

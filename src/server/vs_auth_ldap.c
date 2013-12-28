@@ -64,22 +64,24 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 					/* Setting LDAP version */
 					if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION,
 							&version)) == LDAP_SUCCESS) {
-						/* Bind to LDAP server */
-						int msgid;
 						struct berval bv;
+
+						/* Open TLS connection */
 						ret = ldap_start_tls_s(ldap, NULL, NULL);
 						if (ret != LDAP_SUCCESS) {
 							v_print_log(VRS_PRINT_DEBUG_MSG,
 									"ldap_start_tls_s: %d: %s\n", ret,
 									ldap_err2string(ret));
 						}
+
+						/* Bind to LDAP server */
 						bv.bv_len = strlen(pass);
 						bv.bv_val = malloc((bv.bv_len + 1) * sizeof(char));
 						strcpy(bv.bv_val, pass);
-						ret = ldap_sasl_bind(ldap, vsuser->ldap_dn,
+						ret = ldap_sasl_bind_s(ldap, vsuser->ldap_dn,
 								LDAP_SASL_SIMPLE, &bv, NULL,
-								NULL, &msgid);
-						if (msgid != -1) {
+								NULL, NULL);
+						if (ret == LDAP_SUCCESS) {
 							/* Login OK */
 							uid = vsuser->user_id;
 							/* Unbind */
@@ -87,6 +89,9 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 							break;
 						} else {
 							/* Login failed */
+							v_print_log(VRS_PRINT_DEBUG_MSG,
+									"ldap_sasl_bind_s: %d: %s\n", ret,
+									ldap_err2string(ret));
 							break;
 						}
 						free(bv.bv_val);
@@ -273,20 +278,21 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 		/* Setting LDAP version. */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
-			/* Bind to LDAP server */
-			int msgid;
 			struct berval bv;
 
+			/* Open TLS connection */
 			ret = ldap_start_tls_s(ldap, NULL, NULL);
 			if (ret != LDAP_SUCCESS) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_start_tls_s: %d: %s\n",
 						ret, ldap_err2string(ret));
 			}
+
+			/* Bind to LDAP server */
 			bv.bv_len = strlen(vs_ctx->ldap_passwd);
 			bv.bv_val = vs_ctx->ldap_passwd;
-			ret = ldap_sasl_bind(ldap, vs_ctx->ldap_user, LDAP_SASL_SIMPLE, &bv,
-					NULL, NULL, &msgid);
-			if (msgid != -1) {
+			ret = ldap_sasl_bind_s(ldap, vs_ctx->ldap_user, LDAP_SASL_SIMPLE, &bv,
+					NULL, NULL, NULL);
+			if (ret == LDAP_SUCCESS) {
 				/* bind OK */
 				char *search_filter;
 				int length;
@@ -309,8 +315,6 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 							ldap_err2string(ret));
 				} else {
 					/* Successful search */
-					v_print_log(VRS_PRINT_DEBUG_MSG,
-							"LDAP search successful\n");
 
 					/* Fetching user info from LDAP message */
 					if (vs_add_users_from_ldap_message(vs_ctx, ldap,
@@ -328,7 +332,7 @@ int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 				ldap_unbind_ext(ldap, NULL, NULL);
 			} else {
 				/* Unsuccessful bind */
-				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_sasl_bind: %d: %s\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_sasl_bind_s: %d: %s\n",
 						ret, ldap_err2string(ret));
 			}
 		} else {
@@ -381,33 +385,32 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 	LDAP *ldap;
 	int ret = 0;
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Initializing LDAP\n");
 	/* Initialization of LDAP structure */
 	if ((ret = ldap_initialize(&ldap, vs_ctx->ldap_hostname)) == LDAP_SUCCESS) {
 		int version;
 
-		v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP initialized\n");
 		version = vs_ctx->ldap_version;
 		/* Setting LDAP version. */
 		if ((ret = ldap_set_option(ldap, LDAP_OPT_PROTOCOL_VERSION, &version))
 				== LDAP_SUCCESS) {
-			/* Bind to LDAP server */
-			int msgid;
 			struct berval bv;
+
+			/* Open TLS connection */
 			ret = ldap_start_tls_s(ldap, NULL, NULL);
 			if (ret != LDAP_SUCCESS){
 				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_start_tls_s: %d: %s\n", ret,
 								ldap_err2string(ret));
 			}
+
+			/* Bind to LDAP server */
 			bv.bv_len = strlen(vs_ctx->ldap_passwd);
 			bv.bv_val = vs_ctx->ldap_passwd;
-			ret = ldap_sasl_bind(ldap, vs_ctx->ldap_user, LDAP_SASL_SIMPLE,
-					&bv, NULL, NULL, &msgid);
-			if (msgid != -1) {
+			ret = ldap_sasl_bind_s(ldap, vs_ctx->ldap_user, LDAP_SASL_SIMPLE,
+					&bv, NULL, NULL, NULL);
+			if (ret == LDAP_SUCCESS) {
 				LDAPMessage *ldap_message = NULL;
 				char *search_filter = NULL;
 
-				v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP binded\n");
 				/* Setup search filter */
 				search_filter = strdup("objectClass=inetOrgPerson");
 				/* Sear for users in LDAP */
@@ -421,8 +424,6 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 							ldap_err2string(ret));
 				} else {
 					/* Successful search */
-					v_print_log(VRS_PRINT_DEBUG_MSG,
-							"LDAP search successful\n");
 
 					/* Fetching user info from LDAP message */
 					vs_add_users_from_ldap_message(vs_ctx, ldap, ldap_message);
@@ -438,7 +439,7 @@ int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx)
 				ldap_unbind_ext(ldap, NULL, NULL);
 			} else {
 				/* Unsuccessful bind */
-				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_sasl_bind: %d: %s\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG, "ldap_sasl_bind_s: %d: %s\n",
 						ret, ldap_err2string(ret));
 			}
 		} else {
