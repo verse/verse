@@ -93,17 +93,17 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
  */
 int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 {
-	bson b_obj;
+	bson b;
 	int ret;
 
 	/* Try to find existing "server_id" and update it, when it is different */
-	bson_init(&b_obj);
-	bson_append_new_oid( &b_obj, "_id" );
-	bson_append_string(&b_obj, "server_id", vs_ctx->hostname);
+	bson_init(&b);
+	bson_append_new_oid(&b, "_id");
+	bson_append_string(&b, "server_id", vs_ctx->hostname);
 	/* TODO: save all nodes */
-	bson_finish(&b_obj);
+	bson_finish(&b);
 
-	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b_obj, NULL);
+	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b, NULL);
 
 	if(ret == MONGO_OK) {
 		return 1;
