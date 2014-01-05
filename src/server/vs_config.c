@@ -150,6 +150,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		}
 
 		/* Try to load section [Users] for LDAP */
+#ifdef WITH_LDAP
 		if (user_auth_method != NULL && strcmp(user_auth_method, "ldap") == 0) {
 			int ldap_version = 0;
 
@@ -202,6 +203,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 				}
 			}
 		}
+#endif
 
 		/* Try to load section [Security] */
 #ifdef WITH_KERBEROS

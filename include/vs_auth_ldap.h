@@ -26,12 +26,13 @@
 #ifndef VS_AUTH_LDAP_H_
 #define VS_AUTH_LDAP_H_
 
+#ifdef WITH_LDAP
 int vs_ldap_auth_user(struct vContext *C, const char *username,
 		const char *pass);
 int vs_ldap_auth_and_add_user(struct vContext *C, const char *username,
 		const char *pass);
 int vs_load_user_accounts_ldap_server(VS_CTX *vs_ctx);
 int vs_load_saved_ldap_users(VS_CTX *vs_ctx);
-
+#endif
 
 #endif /* VS_AUTH_LDAP_H_ */

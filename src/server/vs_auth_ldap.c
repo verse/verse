@@ -22,7 +22,7 @@
  * Contributor(s): Jiri Hnidek <jiri.hnidek@tul.cz>.
  *
  */
-
+#ifdef WITH_LDAP
 #include <string.h>
 #include <ldap.h>
 
@@ -496,3 +496,4 @@ int vs_load_saved_ldap_users(VS_CTX *vs_ctx)
 
 	return ret;
 }
+#endif

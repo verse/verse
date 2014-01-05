@@ -96,9 +96,11 @@ static int vs_reload_user_accounts(struct VS_CTX *vs_ctx)
 	case AUTH_METHOD_CSV_FILE:
 		vs_load_user_accounts_csv_file(vs_ctx);
 		break;
+#ifdef WITH_LDAP
 	case AUTH_METHOD_LDAP:
 		vs_load_user_accounts_ldap_server(vs_ctx);
 		break;
+#endif
 	default:
 		break;
 	}
@@ -284,12 +286,14 @@ static int vs_load_user_accounts(struct VS_CTX *vs_ctx)
 		case AUTH_METHOD_CSV_FILE:
 			ret = vs_load_user_accounts_csv_file(vs_ctx);
 			break;
+#ifdef WITH_LDAP
 		case AUTH_METHOD_LDAP:
 			ret = vs_load_user_accounts_ldap_server(vs_ctx);
 			break;
 		case AUTH_METHOD_LDAP_LOAD_AT_LOGIN:
 			ret = vs_load_saved_ldap_users(vs_ctx);
 			break;
+#endif
 		default:
 			break;
 	}

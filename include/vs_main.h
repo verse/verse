@@ -154,11 +154,13 @@ typedef struct VS_CTX {
 	struct VSUser		*other_users;				/* The pointer at fake user other_users */
 	struct VSUser		*super_user;				/* The pointer at fake user of super user */
 	unsigned char		default_perm;				/* Default permissions for other users */
+#ifdef WITH_LDAP
 	char				*ldap_hostname;				/* LDAP server */
 	char				*ldap_user;					/* LDAP Verse user */
 	char				*ldap_passwd;				/* Password of LDAP Verse user */
 	char				*ldap_search_base;			/* LDAP search base */
 	int					ldap_version;				/* Version of LDAP */
+#endif
 	char				*created_user_file;			/* CSV file containing list of created users */
 	/* Data shared at verse server */
 	struct VSData		data;
