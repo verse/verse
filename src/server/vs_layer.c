@@ -22,6 +22,7 @@
  *
  */
 
+#include <stddef.h>
 
 #include "v_common.h"
 #include "v_layer_commands.h"
@@ -1056,4 +1057,3 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 
 	return vs_layer_unset_value(node, layer, item_id, 1);
 }
-

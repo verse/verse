@@ -54,6 +54,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #include "verse_types.h"
 
@@ -943,7 +944,7 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 	close(stream_conn->io_ctx.sockfd);
 
 }
-
+#ifdef WITH_OPENSSL
 /**
  * \brief This function verify certificate presented by server
  *
@@ -1174,6 +1175,7 @@ void vc_verify_certificate(struct vContext *C)
 
 	/* TODO: appropriate callback function */
 }
+#endif
 
 /**
  * \brief Create new TCP connection to the server

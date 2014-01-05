@@ -189,7 +189,7 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 	}
 #endif
 
-#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
+#if (defined WITH_OPENSSL) && (OPENSSL_VERSION_NUMBER>=0x10000000)
 	/* Set up SSL context for DTSL */
 	if( (vc_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_client_method())) == NULL ) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX for DTLS failed.\n");
@@ -218,7 +218,9 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 	/* This is necessary for DTLS */
 	SSL_CTX_set_read_ahead(vc_ctx->dtls_ctx, 1);
 #else
+#ifdef WITH_OPENSSL
 	vc_ctx->dtls_ctx = NULL;
+#endif
 #endif
 
 	/* Default name and version */

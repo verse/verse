@@ -36,7 +36,9 @@
 #if !defined VC_MAIN_H
 #define VC_MAIN_H
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
+#endif
 #include <sys/types.h>
 #include <stdio.h>
 
@@ -181,9 +183,11 @@ typedef struct VC_CTX {
 	struct VSession			**vsessions;				/**< List of sessions and session with connection attempts */
 	struct VFuncStorage		vfs;						/**< List of callback functions*/
 	uint32					session_counter;			/**< Counter of sessions used for unique session_id */
+#ifdef WITH_OPENSSL
 	/* SSL context */
 	SSL_CTX					*tls_ctx;					/**< SSL context for main secured TCP TLS socket */
 	SSL_CTX					*dtls_ctx;
+#endif
 #ifdef WITH_KERBEROS
 	/* Kerberos */
 	unsigned short			use_kerberos;				/** Will be kerberos use? O no 1 yes */
@@ -202,4 +206,3 @@ int vc_init_ctx(struct VC_CTX *ctx);
 void vc_free_ctx(struct VC_CTX *ctx);
 
 #endif
-

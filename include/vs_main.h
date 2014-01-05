@@ -25,7 +25,9 @@
 #ifndef VS_MAIN_H_
 #define VS_MAIN_H_
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
+#endif
 
 #include <stdio.h>
 
@@ -123,8 +125,10 @@ typedef struct VS_CTX {
 	struct IO_CTX 		tcp_io_ctx;					/* Verse context for TCP connection attempts */
 	struct IO_CTX		ws_io_ctx;					/* Verse context for WebSocket connection attempts */
 	/* SSL context */
+#ifdef WITH_OPENSSL
 	SSL_CTX				*tls_ctx;					/* SSL context for main secured TCP TLS socket */
 	SSL_CTX				*dtls_ctx;					/* SSL context for secured UDP DTLS connections (shared with all connections) */
+#endif
 #ifdef WITH_KERBEROS
 	/* Kerberos context */
 	unsigned short		use_krb5;					/* Will be kerebos used? O no 1 yes */

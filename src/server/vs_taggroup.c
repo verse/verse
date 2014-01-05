@@ -23,6 +23,7 @@
  */
 
 #include <assert.h>
+#include <stddef.h>
 
 #include "vs_taggroup.h"
 #include "vs_tag.h"
@@ -31,6 +32,7 @@
 #include "vs_entity.h"
 #include "v_common.h"
 #include "v_fake_commands.h"
+#include "v_list.h"
 
 /**
  * \brief This function finds tag group in node using tag group id

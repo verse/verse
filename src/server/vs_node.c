@@ -23,6 +23,7 @@
  */
 
 #include <assert.h>
+#include <stddef.h>
 
 #include "verse_types.h"
 
@@ -1053,4 +1054,3 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 
 	return 0;
 }
-

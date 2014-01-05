@@ -29,6 +29,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+#include <stdlib.h>
+#include <stddef.h>
 
 #include "verse_types.h"
 
@@ -222,8 +224,10 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->in_queue_max_size = 1048576;	/* 1MB */
 	vs_ctx->out_queue_max_size = 1048576;	/* 1MB */
 
+#ifdef WITH_OPENSSL
 	vs_ctx->tls_ctx = NULL;
 	vs_ctx->dtls_ctx = NULL;
+#endif
 	
 	v_hash_array_init(&vs_ctx->data.nodes,
 			HASH_MOD_65536,
@@ -718,4 +722,3 @@ int main(int argc, char *argv[])
 
 	return EXIT_SUCCESS;
 }
-

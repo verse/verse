@@ -25,7 +25,9 @@
 #ifndef VS_UDP_CONNECT_H
 #define VS_UDP_CONNECT_H
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
+#endif
 
 #include "vs_main.h"
 

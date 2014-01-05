@@ -43,7 +43,9 @@
 #include <signal.h>
 #include <string.h>
 #include <stdint.h>
+#ifdef WITH_KERBEROS
 #include <krb5.h>
+#endif
 
 #include "verse.h"
 
@@ -876,6 +878,7 @@ static int set_debug_level(char *debug_level)
 	return 0;
 }
 
+#ifdef WITH_KERBEROS
 int init_krb5_cc(){
 	krb5_ccache cc = NULL;
 	krb5_context ctx;
@@ -933,6 +936,7 @@ int init_krb5_cc(){
 
 	return 0;
 }
+#endif
 
 /**
  * \brief This function print help of verse_client command (options and
@@ -1030,11 +1034,15 @@ int main(int argc, char *argv[])
 					}
 					break;
 				case 'k':
+#ifdef WITH_KERBEROS
 					vrs_set_krb5_use();
 					ret = init_krb5_cc();
 					if (ret != VRS_SUCCESS) {
 						exit(EXIT_FAILURE);
 					}
+#else
+					exit(EXIT_FAILURE);
+#endif
 					break;
 				case 'h':
 					print_help(argv[0]);

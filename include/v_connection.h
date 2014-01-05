@@ -36,7 +36,9 @@
 #if !defined V_CONNECTION_H
 #define V_CONNECTION_H
 
+#ifdef WITH_OPENSSL
 #include <openssl/ssl.h>
+#endif
 
 #include <sys/time.h>
 #include <pthread.h>
@@ -196,4 +198,3 @@ void v_conn_stream_init(struct VStreamConn *stream_conn);
 void v_conn_stream_destroy(struct VStreamConn *stream_conn);
 
 #endif
-
