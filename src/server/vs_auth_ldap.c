@@ -184,7 +184,7 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 			ldap_entry = ldap_next_entry(ldap, ldap_entry)) {
 		/* username */
 		new_user = (struct VSUser*) calloc(1, sizeof(struct VSUser));
-		user_cn = *ldap_get_values_len(ldap, ldap_entry, "cn");
+		user_cn = *ldap_get_values_len(ldap, ldap_entry, "uid");
 		new_user->username = user_cn->bv_val;
 		/* DN */
 		user_dn = (char *) ldap_get_dn(ldap, ldap_entry);
@@ -201,7 +201,7 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 				user_given_name->bv_val, user_sn->bv_val);
 		new_user->realname = user_real_name;
 		/* uid */
-		uid_str = *ldap_get_values_len(ldap, ldap_entry, "uid");
+		uid_str = *ldap_get_values_len(ldap, ldap_entry, "employeeNumber");
 		sscanf(uid_str->bv_val, "%d", (int *) &new_user->user_id);
 		/* This is real user and can login */
 		new_user->fake_user = 0;
@@ -260,10 +260,10 @@ int vs_add_users_from_ldap_message(struct VS_CTX *vs_ctx, LDAP *ldap,
 }
 
 /**
- * \brief This function tries to add concrete (by cn) LDAP user to verse.
+ * \brief This function tries to add concrete (by uid) LDAP user to verse.
  * \param VS_CTX *vs_ctx			The Verse server context
- * \param const char *username	User name (cn)
- * \param const char *search_by	Attribute used for search ("cn=")
+ * \param const char *username	User name (uid)
+ * \param const char *search_by	Attribute used for search ("uid=")
  */
 int vs_ldap_add_concrete_user(struct VS_CTX *vs_ctx, const char *user_name,
 		const char *search_by)
@@ -367,7 +367,7 @@ int vs_ldap_auth_and_add_user(struct vContext *C, const char *username,
 	/* Try to do traditional authentication */
 	if ((uid = vs_ldap_auth_user(C, username, pass)) == -1) {
 		/* User does not exist in Verse, LDAP or bad password */
-		if (vs_ldap_add_concrete_user(CTX_server_ctx(C), username, "cn=")
+		if (vs_ldap_add_concrete_user(CTX_server_ctx(C), username, "uid=")
 				== 1) {
 			uid = vs_ldap_auth_user(C, username, pass);
 		}
@@ -486,7 +486,7 @@ int vs_load_saved_ldap_users(VS_CTX *vs_ctx)
 					}
 					name = strndup(&line[0], col);
 					/* Search for user with given username */
-					ret = vs_ldap_add_concrete_user(vs_ctx, name, "cn=");
+					ret = vs_ldap_add_concrete_user(vs_ctx, name, "uid=");
 				}
 
 			}
