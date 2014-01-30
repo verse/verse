@@ -213,6 +213,7 @@ message ("* Verse Configuration *")
 message ("")
 
     message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+    message (" * Generator:     ${CMAKE_GENERATOR}")
 
 if (OPENSSL_FOUND)
 	message (" * OpenSSL:       ON")
