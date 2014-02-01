@@ -52,7 +52,10 @@
 
 struct VS_CTX *local_vs_ctx = NULL;
 
-
+/**
+ * \brief This function tries to stop close connections and the server
+ * is switched to CLOSING state.
+ */
 static void vs_request_terminate(struct VS_CTX *vs_ctx)
 {
 	int i;

@@ -24,6 +24,13 @@
 
 #include <string.h>
 
+#ifdef WITH_OPENSSL
+#include <openssl/sha.h>
+#ifdef __APPLE__
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+#endif
+
 #include "vs_main.h"
 #include "v_context.h"
 #include "v_common.h"
@@ -49,12 +56,24 @@ int vs_csv_auth_user(struct vContext *C, const char *username, const char *pass)
 			if( strcmp(vsuser->username, username) == 0 ) {
 				/* When record with username, then passwords has to be same,
 				 * otherwise return 0 */
-				if( strcmp(vsuser->password, pass) == 0 ) {
-					uid = vsuser->user_id;
-					break;
-				} else {
-					break;
+				if(vsuser->password != NULL) {
+					if( strcmp(vsuser->password, pass) == 0 ) {
+						uid = vsuser->user_id;
+					}
+				} else if(vsuser->password_hash != NULL) {
+					/* TODO: Compute SHA1 hash of pass and compare it with
+					 * password_hash */
+#ifdef WITH_OPENSSL
+					unsigned char md[SHA_DIGEST_LENGTH];
+					
+					SHA1(pass, strlen(pass), md);
+					
+					if (strncmp(vsuser->password_hash, md, SHA_DIGEST_LENGTH)) {
+						uid = vsuser->user_id;
+					}
+#endif
 				}
+				break;
 			}
 		}
 		vsuser = vsuser->next;
@@ -77,16 +96,27 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 		if(file != NULL) {
 			struct VSUser *new_user, *user;
 			char line[LINE_LEN], *tmp;
+			char raw_pass = 0, hash_pass = 0;
 
 			raw = 0;
 			while( fgets(line, LINE_LEN-2, file) != NULL) {
 				/* First line has to have following structure:
 				 * username,password,UID,real name */
 				if(raw == 0) {
-					if(strncmp(&line[0], "username", 8) != 0) break;
-					if(strncmp(&line[9], "password", 8) != 0) break;
-					if(strncmp(&line[18], "UID", 3) != 0) break;
-					if(strncmp(&line[22], "real name", 9) != 0) break;
+					int offset = 0;
+					if(strncmp(&line[offset], "username", 8) != 0) break;
+					offset += 9;
+					if(strncmp(&line[offset], "password", 8) == 0) {
+						raw_pass = 1;
+					} else if(strncmp(&line[offset], "passhash", 8)) {
+						hash_pass = 1;
+					} else {
+						break;
+					}
+					offset += 9;
+					if(strncmp(&line[offset], "UID", 3) != 0) break;
+					offset += 4;
+					if(strncmp(&line[offset], "real name", 9) != 0) break;
 				} else {
 					new_user = (struct VSUser*)calloc(1, sizeof(struct VSUser));
 
@@ -98,11 +128,18 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					prev_comma = next_comma+1;
 
 					/* password */
-					for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
-					next_comma = col;
-					new_user->password = strndup(&line[prev_comma], next_comma-prev_comma);
-					prev_comma = next_comma+1;
-
+					if (raw_pass == 1) {
+						for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
+						next_comma = col;
+						new_user->password = strndup(&line[prev_comma], next_comma-prev_comma);
+						prev_comma = next_comma+1;
+					} else if (hash_pass == 1) {
+						for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
+						next_comma = col;
+						new_user->password = strndup(&line[prev_comma], next_comma-prev_comma);
+						prev_comma = next_comma+1;
+					}
+					
 					/* user id */
 					for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
 					next_comma = col;
