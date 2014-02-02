@@ -123,19 +123,41 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 				 * username,passhash,UID,real name*/
 				if(raw == 0) {
 					int offset = 0;
-					if(strncmp(&line[offset], "username", 8) != 0) break;
+					if(strncmp(&line[offset], "username", 8) != 0) {
+						v_print_log(VRS_PRINT_ERROR,
+									"Wrong format of CSV header (username)\n");
+						break;
+					}
 					offset += 9;
 					if(strncmp(&line[offset], "password", 8) == 0) {
 						raw_pass = 1;
 					} else if(strncmp(&line[offset], "passhash", 8) == 0) {
+#ifdef WITH_OPENSLL
 						hash_pass = 1;
+#else
+						v_print_log(VRS_PRINT_ERROR,
+									"Wrong format of CSV header (passhash)\n");
+						v_print_log(VRS_PRINT_ERROR,
+									"Hashed passwords are not supported without OpenSSL\n");
+						break;
+#endif
 					} else {
+						v_print_log(VRS_PRINT_ERROR,
+									"Wrong format of CSV header (password/passhash)\n");
 						break;
 					}
 					offset += 9;
-					if(strncmp(&line[offset], "UID", 3) != 0) break;
+					if(strncmp(&line[offset], "UID", 3) != 0) {
+						v_print_log(VRS_PRINT_ERROR,
+									"Wrong format of CSV header (UID)\n");
+						break;
+					}
 					offset += 4;
-					if(strncmp(&line[offset], "real name", 9) != 0) break;
+					if(strncmp(&line[offset], "real name", 9) != 0) {
+						v_print_log(VRS_PRINT_ERROR,
+									"Wrong format of CSV header (real name)\n");
+						break;
+					}
 				} else {
 					new_user = (struct VSUser*)calloc(1, sizeof(struct VSUser));
 
