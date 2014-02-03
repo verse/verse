@@ -132,7 +132,7 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					if(strncmp(&line[offset], "password", 8) == 0) {
 						raw_pass = 1;
 					} else if(strncmp(&line[offset], "passhash", 8) == 0) {
-#ifdef WITH_OPENSLL
+#ifdef WITH_OPENSSL
 						hash_pass = 1;
 #else
 						v_print_log(VRS_PRINT_ERROR,
