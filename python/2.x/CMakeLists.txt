@@ -5,7 +5,7 @@ if (CMAKE_COMPILER_IS_GNUCC)
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 		set (CMAKE_C_FLAGS "-D_REETRANT -ggdb -fPIC -Wall -Wextra -pedantic -std=c99 -O0")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-		set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -fPIC -Wall -Wextra -pedantic -std=c99 -O3")
+		set (CMAKE_C_FLAGS "-D_REETRANT -DNDEBUG -fPIC -Wall -Wextra -pedantic -std=c99 -O3 -fno-strict-aliasing")
 	endif()
 endif (CMAKE_COMPILER_IS_GNUCC)
 
@@ -39,6 +39,13 @@ target_link_libraries (py2_verse
 		verse_shared_lib
 		${verse_python_libs})
 
+# Try to get Python prefix for installing Python module
+execute_process(COMMAND python2 -c "import sys; sys.stdout.write(sys.prefix)"
+    OUTPUT_VARIABLE PYTHON_PREFIX)
+# Try to get Python version
+execute_process(COMMAND python2 -c "import sys; sys.stdout.write(sys.version[0:3])"
+    OUTPUT_VARIABLE PYTHON_VERSION)
+
 install (TARGETS py2_verse
 	LIBRARY
-	DESTINATION lib/python${PYTHON_VERSION}/site-packages)
+	DESTINATION ${PYTHON_PREFIX}/lib${LIBSUFFIX}/python${PYTHON_VERSION}/site-packages)

@@ -79,6 +79,7 @@ IF((NOT _IS_INC_DEF) OR (NOT _IS_INC_CONF_DEF) OR (NOT _IS_LIB_DEF) OR (NOT _IS_
     "$ENV{HOME}/py${_PYTHON_VERSION_NO_DOTS}"
     "/opt/py${_PYTHON_VERSION_NO_DOTS}"
     "/opt/lib/python-${PYTHON_VERSION}"
+    "/opt/rh/python33/root/usr/"
   )
 
   FOREACH(_CURRENT_ABI_FLAGS ${_python_ABI_FLAGS})

@@ -91,9 +91,9 @@ include_directories (../include)
 if (CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_C_FLAGS "-D_REETRANT -fPIC -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
+		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0 --coverage")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3")
+		set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3 -fno-strict-aliasing")
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
 
@@ -119,9 +119,9 @@ endif (OPENSSL_FOUND)
 if (CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_C_FLAGS "-D_REETRANT -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
+   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0 --coverage")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3")
+	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3 -fno-strict-aliasing")
 	endif ()
 endif (CMAKE_COMPILER_IS_GNUCC)
 
@@ -171,7 +171,7 @@ install (TARGETS verse_server
 # The rule to install shared library used by Verse server and Verse clients
 install (TARGETS verse_shared_lib
 	LIBRARY
-	DESTINATION lib)
+	DESTINATION lib${LIBSUFFIX})
 
 # TODO: Make building static verse library (libverse.a) optional
 #add_library (verse_static STATIC ${libverse_src})

@@ -87,16 +87,26 @@ static int32_t my_test_taggroup_id = -1;
 static int64_t my_test_layer_id = -1;
 
 /**
- * My test types for node, tag group and tag
+ * Username passed from command line
  */
-#define MY_TEST_TAG_TYPE			1
+static char *my_username = NULL;
 
-#define MY_TEST_TAGGROUP_TYPE		1
+/**
+ * Password passed from command line
+ */
+static char *my_password = NULL;
 
-#define MY_TEST_LAYER_TYPE			1
-#define MY_TEST_CHILD_LAYER_TYPE	2
+/**
+ * My test custom types for node, tag group and tag
+ */
+#define MY_TEST_TAG_CT			1
 
-#define MY_TEST_NODE_TYPE			1
+#define MY_TEST_TAGGROUP_CT		1
+
+#define MY_TEST_LAYER_CT		1
+#define MY_TEST_CHILD_LAYER_CT	2
+
+#define MY_TEST_NODE_CT			32
 
 /**
  * \brief Callback function for handling signals.
@@ -139,16 +149,16 @@ static void cb_receive_layer_set_value(const uint8_t session_id,
 	     const uint32_t node_id,
 	     const uint16_t layer_id,
 	     const uint32_t item_id,
-	     const uint8_t type,
+	     const uint8_t data_type,
 	     const uint8_t count,
 	     const void *value)
 {
 	int i;
 
 	printf("%s(): session_id: %u, node_id: %u, layer_id: %d, item_id: %d, data_type: %d, count: %d, value(s): ",
-			__FUNCTION__, session_id, node_id, layer_id, item_id, type, count);
+			__FUNCTION__, session_id, node_id, layer_id, item_id, data_type, count);
 
-	switch(type) {
+	switch(data_type) {
 	case VRS_VALUE_TYPE_UINT8:
 		for(i=0; i<count; i++) {
 			printf("%d, ", ((uint8_t*)value)[i]);
@@ -218,12 +228,12 @@ static void cb_receive_layer_create(const uint8_t session_id,
 		const uint16_t layer_id,
 		const uint8_t data_type,
 		const uint8_t count,
-		const uint16_t type)
+		const uint16_t custom_type)
 {
-	printf("%s(): session_id: %u, node_id: %u, parent_layer_id: %d, layer_id: %d, data_type: %d, count: %d, type: %d\n",
-			__FUNCTION__, session_id, node_id, parent_layer_id, layer_id, data_type, count, type);
+	printf("%s(): session_id: %u, node_id: %u, parent_layer_id: %d, layer_id: %d, data_type: %d, count: %d, custom_type: %d\n",
+			__FUNCTION__, session_id, node_id, parent_layer_id, layer_id, data_type, count, custom_type);
 
-	if(node_id == my_test_node_id && type == MY_TEST_LAYER_TYPE) {
+	if(node_id == my_test_node_id && custom_type == MY_TEST_LAYER_CT) {
 		uint8_t uint8_t_val[4] = {123, 124, 125, 126};
 		uint16_t uint16_t_val[4] = {1234, 456, 7890, 4321};
 		uint32_t uint32_t_val[4] = {12345, 67890, 98765, 43210};
@@ -240,7 +250,7 @@ static void cb_receive_layer_create(const uint8_t session_id,
 
 		/* Test of creating child layer */
 		vrs_send_layer_create(session_id, my_test_node_prio,
-				node_id, layer_id, VRS_VALUE_TYPE_REAL32, 2, MY_TEST_CHILD_LAYER_TYPE);
+				node_id, layer_id, VRS_VALUE_TYPE_REAL32, 2, MY_TEST_CHILD_LAYER_CT);
 
 		/* Test sending some values of tag types */
 		switch(data_type) {
@@ -279,7 +289,7 @@ static void cb_receive_layer_create(const uint8_t session_id,
 
 	if(node_id == my_test_node_id &&
 			parent_layer_id == my_test_layer_id &&
-			type == MY_TEST_CHILD_LAYER_TYPE) {
+			custom_type == MY_TEST_CHILD_LAYER_CT) {
 		/* Test of destroying parent layer */
 		vrs_send_layer_destroy(session_id, my_test_node_prio, node_id, parent_layer_id);
 	}
@@ -298,7 +308,7 @@ static void cb_receive_tag_set_value(const uint8_t session_id,
 {
 	int i;
 
-	printf("%s() session_id: %u, node_id: %u, taggroup_id: %u, tag_id: %u, type: %d, count: %d, value(s): ",
+	printf("%s() session_id: %u, node_id: %u, taggroup_id: %u, tag_id: %u, data_type: %d, count: %d, value(s): ",
 				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, data_type, count);
 
 	switch(data_type) {
@@ -381,10 +391,10 @@ static void cb_receive_tag_create(const uint8_t session_id,
 		const uint16_t tag_id,
 		const uint8_t data_type,
 		const uint8_t count,
-		const uint16_t type)
+		const uint16_t custom_type)
 {
-	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, tag_id: %d, data_type: %d, count: %d, type: %d\n",
-				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, data_type, count, type);
+	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, tag_id: %d, data_type: %d, count: %d, custom_type: %d\n",
+				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, data_type, count, custom_type);
 
 	if(node_id == my_test_node_id && taggroup_id == my_test_taggroup_id) {
 		void *value = NULL;
@@ -450,25 +460,25 @@ static void cb_receive_taggroup_destroy(const uint8_t session_id,
 static void cb_receive_taggroup_create(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
-		const uint16_t type)
+		const uint16_t custom_type)
 {
-	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, type: %d\n",
-				__FUNCTION__, session_id, node_id, taggroup_id, type);
+	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, custom_type: %d\n",
+				__FUNCTION__, session_id, node_id, taggroup_id, custom_type);
 
-	if(node_id == my_test_node_id && type == MY_TEST_TAGGROUP_TYPE) {
+	if(node_id == my_test_node_id && custom_type == MY_TEST_TAGGROUP_CT) {
 		/* Set up name of my tag group */
 		my_test_taggroup_id = taggroup_id;
 
 		/* Test that it's not possible to create tag group with the same name in
 		 * on node. */
-		vrs_send_taggroup_create(session_id, my_test_node_prio, node_id, type);
+		vrs_send_taggroup_create(session_id, my_test_node_prio, node_id, custom_type);
 
 		/* Test of subscribing to tag group */
 		vrs_send_taggroup_subscribe(session_id, my_test_node_prio, node_id, taggroup_id, 0, 0);
 
 		/* Test of uint8 tag create */
 		vrs_send_tag_create(session_id, my_test_node_prio, node_id,
-				taggroup_id, VRS_VALUE_TYPE_UINT8, 3, MY_TEST_TAG_TYPE);
+				taggroup_id, VRS_VALUE_TYPE_UINT8, 3, MY_TEST_TAG_CT);
 #if 0
 		/* Test of string tag create */
 		vrs_send_tag_create(session_id, my_test_node_prio, node_id,
@@ -491,10 +501,10 @@ static void cb_receive_node_create(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t parent_id,
 		const uint16_t user_id,
-		const uint16_t type)
+		const uint16_t custom_type)
 {
-	printf("%s() session_id: %d, node_id: %d, parent_id: %d, user_id: %d, type: %d\n",
-			__FUNCTION__, session_id, node_id, parent_id, user_id, type);
+	printf("%s() session_id: %d, node_id: %d, parent_id: %d, user_id: %d, custom_type: %d\n",
+			__FUNCTION__, session_id, node_id, parent_id, user_id, custom_type);
 
 	/* Is node special node? */
 	if(node_id==VRS_ROOT_NODE_ID) {
@@ -686,10 +696,10 @@ static void cb_receive_node_link(const uint8_t session_id,
 	if(parent_node_id == VRS_SCENE_PARENT_NODE_ID && child_node_id == my_test_node_id) {
 
 		/* Test of creating new Tag Group in my own node */
-		vrs_send_taggroup_create(session_id, my_test_node_prio, child_node_id, MY_TEST_TAGGROUP_TYPE);
+		vrs_send_taggroup_create(session_id, my_test_node_prio, child_node_id, MY_TEST_TAGGROUP_CT);
 
 		/* Test of creating new Layer in my own node */
-		vrs_send_layer_create(session_id, my_test_node_prio, my_test_node_id, 0xFFFF, VRS_VALUE_TYPE_REAL64, 4, MY_TEST_LAYER_TYPE);
+		vrs_send_layer_create(session_id, my_test_node_prio, my_test_node_id, 0xFFFF, VRS_VALUE_TYPE_REAL64, 4, MY_TEST_LAYER_CT);
 	}
 }
 
@@ -721,7 +731,7 @@ static void cb_receive_connect_accept(const uint8_t session_id,
 	vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, 1, 0, 0);
 
 	/* Try to create new node */
-	vrs_send_node_create(session_id, VRS_DEFAULT_PRIORITY, MY_TEST_NODE_TYPE);
+	vrs_send_node_create(session_id, VRS_DEFAULT_PRIORITY, MY_TEST_NODE_CT);
 
 	/* Change FPS value */
 	vrs_send_fps(session_id, VRS_DEFAULT_PRIORITY+1, FPS);
@@ -791,15 +801,15 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 		const uint8_t auth_methods_count,
 		const uint8_t *methods)
 {
-	static int attempts=0;	/* Store number of authentication attempt for this session. */
+	static int attempts = 0;	/* Store number of authentication attempt for this session. */
 	char name[64];
 	char *password;
-	int i, is_passwd_supported=0;
+	int i, is_passwd_supported = 0;
 
 	/* Debug print */
 	printf("%s() username: %s, auth_methods_count: %d, methods: ",
 			__FUNCTION__, username, auth_methods_count);
-	for(i=0; i<auth_methods_count; i++) {
+	for(i = 0; i < auth_methods_count; i++) {
 		printf("%d, ", methods[i]);
 		if(methods[i] == VRS_UA_METHOD_PASSWORD)
 			is_passwd_supported = 1;
@@ -808,20 +818,28 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 
 	/* Get username, when it is requested */
 	if(username == NULL) {
-		printf("Username: ");
-		scanf("%s", name);
 		attempts = 0;	/* Reset counter of auth. attempt. */
-		vrs_send_user_authenticate(session_id, name, 0, NULL);
+		if(my_username != NULL) {
+			vrs_send_user_authenticate(session_id, my_username, 0, NULL);
+		} else {
+			printf("Username: ");
+			scanf("%s", name);
+			vrs_send_user_authenticate(session_id, name, 0, NULL);
+		}
 	} else {
-		if(is_passwd_supported==1) {
-			strcpy(name, username);
-			/* Print this warning, when previous authentication attempt failed. */
-			if(attempts>0)
-				printf("Permission denied, please try again.\n");
-			/* Get password from user */
-			password = getpass("Password: ");
+		if(is_passwd_supported == 1) {
 			attempts++;
-			vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, password);
+			strcpy(name, username);
+			if(my_password != NULL && attempts == 1) {
+				vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, my_password);
+			} else {
+				/* Print this warning, when previous authentication attempt failed. */
+				if(attempts > 1)
+					printf("Permission denied, please try again.\n");
+				/* Get password from user */
+				password = getpass("Password: ");
+				vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, password);
+			}
 		} else {
 			printf("ERROR: Verse server does not support password authentication method\n");
 		}
@@ -867,6 +885,8 @@ static void print_help(char *prog_name)
 	printf("  This program is example of Verse client\n\n");
 	printf("  Options:\n");
 	printf("   -h               display this help and exit\n");
+	printf("   -u username      username used for login at Verse server\n");
+	printf("   -p password      password used for login at Verse server\n");
 	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
 	printf("   -s security      security of data exchange [none|tls]\n");
 	printf("   -c compresion    compression used for data exchange [none|addrshare]\n");
@@ -895,7 +915,7 @@ int main(int argc, char *argv[])
 	/* When client was started with some arguments */
 	if(argc>1) {
 		/* Parse all options */
-		while( (opt = getopt(argc, argv, "hs:t:d:")) != -1) {
+		while( (opt = getopt(argc, argv, "hu:p:s:t:d:")) != -1) {
 			switch(opt) {
 				case 's':
 					if(strcmp(optarg, "none") == 0) {
@@ -922,6 +942,12 @@ int main(int argc, char *argv[])
 						print_help(argv[0]);
 						exit(EXIT_FAILURE);
 					}
+					break;
+				case 'u':
+					my_username = optarg;
+					break;
+				case 'p':
+					my_password = optarg;
 					break;
 				case 'c':
 					if(strcmp(optarg, "none") == 0) {

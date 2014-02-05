@@ -1,6 +1,7 @@
 Verse 2.0
 =========
 [![Travis CI Build Status](https://travis-ci.org/verse/verse.png?branch=master)](https://travis-ci.org/verse/verse)
+[![Coverage Status](https://coveralls.io/repos/verse/verse/badge.png?branch=master)](https://coveralls.io/r/verse/verse?branch=master)
 
 Verse 2.0 is network protocol for real-time sharing of 3D data. It is successor of old Verse protocol developed at KTH.
 Verse 2.0 is still in alpha version.
@@ -40,7 +41,7 @@ be possible.
 
 ### Building ###
 
-To compile Verse server, libverse.ao and example of Verse
+To compile Verse server, libverse.so and example of Verse
 client open terminal, go to root of verse source code and type:
   
     $ mkdir ./build
@@ -49,14 +50,14 @@ client open terminal, go to root of verse source code and type:
     $ make
     $ sudo make install
   
-If you want to build release version, then you have to run cmake
+If you want to build debug version, then you have to run cmake
 with following parameter:
 
-    $ cmake -DCMAKE_BUILD_TYPE=Release ../
+    $ cmake -DCMAKE_BUILD_TYPE=Debug ../
 
 If you want to build Verse with Clang, then you have to do more
   
-    $ export CC=/usr/bin/clang      
+    $ export CC=/usr/bin/clang
     $ export CXX=/usr/bin/clang++
     $ mkdir ./build
     $ cd ./build
@@ -68,18 +69,18 @@ Folders
 -------
 
  * ./build		is target directory for compiled binaries
- * ./config	is directory with example of users.csv file
+ * ./config		is directory with example of users.csv file
  * ./doc		contains doxyfile for generated doxygen documentation
  * ./example	contains source code of example Verse clients
  * ./include	contains all .h files
  * ./pki		contains example of certificate and private key
- * ./python	contains source code for Python module implemented in C
- * ./promela   contains Promela source code used for protocol verification
+ * ./python		contains source code for Python module implemented in C
+ * ./promela	contains Promela source code used for protocol verification
  * ./src		contains source code
-  * ./api			source code of API
-  * ./client		source code specific for Verse clients
-  * ./common		source code shared with Verse server and Verse client
-  * ./server		source code specified for Verse server 
+  * ./api		source code of API
+  * ./client	source code specific for Verse clients
+  * ./common	source code shared with Verse server and Verse client
+  * ./server	source code specified for Verse server 
  * ./unittests	contains source code of unit tests
 
 Installation
@@ -137,12 +138,12 @@ open TCP port use something like this:
       -p tcp --dport 12345 \ # own opening of TCP port 12345
       -j ACCEPT              # accept this packet
 
-To open UDP port in range 2000 - 20009 use something like this:
+To open UDP port in range 50000 - 50009 use something like this:
 
     $ iptables -I INPUT 11 \
       -m state --state NEW \
       -s 1.2.3.4/16 \
-      -p udp --dport 20000:20009 \ # open UDP ports in range: 20000 - 20009
+      -p udp --dport 50000:50009 \ # open UDP ports in range: 50000 - 50009
       -j ACCEPT
 
 Verse server and all verse client can use IPv6. Configuration of ip6tables is
@@ -155,7 +156,7 @@ very similar:
 
     $ ip6tables -I INPUT 11 \
       -m state --state NEW \
-      -p udp --dport 20000:20009
+      -p udp --dport 50000:50009
       -j ACCEPT
 
 Verification
@@ -182,5 +183,3 @@ Contacts
   * E-mail: jiri.hnidek@tul.cz
   * Phone: +420 485 35 3695
   * Address: Studentska 2, 461 17, Liberec 1, Czech Republic
-
-

@@ -133,10 +133,11 @@ static void *vs_server_cli(void *arg)
  * context.
  * \param	vs_ctx	The Verse server context.
  */
-static void vs_load_default_values(struct VS_CTX *vs_ctx)
+static void vs_init(struct VS_CTX *vs_ctx)
 {
 	int i;
 	vs_ctx->max_connection_attempts = 10;
+	vs_ctx->vsessions = NULL;
 	vs_ctx->max_sessions = 10;
 	vs_ctx->max_sockets = vs_ctx->max_sessions;
 	vs_ctx->flag = SERVER_DEBUG_MODE;		/* SERVER_MULTI_SOCKET_MODE | SERVER_REQUIRE_SECURE_CONNECTION */
@@ -156,7 +157,7 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 
 	vs_ctx->ws_port = VRS_DEFAULT_WEB_PORT;		/* WebSocket TCP port for listening */
 
-	vs_ctx->port_low = 20000;					/* The lowest port number for client-server connection */
+	vs_ctx->port_low = 50000;					/* The lowest port number for client-server connection */
 	vs_ctx->port_high = vs_ctx->port_low + vs_ctx->max_sockets;
 	/* Initialize list of free ports */
 	vs_ctx->port_list = (struct VS_Port*)calloc(vs_ctx->max_sockets, sizeof(struct VS_Port));
@@ -165,7 +166,9 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	}
 
 	vs_ctx->tcp_io_ctx.host_addr.ip_ver = IPV6;
+	vs_ctx->tcp_io_ctx.buf = NULL;
 	vs_ctx->ws_io_ctx.host_addr.ip_ver = IPV6;
+	vs_ctx->ws_io_ctx.buf = NULL;
 
 	vs_ctx->print_log_level = VRS_PRINT_DEBUG_MSG;
 	vs_ctx->log_file = stdout;
@@ -179,6 +182,8 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 
 	vs_ctx->auth_type = AUTH_METHOD_CSV_FILE;
 	vs_ctx->csv_user_file = strdup("./config/users.csv");
+
+	vs_ctx->users.first = vs_ctx->users.last = NULL;
 
 	vs_ctx->default_perm = VRS_PERM_NODE_READ;
 
@@ -195,6 +200,11 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
 	vs_ctx->tls_ctx = NULL;
 	vs_ctx->dtls_ctx = NULL;
 	
+	v_hash_array_init(&vs_ctx->data.nodes,
+			HASH_MOD_65536,
+			offsetof(VSNode, id),
+			sizeof(uint32));
+
 	vs_ctx->data.root_node = NULL;
 	vs_ctx->data.scene_node = NULL;
 	vs_ctx->data.user_node = NULL;
@@ -214,9 +224,6 @@ static void vs_load_default_values(struct VS_CTX *vs_ctx)
  */
 static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 {
-	/* Load default values first */
-	vs_load_default_values(vs_ctx);
-
 #if WITH_INIPARSER
 	/* When no configuration file is specified, then load values from
 	 * default path */
@@ -284,20 +291,45 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 		vs_ctx->vsessions = NULL;
 	}
 
-	free(vs_ctx->port_list); vs_ctx->port_list = NULL;
+	if(vs_ctx->port_list != NULL) {
+		free(vs_ctx->port_list);
+		vs_ctx->port_list = NULL;
+	}
 
-	free(vs_ctx->tcp_io_ctx.buf); vs_ctx->tcp_io_ctx.buf = NULL;
+	if(vs_ctx->tcp_io_ctx.buf != NULL) {
+		free(vs_ctx->tcp_io_ctx.buf);
+		vs_ctx->tcp_io_ctx.buf = NULL;
+	}
 
-	free(vs_ctx->private_cert_file); vs_ctx->private_cert_file = NULL;
+	if(vs_ctx->ws_io_ctx.buf != NULL) {
+		free(vs_ctx->ws_io_ctx.buf);
+		vs_ctx->ws_io_ctx.buf = NULL;
+	}
+
+	if(vs_ctx->private_cert_file) {
+		free(vs_ctx->private_cert_file);
+		vs_ctx->private_cert_file = NULL;
+	}
+
 	if(vs_ctx->ca_cert_file != NULL) {
 		free(vs_ctx->ca_cert_file);
 		vs_ctx->ca_cert_file = NULL;
 	}
-	free(vs_ctx->public_cert_file); vs_ctx->public_cert_file = NULL;
 
-	free(vs_ctx->hostname); vs_ctx->hostname = NULL;
+	if(vs_ctx->public_cert_file != NULL) {
+		free(vs_ctx->public_cert_file);
+		vs_ctx->public_cert_file = NULL;
+	}
 
-	free(vs_ctx->ded); vs_ctx->ded = NULL;
+	if(vs_ctx->hostname != NULL) {
+		free(vs_ctx->hostname);
+		vs_ctx->hostname = NULL;
+	}
+
+	if(vs_ctx->ded) {
+		free(vs_ctx->ded);
+		vs_ctx->ded = NULL;
+	}
 
 	if(vs_ctx->csv_user_file != NULL) {
 		free(vs_ctx->csv_user_file);
@@ -427,7 +459,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* Load Verse server configuration file */
+	/* Initialize default values first */
+	vs_init(&vs_ctx);
+
+	/* Try to load Verse server configuration file */
 	vs_load_config_file(&vs_ctx, config_file);
 
 	/* When debug level wasn't specified as option at command line, then use
@@ -438,6 +473,12 @@ int main(int argc, char *argv[])
 	} else {
 		v_init_print_log(vs_ctx.print_log_level, vs_ctx.log_file);
 	}
+
+	/* Add superuser account to the list of users */
+	vs_add_superuser_account(&vs_ctx);
+
+	/* Add fake account for other users to the list of users*/
+	vs_add_other_users_account(&vs_ctx);
 
 	/* Load user accounts and save them in the linked list of verse server
 	 * context */
@@ -461,12 +502,6 @@ int main(int argc, char *argv[])
 			vs_destroy_ctx(&vs_ctx);
 			exit(EXIT_FAILURE);
 	}
-
-	/* Add superuser account to the list of users */
-	vs_add_superuser_account(&vs_ctx);
-
-	/* Add fake account for other users to the list of users*/
-	vs_add_other_users_account(&vs_ctx);
 
 	/* Initialize data mutex */
 	if( pthread_mutex_init(&vs_ctx.data.mutex, NULL) != 0) {

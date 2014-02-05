@@ -6,8 +6,8 @@ cmake_minimum_required (VERSION 2.6)
 
 # Build type
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-	message(STATUS "Setting build type to 'Debug' as none was specified.")
-	set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
+	message(STATUS "Setting build type to 'Release' as none was specified.")
+	set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 	# Set the possible values of build type for cmake-gui
 	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release")
 endif ()
@@ -55,6 +55,13 @@ set (EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin/)
 set (CMAKE_MODULE_PATH
 	${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/build_files/cmake/modules/")
 
+# Try to get information about using /lib/ or /lib64/
+get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+if (${LIB64} STREQUAL "TRUE")
+    set(LIBSUFFIX 64)
+else()
+    set(LIBSUFFIX "")
+endif()
 
 # Check OpenSSL library
 if (VERSE_OPENSSL)
@@ -187,12 +194,18 @@ configure_file ("${PROJECT_SOURCE_DIR}/config/users.csv.example"
 
 # Install verse.h file used for development of Verse clients
 install (FILES "${PROJECT_SOURCE_DIR}/include/verse.h"
-	CONFIGURATIONS "Debug"
 	DESTINATION include)
+
+# Create .cvs file without any valid user
+file(WRITE ${PROJECT_BINARY_DIR}/tmp/users.csv "username,password,UID,real name")
+
+# Install "empty" users.csv file
+install (FILES ${PROJECT_BINARY_DIR}/tmp/users.csv
+    DESTINATION /etc/verse) 
 
 # Install configuration file
 install (FILES "${PROJECT_SOURCE_DIR}/config/server.ini"
-	DESTINATION etc)
+	DESTINATION /etc/verse)
 
 
 message ("")
@@ -200,6 +213,7 @@ message ("* Verse Configuration *")
 message ("")
 
     message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+    message (" * Generator:     ${CMAKE_GENERATOR}")
 
 if (OPENSSL_FOUND)
 	message (" * OpenSSL:       ON")

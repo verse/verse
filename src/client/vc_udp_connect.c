@@ -826,7 +826,7 @@ int vc_receive_and_handle_packet(struct vContext *C, int handle_packet(struct vC
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VPacket *r_packet = CTX_r_packet(C);
 	int ret, error_num;
-	long int sec, usec;
+	long int sec = 0, usec = 0;
 	fd_set set;
 	struct timeval tv;
 

@@ -39,6 +39,11 @@ target_link_libraries (py3_verse
 		verse_shared_lib
 		${verse_python_libs})
 
+# Try to get Python prefix for installing Python module
+unset(PYTHON_PREFIX CACHE)
+execute_process(COMMAND python3 -c "import sys; sys.stdout.write(sys.prefix)"
+    OUTPUT_VARIABLE PYTHON_PREFIX)
+
 install (TARGETS py3_verse
 	LIBRARY
-	DESTINATION lib/python${PYTHON_VERSION}/site-packages)
+	DESTINATION ${PYTHON_PREFIX}/lib/python${PYTHON_VERSION}/site-packages)
