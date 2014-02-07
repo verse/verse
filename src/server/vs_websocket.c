@@ -185,22 +185,22 @@ static int http_handshake(int fd)
 	char header[16384], accept_key[29], res_header[256];
 	char *keyhdstart, *keyhdend;
 	size_t header_length = 0, res_header_sent = 0, res_header_length;
-	ssize_t r;
+	ssize_t ret;
 
 	while(1) {
-		while((r = read(fd, header+header_length,
+		while((ret = read(fd, header+header_length,
 				sizeof(header)-header_length)) == -1 && errno == EINTR);
-		if(r == -1) {
+		if(ret == -1) {
 			perror("read");
 			return -1;
-		} else if(r == 0) {
+		} else if(ret == 0) {
 			v_print_log(VRS_PRINT_ERROR,
 					"HTTP Handshake: Got EOF");
 			return -1;
 		} else {
-			header_length += r;
+			header_length += ret;
 			if(header_length >= 4 &&
-					memcmp(header+header_length-4, "\r\n\r\n", 4) == 0) {
+					memcmp(header + header_length - 4, "\r\n\r\n", 4) == 0) {
 				break;
 			} else if(header_length == sizeof(header)) {
 				v_print_log(VRS_PRINT_ERROR,
@@ -245,7 +245,10 @@ static int http_handshake(int fd)
 		return -1;
 	}
 
+	/* Create accepted key */
 	create_accept_key(accept_key, keyhdstart);
+
+	/* Create response for client */
 	snprintf(res_header, sizeof(res_header),
 			"HTTP/1.1 101 Switching Protocols\r\n"
 			"Upgrade: websocket\r\n"
@@ -253,16 +256,18 @@ static int http_handshake(int fd)
 			"Sec-WebSocket-Accept: %s\r\n"
 			"Sec-WebSocket-Protocol: v1.verse.tul.cz\r\n"
 			"\r\n", accept_key);
+
+	/* Send response to the client */
 	res_header_length = strlen(res_header);
 	while(res_header_sent < res_header_length) {
-		while((r = write(fd, res_header + res_header_sent,
+		while((ret = write(fd, res_header + res_header_sent,
 				res_header_length - res_header_sent)) == -1 &&
 				errno == EINTR);
-		if(r == -1) {
+		if(ret == -1) {
 			perror("write");
 			return -1;
 		} else {
-			res_header_sent += r;
+			res_header_sent += ret;
 		}
 	}
 
