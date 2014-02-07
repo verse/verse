@@ -208,9 +208,12 @@ static int http_handshake(int fd)
 		}
 	}
 
+	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: received request\n");
+
 	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL ||
 			http_header_find_field_value(header, "Connection", "Upgrade") == NULL ||
-			(keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL) {
+			(keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL ||
+			http_header_find_field_value(header, "Sec-WebSocket-Protocol", "v1.verse.tul.cz") == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Missing required header fields");
 		return -1;
@@ -229,10 +232,11 @@ static int http_handshake(int fd)
 			"Upgrade: websocket\r\n"
 			"Connection: Upgrade\r\n"
 			"Sec-WebSocket-Accept: %s\r\n"
+			"Sec-WebSocket-Protocol: v1.verse.tul.cz\r\n"
 			"\r\n", accept_key);
 	res_header_length = strlen(res_header);
 	while(res_header_sent < res_header_length) {
-		while((r = write(fd, res_header+res_header_sent,
+		while((r = write(fd, res_header + res_header_sent,
 				res_header_length-res_header_sent)) == -1 &&
 				errno == EINTR);
 		if(r == -1) {
@@ -242,6 +246,9 @@ static int http_handshake(int fd)
 			res_header_sent += r;
 		}
 	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: sent response\n");
+
 	return 0;
 }
 
@@ -316,7 +323,7 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 
 
 /**
- * \brief WebSocket callback function for recived message
+ * \brief WebSocket callback function for received message
  */
 void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 		const struct wslay_event_on_msg_recv_arg *arg,
@@ -389,7 +396,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 }
 
 /**
- * \brief The function with websocket infinite loop
+ * \brief The function with WebSocket infinite loop
  */
 void *vs_websocket_loop(void *arg)
 {
