@@ -47,6 +47,7 @@
 
 #define BASE64_ENCODE_RAW_LENGTH(length) ((((length) + 2)/3)*4)
 #define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+#define WEB_SOCKET_PROTO_NAME "v1.verse.tul.cz"
 
 
 /*
@@ -181,7 +182,8 @@ static char* http_header_find_field_value(char *header, char *field_name, char *
  */
 static int http_handshake(int fd)
 {
-	char header[16384], accept_key[29], *keyhdstart, *keyhdend, res_header[256];
+	char header[16384], accept_key[29], res_header[256];
+	char *keyhdstart, *keyhdend;
 	size_t header_length = 0, res_header_sent = 0, res_header_length;
 	ssize_t r;
 
@@ -202,7 +204,7 @@ static int http_handshake(int fd)
 				break;
 			} else if(header_length == sizeof(header)) {
 				v_print_log(VRS_PRINT_ERROR,
-						"HTTP Handshake: Too large HTTP headers");
+						"HTTP Handshake: Too large HTTP headers\n");
 				return -1;
 			}
 		}
@@ -210,22 +212,39 @@ static int http_handshake(int fd)
 
 	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: received request\n");
 
-	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL ||
-			http_header_find_field_value(header, "Connection", "Upgrade") == NULL ||
-			(keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL ||
-			http_header_find_field_value(header, "Sec-WebSocket-Protocol", "v1.verse.tul.cz") == NULL) {
+	/* Check if required HTTP headers were received  in the request */
+	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
-				"HTTP Handshake: Missing required header fields");
+				"HTTP Handshake: Missing required header field 'Upgrade: websocket'\n");
 		return -1;
 	}
+	if(http_header_find_field_value(header, "Connection", "Upgrade") == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"HTTP Handshake: Missing required header field 'Connection: Upgrade'\n");
+		return -1;
+	}
+	if( (keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"HTTP Handshake: Missing required header field 'Sec-WebSocket-Key: SOME_SECRET_KEY'\n");
+		return -1;
+	}
+	if( http_header_find_field_value(header, "Sec-WebSocket-Protocol", WEB_SOCKET_PROTO_NAME) == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"HTTP Handshake: Missing required header field 'Sec-WebSocket-Protocol: %s'\n",
+				WEB_SOCKET_PROTO_NAME);
+		return -1;
+	}
+
+	/* Check the length of WebSocket key */
 	for(; *keyhdstart == ' '; ++keyhdstart);
 	keyhdend = keyhdstart;
 	for(; *keyhdend != '\r' && *keyhdend != ' '; ++keyhdend);
-	if(keyhdend-keyhdstart != 24) {
+	if(keyhdend - keyhdstart != 24) {
 		v_print_log(VRS_PRINT_ERROR,
-				"HTTP Handshake: Invalid value in Sec-WebSocket-Key");
+				"HTTP Handshake: Invalid value in Sec-WebSocket-Key\n");
 		return -1;
 	}
+
 	create_accept_key(accept_key, keyhdstart);
 	snprintf(res_header, sizeof(res_header),
 			"HTTP/1.1 101 Switching Protocols\r\n"
@@ -237,7 +256,7 @@ static int http_handshake(int fd)
 	res_header_length = strlen(res_header);
 	while(res_header_sent < res_header_length) {
 		while((r = write(fd, res_header + res_header_sent,
-				res_header_length-res_header_sent)) == -1 &&
+				res_header_length - res_header_sent)) == -1 &&
 				errno == EINTR);
 		if(r == -1) {
 			perror("write");
@@ -349,7 +368,8 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 
 			if(session->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
 				if(v_STREAM_handle_messages(C) == 0) {
-					/* TODO: end connection */
+					/* TODO: End connection */
+					/* session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING; */
 					return;
 				}
 			} else {
@@ -427,7 +447,11 @@ void *vs_websocket_loop(void *arg)
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags & ~O_NONBLOCK);
 
-	http_handshake(io_ctx->sockfd);
+	/* Listen for HTTP request from web client and try to do
+	 * WebSocket handshake */
+	if(http_handshake(io_ctx->sockfd) != 0 ) {
+		goto end;
+	}
 
 	/* Try to get size of TCP buffer */
 	int_size = sizeof(int_size);
@@ -447,18 +471,26 @@ void *vs_websocket_loop(void *arg)
 		printf("%c[%dm", 27, 0);
 	}
 
-	/* Set non-blocking */
+	/* Set socket non-blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK);
 
-	wslay_event_context_server_init(&wslay_ctx, &callbacks, C);
+	/* Try to initialize WebSocket server context */
+	if(wslay_event_context_server_init(&wslay_ctx, &callbacks, C) != 0) {
+		goto end;
+	}
 
 	/* "Never ending" loop */
 	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED)
 	{
+
+		/* When server is going to stop, then close connection with WebSocket
+		 * client */
 		if(vs_ctx->state != SERVER_STATE_READY) {
+
 			vsession->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
-			/* Try to close connection with websocket client */
+
+			/* Try to close connection with WebSocket client */
 			wslay_event_queue_close(wslay_ctx,
 					WSLAY_CODE_GOING_AWAY,
 					(uint8_t*)"Server shutdown",	/* Close message */
@@ -484,21 +516,22 @@ void *vs_websocket_loop(void *arg)
 			tv.tv_usec = 0;
 		}
 
-		if( (ret = select(io_ctx->sockfd+1,
+		if( (ret = select(io_ctx->sockfd + 1,
 				&read_set,
 				&write_set,
-				NULL,			/* Exception*/
+				NULL,			/* Don't care about exception */
 				&tv)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
-		} else if(ret>0){
+		} else if(ret > 0) {
 			if(FD_ISSET(io_ctx->sockfd, &read_set)) {
 				if( wslay_event_recv(wslay_ctx) != 0 ) {
 					goto end;
 				}
-			} else if (FD_ISSET(io_ctx->sockfd, &write_set)) {
+			}
+			if (FD_ISSET(io_ctx->sockfd, &write_set)) {
 				if( wslay_event_send(wslay_ctx) != 0 ) {
 					goto end;
 				}
@@ -506,7 +539,7 @@ void *vs_websocket_loop(void *arg)
 		}
 
 		if(stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
-			/* Check if there is any command in outgouing queue
+			/* Check if there is any command in outgoing queue
 			 * and eventually pack these commands to buffer */
 			if((ret = v_STREAM_pack_message(C)) == 0 ) {
 				goto end;
