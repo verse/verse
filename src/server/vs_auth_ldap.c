@@ -1,5 +1,4 @@
 /*
- * $Id: vs_auth_ldap.c 1360 $
  *
  * ***** BEGIN GPL LICENSE BLOCK *****
  *

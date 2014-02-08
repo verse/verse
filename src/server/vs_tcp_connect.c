@@ -130,6 +130,7 @@ void *vs_tcp_conn_loop(void *arg)
 		}
 	}
 #endif
+
 	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	CTX_r_message_set(C, r_message);
@@ -147,13 +148,13 @@ void *vs_tcp_conn_loop(void *arg)
 		}
 	} else {
 #endif
-	stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
+		stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
 
-	if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
-		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
-		printf("%c[%dm", 27, 0);
-	}
+		if (is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			printf("%c[%d;%dm", 27, 1, 31);
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
+			printf("%c[%dm", 27, 0);
+		}
 #ifdef WITH_KERBEROS
 	}
 #endif
@@ -186,11 +187,11 @@ void *vs_tcp_conn_loop(void *arg)
 				}
 			} else {
 #endif
-			if( (ret = vs_handle_handshake(C, NULL)) == -1) {
-				goto end;
-			}
+				if( (ret = vs_handle_handshake(C, NULL)) == -1) {
+					goto end;
+				}
 #ifdef WITH_KERBEROS
-	}
+			}
 #endif
 			/* When there is something to send, then send it to peer */
 			if( ret == 1 ) {
@@ -813,8 +814,8 @@ static int vs_init_io_ctx(struct IO_CTX *io_ctx,
 
 #ifdef WITH_KERBEROS
 	io_ctx->krb5_keytab = NULL;		/* Will use defaul keytab */
-    io_ctx->krb5_auth_ctx = NULL;
-    io_ctx->krb5_ticket = NULL;
+	io_ctx->krb5_auth_ctx = NULL;
+	io_ctx->krb5_ticket = NULL;
 #endif
 
 	/* Set up flag for V_CTX of server */
@@ -893,9 +894,11 @@ static int vs_init_sessions(VS_CTX *vs_ctx)
 
 #ifdef WITH_KERBEROS
 /**
- *
+ * \brief This function initialize Kerberos properties in Verse server
+ * context.
  */
-int vs_init_kerberos(VS_CTX *vs_ctx){
+int vs_init_kerberos(VS_CTX *vs_ctx)
+{
 	char *name;
 	krb5_error_code krb5_err;
 
@@ -915,12 +918,14 @@ int vs_init_kerberos(VS_CTX *vs_ctx){
 				krb5_err, krb5_get_error_message(vs_ctx->tcp_io_ctx.krb5_ctx, krb5_err));
 		return -1;
 	}
-	krb5_unparse_name(vs_ctx->tcp_io_ctx.krb5_ctx, vs_ctx->tcp_io_ctx.krb5_principal, &name);
+	krb5_unparse_name(vs_ctx->tcp_io_ctx.krb5_ctx,
+			vs_ctx->tcp_io_ctx.krb5_principal, &name);
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Kerberos principal: %s\n", name);
 
 	return 1;
 }
 #endif
+
 /**
  * \brief Initialize verse server context for connection at TCP
  */
@@ -941,6 +946,7 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 	}
 #endif
 #endif
+
 #ifdef WITH_KERBEROS
 	/* Will be Kerberos used? */
 	if (vs_ctx->use_krb5 == USE_KERBEROS) {
@@ -950,6 +956,7 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 		}
 	}
 #endif
+
 	ret = vs_init_tcp_io_ctx(vs_ctx);
 	if(ret != 1) {
 		return ret;
