@@ -176,7 +176,7 @@ static char* http_header_find_field_value(char *header, char *field_name, char *
 
 
 /*
- * WIP: Performs simple HTTP handshake. *fd* is the file descriptor of the
+ * \brief Performs simple HTTP handshake. *fd* is the file descriptor of the
  * connection to the client. This function returns 0 if it succeeds,
  * or returns -1.
  */
@@ -212,7 +212,7 @@ static int http_handshake(int fd)
 
 	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: received request\n");
 
-	/* Check if required HTTP headers were received  in the request */
+	/* Check if required HTTP headers were received in the request */
 	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Missing required header field 'Upgrade: websocket'\n");
@@ -278,7 +278,7 @@ static int http_handshake(int fd)
 
 
 /**
- * \brief WIP: Wslay send callback
+ * \brief WSLay send callback
  */
 ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 		const uint8_t *data,
@@ -288,32 +288,35 @@ ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 {
 	struct vContext *C = (struct vContext*)user_data;
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	ssize_t r;
+	ssize_t ret;
 	int sflags = 0;
 
 #ifdef MSG_MORE
-if(flags & WSLAY_MSG_MORE) {
-	sflags |= MSG_MORE;
-}
+	if(flags & WSLAY_MSG_MORE) {
+		sflags |= MSG_MORE;
+	}
 #endif
 
-	while((r = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
+	/* Try to send all data */
+	while((ret = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
 			errno == EINTR);
-	if(r == -1) {
+	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
 		} else {
 			wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		}
 	}
+
 	v_print_log(VRS_PRINT_DEBUG_MSG,
 			"WS Callback Send Data\n");
-	return r;
+
+	return ret;
 }
 
 
 /**
- * \brief WIP: Wslay receive callback
+ * \brief WSLay receive callback
  */
 ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 		uint8_t *buf,
@@ -323,26 +326,31 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 {
 	struct vContext *C = (struct vContext*)user_data;
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	ssize_t r;
+	ssize_t ret;
+
 	(void)flags;
 
-	while((r = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
+	/* Try to receive all data from TCP stack */
+	while((ret = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
 			errno == EINTR);
-	if(r == -1) {
+
+	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
 		} else {
 			wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		}
-	} else if(r == 0) {
+	} else if(ret == 0) {
 		/* Unexpected EOF is also treated as an error */
 		wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
-		r = -1;
+		ret = -1;
 	}
+
 	v_print_log(VRS_PRINT_DEBUG_MSG,
 			"WS Callback Received Data, len: %ld, flags: %d\n",
 			len, flags);
-	return r;
+
+	return ret;
 }
 
 
@@ -360,7 +368,8 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 	(void)ctx;
 
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
-		/* Verse server uses binary message for communication */
+
+		/* Verse server uses only binary message for communication */
 		if(arg->opcode == WSLAY_BINARY_FRAME) {
 		    struct wslay_event_msg msgarg;
 
@@ -400,16 +409,25 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"WS Callback Received Ctrl Message: opcode: %d\n",
 				arg->opcode);
+
 		/* Is it closing message? */
 		if(arg->opcode & WSLAY_CONNECTION_CLOSE) {
+
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Close message with code: %d, message: %s\n",
 					arg->status_code,
 					arg->msg);
+
+			/* When this control message was received at second time, then
+			 * switch to the state CLOSED. Otherwise switch to the state
+			 * CLOSING */
 			if(session->stream_conn->host_state == TCP_SERVER_STATE_CLOSING) {
 				session->stream_conn->host_state = TCP_SERVER_STATE_CLOSED;
 			} else {
 				session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+				/* When server wasn't in the state closing, then send
+				 * confirmation to the client, that this connection will be
+				 * closed */
 				wslay_event_queue_close(ctx,
 						WSLAY_CODE_NORMAL_CLOSURE,
 						(uint8_t*)"Closing connection",
