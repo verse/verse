@@ -232,6 +232,7 @@ message ("* Verse Configuration *")
 message ("")
 
     message (" * Configuration: ${CMAKE_BUILD_TYPE}")
+    message (" * Generator:     ${CMAKE_GENERATOR}")
 
 if (LDAP_FOUND)
 	message (" * OpenLDAP:      ON")

@@ -222,6 +222,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 	int i, ret;
 	void *values = NULL;
 	static char *kwlist[] = {"prio", "node_id", "layer_id", "item_id", "data_type", "values", NULL};
+	char err_message[256];
 
 	/* Parse arguments */
 	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BIHIBO", kwlist,
@@ -237,7 +238,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 
 	size = PyTuple_Size(tuple_values);
 	if(!(size>0 && size <=4)) {
-		PyErr_SetString(VerseError, "Wrong size of tuple");
+		sprintf(err_message, "Wrong size of tuple: %ld", size);
+		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	} else {
 		count = size;
@@ -251,7 +253,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
@@ -274,7 +276,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
@@ -297,7 +299,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
@@ -320,7 +322,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
@@ -338,7 +340,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not float)");
 					free(values);
 					return NULL;
 				}
@@ -357,7 +359,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not float)");
 					free(values);
 					return NULL;
 				}
@@ -375,7 +377,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item");
+					PyErr_SetString(VerseError, "Wrong type of tuple item (not float)");
 					free(values);
 					return NULL;
 				}
@@ -388,7 +390,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 		}
 		break;
 	default:
-		PyErr_SetString(VerseError, "Unsupported value type");
+		sprintf(err_message, "Unsupported value type: %d", data_type);
+		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	}
 

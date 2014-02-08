@@ -32,14 +32,18 @@ struct VS_CTX;
 #define MIN_USER_ID		1000
 #define MAX_USER_ID		(VRS_OTHER_USERS_UID - 1)
 
+/**
+ * Structure holding information about verse user.
+ */
 typedef struct VSUser {
 	struct VSUser	*prev, *next;
-	uint16			user_id;
-	char			*username;
-	char			*password;
-	char			*realname;
+	uint16			user_id;		/* Unique ID of the user */
+	char			*username;		/* Username used for login */
+	char			*password;		/* Raw password (unsecure) */
+	char			*password_hash;	/* SHA1 hash of password */
+	char			*realname;		/* Name displayed to other users */
 	char			*ldap_dn;
-	uint8			fake_user;
+	uint8			fake_user;		/* Fake user for server and other_users */
 } VSUser;
 
 struct VSUser *vs_user_find(struct VS_CTX *vs_ctx, uint16 user_id);

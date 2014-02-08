@@ -67,7 +67,7 @@
 /**
  * States of Verse server
  */
-typedef enum ServerState{
+typedef enum ServerState {
 	SERVER_STATE_RESERVED =	0,
 	SERVER_STATE_CONF =		1,
 	SERVER_STATE_READY =	2,

@@ -70,7 +70,7 @@ static void vs_CLOSEREQ_init(struct VDgramConn *dgram_conn);
 static void vs_CLOSED_init_send_packet(struct vContext *C);
 static void vs_CLOSED_init(struct vContext *C);
 
-#ifdef WITH_OPENSSL
+#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 static int cookie_initialized = 0;
 static unsigned char cookie_secret[COOKIE_SECRET_LENGTH];
 #endif
