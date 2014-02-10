@@ -103,7 +103,7 @@ void *vs_tcp_conn_loop(void *arg)
 
 #ifdef WITH_OPENSSL
 	/* Try to do TLS handshake with client */
-	if(vs_TLS_handshake(C)!=1) {
+	if(vs_TLS_handshake(C) != 1) {
 		goto end;
 	}
 #endif
@@ -171,7 +171,7 @@ end:
 	/* Set up TCP CLOSING state (non-blocking) */
 	vs_CLOSING(C);
 
-	/* Receive and Send messages are not neccessary any more */
+	/* Receive and Send messages are not necessary any more */
 	if(r_message != NULL) {
 		free(r_message);
 		r_message = NULL;

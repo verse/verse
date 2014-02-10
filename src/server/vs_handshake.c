@@ -166,7 +166,7 @@ int vs_TLS_teardown(struct vContext *C)
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
 
 	ret = SSL_shutdown(stream_conn->io_ctx.ssl);
-	if(ret!=1) {
+	if(ret != 1) {
 		ret = SSL_shutdown(stream_conn->io_ctx.ssl);
 	}
 
@@ -198,7 +198,7 @@ void vs_CLOSING(struct vContext *C)
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
 
 #ifdef WITH_OPENSSL
-	if(stream_conn->io_ctx.ssl!=NULL) vs_TLS_teardown(C);
+	if(stream_conn->io_ctx.ssl != NULL) vs_TLS_teardown(C);
 #endif
 
 	close(stream_conn->io_ctx.sockfd);
@@ -842,7 +842,8 @@ int vs_RESPOND_methods_loop(struct vContext *C)
 
 /**
  * \brief This function handles messages received during verse handshake
- * and it can create new thread for datagram connection.
+ * and it can create new thread for datagram connection, when datagram
+ * connection was negotiated.
  */
 int vs_handle_handshake(struct vContext *C)
 {
@@ -863,7 +864,7 @@ int vs_handle_handshake(struct vContext *C)
 	switch(stream_conn->host_state) {
 	case TCP_SERVER_STATE_RESPOND_METHODS:
 		ret = vs_RESPOND_methods_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_RESPOND_USRAUTH;
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 				printf("%c[%d;%dm", 27, 1, 31);
@@ -876,7 +877,7 @@ int vs_handle_handshake(struct vContext *C)
 		break;
 	case TCP_SERVER_STATE_RESPOND_USRAUTH:
 		ret = vs_RESPOND_userauth_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
 
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
@@ -893,7 +894,7 @@ int vs_handle_handshake(struct vContext *C)
 		break;
 	case TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED:
 		ret = vs_NEGOTIATE_cookie_ded_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_NEWHOST;
 
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
