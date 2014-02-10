@@ -643,13 +643,13 @@ end:
 	/* Set up TCP CLOSING state (non-blocking) */
 	vs_CLOSING(C);
 
-	/* Receive and Send messages are not neccessary any more */
-	if(r_message!=NULL) {
+	/* Receive and Send messages are not necessary any more */
+	if(r_message != NULL) {
 		free(r_message);
 		r_message = NULL;
 		CTX_r_message_set(C, NULL);
 	}
-	if(s_message!=NULL) {
+	if(s_message != NULL) {
 		free(s_message);
 		s_message = NULL;
 		CTX_s_message_set(C, NULL);
