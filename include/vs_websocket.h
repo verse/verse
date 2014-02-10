@@ -25,9 +25,29 @@
 #ifndef VS_WEBSOCKET_H_
 #define VS_WEBSOCKET_H_
 
+/**
+ *
+ */
+#define BASE64_ENCODE_RAW_LENGTH(length) ((((length) + 2)/3)*4)
+
+/**
+ * Constant from RFC 6455 that is used for concatenate to key
+ * proposed by WebSocket client and result string is used for computing
+ * SHA-1 hash. This hash is send as response to WebSocket client.
+ */
+#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+/**
+ * The name of supported WebSocket protocol that is negotiated during
+ * WebSocket handshake.
+ */
+#define WEB_SOCKET_PROTO_NAME "v1.verse.tul.cz"
+
+
 struct vContext;
 
 int vs_STREAM_OPEN_ws_loop(struct vContext *C);
 void *vs_websocket_loop(void *arg);
+
 
 #endif

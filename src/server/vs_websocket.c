@@ -45,11 +45,6 @@
 
 #include "v_stream.h"
 
-#define BASE64_ENCODE_RAW_LENGTH(length) ((((length) + 2)/3)*4)
-#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-#define WEB_SOCKET_PROTO_NAME "v1.verse.tul.cz"
-
-
 /*
  * Calculates SHA-1 hash of *src*. The size of *src* is *src_length* bytes.
  * *dst* must be at least SHA1_DIGEST_SIZE.
@@ -288,7 +283,7 @@ ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 {
 	struct vContext *C = (struct vContext*)user_data;
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	ssize_t ret;
+	ssize_t ret = 0;
 	int sflags = 0;
 
 #ifdef MSG_MORE
@@ -299,7 +294,16 @@ ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 
 	/* Try to send all data */
 	while((ret = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
-			errno == EINTR);
+			errno == EINTR) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"WS Callback Send Data, len: %ld, flags: %d -> %ld\n",
+				len, sflags, ret);
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"WS Callback Send Data, len: %ld, flags: %d -> ret: %ld\n",
+			len, sflags, ret);
+
 	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
@@ -307,9 +311,6 @@ ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 			wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		}
 	}
-
-	v_print_log(VRS_PRINT_DEBUG_MSG,
-			"WS Callback Send Data\n");
 
 	return ret;
 }
@@ -332,7 +333,15 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 
 	/* Try to receive all data from TCP stack */
 	while((ret = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
-			errno == EINTR);
+			errno == EINTR) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"WS Callback Received Data, len: %ld, flags: %d -> ret: %ld\n",
+				len, flags, ret);
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"WS Callback Received Data, len: %ld, flags: %d -> ret: %ld\n",
+			len, flags, ret);
 
 	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -345,10 +354,6 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 		wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		ret = -1;
 	}
-
-	v_print_log(VRS_PRINT_DEBUG_MSG,
-			"WS Callback Received Data, len: %ld, flags: %d\n",
-			len, flags);
 
 	return ret;
 }
@@ -364,6 +369,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 	struct vContext *C = (struct vContext*)user_data;
 	struct VSession *session = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	int ret;
 
 	(void)ctx;
 
@@ -387,17 +393,28 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 					return;
 				}
 			} else {
-
 				if( vs_handle_handshake(C) == -1 ) {
 					/* TODO: end connection */
 					return;
 				}
-
-			    msgarg.opcode = WSLAY_BINARY_FRAME;
-			    msgarg.msg = (uint8_t*)io_ctx->buf;
-			    msgarg.msg_length = io_ctx->buf_size;
-			    wslay_event_queue_msg(ctx, &msgarg);
 			}
+
+			/* TODO: optionally send message fragmented, when it is needed using:
+			 * wslay_event_queue_fragmented_msg() */
+
+		    msgarg.opcode = WSLAY_BINARY_FRAME;
+		    msgarg.msg = (uint8_t*)io_ctx->buf;
+		    msgarg.msg_length = io_ctx->buf_size;
+
+		    /* Queue message for sending */
+		    if((ret = wslay_event_queue_msg(ctx, &msgarg)) != 0) {
+				v_print_log(VRS_PRINT_ERROR,
+						"Unable to queue message to WebSocket: %d\n", ret);
+				return;
+		    } else {
+		    	v_print_log(VRS_PRINT_DEBUG_MSG,
+		    			"WebSocket message successfully queued\n");
+		    }
 
 		} else if(arg->opcode == WSLAY_TEXT_FRAME) {
 			v_print_log(VRS_PRINT_ERROR, "WebSocket text frame is not supported\n");
@@ -522,11 +539,15 @@ void *vs_websocket_loop(void *arg)
 
 		/* Initialize read set */
 		FD_ZERO(&read_set);
-		FD_SET(io_ctx->sockfd, &read_set);
+		if(wslay_event_want_read(wslay_ctx)) {
+			FD_SET(io_ctx->sockfd, &read_set);
+		}
 
 		/* Initialize write set */
 		FD_ZERO(&write_set);
-		FD_SET(io_ctx->sockfd, &write_set);
+		if(wslay_event_want_write(wslay_ctx)) {
+			FD_SET(io_ctx->sockfd, &write_set);
+		}
 
 		/* Set timeout for select() */
 		if(stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
