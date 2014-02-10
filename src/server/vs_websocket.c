@@ -362,7 +362,7 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 /**
  * \brief WebSocket callback function for received message
  */
-void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
+void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 		const struct wslay_event_on_msg_recv_arg *arg,
 		void *user_data)
 {
@@ -370,8 +370,6 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 	struct VSession *session = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	int ret;
-
-	(void)ctx;
 
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
 
@@ -388,13 +386,26 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 
 			if(session->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
 				if(v_STREAM_handle_messages(C) == 0) {
-					/* TODO: End connection */
-					/* session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING; */
+					/* End connection */
+					session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+					/* Try to close connection with WebSocket client */
+					wslay_event_queue_close(wslay_ctx,
+							WSLAY_CODE_PROTOCOL_ERROR,
+							(uint8_t*)"Wrong command",	/* Close message */
+							13);	/* The length of close message */
 					return;
 				}
 			} else {
 				if( vs_handle_handshake(C) == -1 ) {
-					/* TODO: end connection */
+					/* End connection */
+					session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+					/* Try to close connection with WebSocket client */
+					wslay_event_queue_close(wslay_ctx,
+							WSLAY_CODE_PROTOCOL_ERROR,
+							(uint8_t*)"Wrong command",	/* Close message */
+							13);	/* The length of close message */
 					return;
 				}
 			}
@@ -407,7 +418,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 		    msgarg.msg_length = io_ctx->buf_size;
 
 		    /* Queue message for sending */
-		    if((ret = wslay_event_queue_msg(ctx, &msgarg)) != 0) {
+		    if((ret = wslay_event_queue_msg(wslay_ctx, &msgarg)) != 0) {
 				v_print_log(VRS_PRINT_ERROR,
 						"Unable to queue message to WebSocket: %d\n", ret);
 				return;
@@ -445,14 +456,13 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 				/* When server wasn't in the state closing, then send
 				 * confirmation to the client, that this connection will be
 				 * closed */
-				wslay_event_queue_close(ctx,
+				wslay_event_queue_close(wslay_ctx,
 						WSLAY_CODE_NORMAL_CLOSURE,
 						(uint8_t*)"Closing connection",
 						15);
 			}
 		}
 	}
-
 }
 
 /**
@@ -521,14 +531,19 @@ void *vs_websocket_loop(void *arg)
 	}
 
 	/* "Never ending" loop */
-	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED)
+	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED &&
+			( wslay_event_want_read(wslay_ctx) == 1 ||
+					wslay_event_want_write(wslay_ctx) == 1) )
 	{
 
 		/* When server is going to stop, then close connection with WebSocket
 		 * client */
 		if(vs_ctx->state != SERVER_STATE_READY) {
 
-			vsession->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Closing WebSocket connection: Server shutdown\n");
+
+			stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
 
 			/* Try to close connection with WebSocket client */
 			wslay_event_queue_close(wslay_ctx,
@@ -539,13 +554,17 @@ void *vs_websocket_loop(void *arg)
 
 		/* Initialize read set */
 		FD_ZERO(&read_set);
-		if(wslay_event_want_read(wslay_ctx)) {
+		if(wslay_event_want_read(wslay_ctx) == 1) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Waiting for WebSocket message ...\n");
 			FD_SET(io_ctx->sockfd, &read_set);
 		}
 
 		/* Initialize write set */
 		FD_ZERO(&write_set);
-		if(wslay_event_want_write(wslay_ctx)) {
+		if(wslay_event_want_write(wslay_ctx) == 1) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Going to write message to WebSocket ...\n");
 			FD_SET(io_ctx->sockfd, &write_set);
 		}
 
@@ -580,6 +599,19 @@ void *vs_websocket_loop(void *arg)
 					goto end;
 				}
 			}
+		} else if(ret == 0 && stream_conn->host_state != TCP_SERVER_STATE_STREAM_OPEN) {
+			/* When handshake is not finished during VRS_TIMEOT seconds, then
+			 * close connection with WebSocket client. */
+
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Closing WebSocket connection: Handshake timed-out\n");
+
+			stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+			wslay_event_queue_close(wslay_ctx,
+					WSLAY_CODE_PROTOCOL_ERROR,
+					(uint8_t*)"Handshake timed-out",	/* Close message */
+					19);	/* The length of close message */
 		}
 
 		if(stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
