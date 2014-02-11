@@ -551,7 +551,7 @@ int main(int argc, char *argv[])
 #endif
 	}
 
-	/* Create unique semaphore name */
+	/* Create unique semaphore name from constant and EUID */
 	effective_user_id = geteuid();
 	/* Note: uid_t is unsigned int at Linux, then there is constant 10,
 	 * but other OS can use in theory e.g.: unsigned long int for this purpose */
@@ -564,7 +564,8 @@ int main(int argc, char *argv[])
 	 * Mac OS X (and probably other BSD like UNIXes) doesn't support unnamed
 	 * semaphores */
 	if( (vs_ctx.data.sem = sem_open(vs_ctx.data.sem_name, O_CREAT, 0644, 1)) == SEM_FAILED) {
-		v_print_log(VRS_PRINT_ERROR, "sem_open(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "sem_open(%s): %s\n",
+				vs_ctx.data.sem_name, strerror(errno));
 		if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
