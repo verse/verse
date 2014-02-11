@@ -434,6 +434,8 @@ int main(int argc, char *argv[])
 	char *config_file=NULL;
 	int debug_level_set = 0;
 	void *res;
+	uid_t effective_user_id;
+	int semaphore_name_len;
 
 	/* Set up initial state */
 	vs_ctx.state = SERVER_STATE_CONF;
@@ -540,7 +542,7 @@ int main(int argc, char *argv[])
 		}
 	} else {
 #if 0
-		/* Make from verse server real verse application:
+		/* Make from verse server real daemon:
 		 * - detach from standard file descriptors, terminals, PPID process etc. */
 		if(vs_init_server(&vs_ctx) == -1) {
 			vs_destroy_ctx(&vs_ctx);
@@ -549,9 +551,21 @@ int main(int argc, char *argv[])
 #endif
 	}
 
-	/* Initialize data semaphore */
-	if( (vs_ctx.data.sem = sem_open(DATA_SEMAPHORE_NAME, O_CREAT, 0644, 1)) == SEM_FAILED) {
-		v_print_log(VRS_PRINT_ERROR, "sem_init(): %s\n", strerror(errno));
+	/* Create unique semaphore name */
+	effective_user_id = geteuid();
+	/* Note: uid_t is unsigned int at Linux, then there is constant 10,
+	 * but other OS can use in theory e.g.: unsigned long int for this purpose */
+	semaphore_name_len = strlen(DATA_SEMAPHORE_NAME) + 1 + 10 + 1;
+	vs_ctx.data.sem_name = (char*)malloc(semaphore_name_len * sizeof(char));
+	sprintf(vs_ctx.data.sem_name, "%s-%d", DATA_SEMAPHORE_NAME, effective_user_id);
+	vs_ctx.data.sem_name[semaphore_name_len] = '\0';
+
+	/* Initialize data semaphore. The semaphore has to be named, because
+	 * Mac OS X (and probably other BSD like UNIXes) doesn't support unnamed
+	 * semaphores */
+	if( (vs_ctx.data.sem = sem_open(vs_ctx.data.sem_name, O_CREAT, 0644, 1)) == SEM_FAILED) {
+		v_print_log(VRS_PRINT_ERROR, "sem_open(): %s\n", strerror(errno));
+		if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
@@ -609,16 +623,21 @@ int main(int argc, char *argv[])
 		if(res != PTHREAD_CANCELED && res != NULL) free(res);
 	}
 
-	/* Try to close named semaphore s*/
+	/* Try to close named semaphore */
 	if(sem_close(vs_ctx.data.sem) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
 	}
 #endif
 
-	/* Try to unlink named semphore */
-	if(vs_ctx.data.sem != NULL && sem_unlink(DATA_SEMAPHORE_NAME) == -1) {
+	/* Try to unlink named semaphore */
+	if(vs_ctx.data.sem != NULL &&
+			vs_ctx.data.sem_name != NULL &&
+			sem_unlink(vs_ctx.data.sem_name) == -1)
+	{
 		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
 	}
+
+	if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
 
 	return EXIT_SUCCESS;
 }
