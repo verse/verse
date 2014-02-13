@@ -1,5 +1,5 @@
-/* jshint devel: true, unused: true */
-/* global request, response*/
+/* jshint devel: true, browser: true */
+/* globals wsocket*/
 
 (function(wsocket) {
     'use strict';

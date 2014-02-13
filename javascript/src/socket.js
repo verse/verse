@@ -1,5 +1,7 @@
-/* jshint devel: true, unused: true */
-/* global request, response*/
+/* jshint browser: true*/
+/* globals request, response*/
+/*exported wsocket*/
+
 var wsocket = (function(request, response) {
     'use strict';
     window.WebSocket = window.WebSocket || window.MozWebSocket;
@@ -55,7 +57,7 @@ var wsocket = (function(request, response) {
                 }
 
                 response_type = response.parse(message.data);
-                if (response_type == 'passwd') {
+                if (response_type === 'passwd') {
                     buf = request.userAuth(username, passwd);
                     /* Send the blob */
                     my_webscoket.send(buf);
