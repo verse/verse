@@ -1,0 +1,22 @@
+{
+  "name": "verse",
+  "version": "0.0.0",
+  "authors": [
+    "Jiri Vrany <jiri.vrany@tul.cz>"
+  ],
+  "main": "src/app.js",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "requirejs": "~2.1.10"
+  },
+  "devDependencies": {
+    "almond": "~0.2.9"
+  }
+}
