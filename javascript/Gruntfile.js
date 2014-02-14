@@ -6,7 +6,13 @@ module.exports = function(grunt) {
         jasmine: {
             src: 'src/**/*.js',
             options: {
-                specs: 'spec/**/*.js'
+                specs: 'spec/**/*.js',
+                template: require('grunt-template-jasmine-requirejs'),
+                templateOptions: {
+                    requireConfig: {
+                            baseUrl: 'src/'
+                    }
+                }
             }
         },
         jshint: {

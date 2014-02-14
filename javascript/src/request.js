@@ -1,6 +1,6 @@
-/*globals ArrayBuffer*/
-/*exported request*/
-var request = (function() {
+/*globals ArrayBuffer, define*/
+
+define(function() {
     'use strict';
 
 
@@ -78,4 +78,4 @@ var request = (function() {
 
     return request;
 
-}());
+});
