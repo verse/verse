@@ -1,11 +1,13 @@
 /* jshint browser: true*/
-/* globals request, response*/
-/*exported wsocket*/
+/* globals define*/
 
-var wsocket = (function(request, response) {
+
+define(['request', 'response'], function(request, response) {
     'use strict';
     window.WebSocket = window.WebSocket || window.MozWebSocket;
     var my_webscoket;
+
+    console.log(response);
 
     window.onbeforeunload = function() {
         my_webscoket.onclose = function() {}; // disable onclose handler first
@@ -72,4 +74,4 @@ var wsocket = (function(request, response) {
 
     return wsocket;
 
-}(request, response));
+});

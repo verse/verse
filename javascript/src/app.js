@@ -1,20 +1,19 @@
-/* jshint devel: true, browser: true */
-/* globals wsocket*/
+/* jshint devel: true, unused: true */
+/* global require */
 
-(function(wsocket) {
+require(['wsocket'], function(wsocket) {
     'use strict';
 
     var config;
 
     config = {
-        /* example of config */
-        uri: 'ws://websocket.example.com',
-        version: 'v1.verse',
-        username: 'username',
-        passwd: 'yourverysecretpassword'
+        uri: 'ws://verse.tul.cz:23456',
+        version: 'v1.verse.tul.cz',
+        username: 'albert',
+        passwd: 'aaa'
     };
 
     wsocket.init(config);
 
 
-}(wsocket));
+});
