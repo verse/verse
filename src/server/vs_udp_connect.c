@@ -1216,6 +1216,9 @@ again:
 	}
 
 	SSL_free(dgram_conn->io_ctx.ssl);
+	dgram_conn->io_ctx.ssl = NULL;
+	/* Side effect of stupid SSL_free is free BIO too */
+	dgram_conn->io_ctx.bio = NULL;
 }
 
 static int vs_init_dtls_connection(struct vContext *C)
