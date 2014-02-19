@@ -558,7 +558,7 @@ int main(int argc, char *argv[])
 	semaphore_name_len = strlen(DATA_SEMAPHORE_NAME) + 1 + 10 + 1;
 	vs_ctx.data.sem_name = (char*)malloc(semaphore_name_len * sizeof(char));
 	sprintf(vs_ctx.data.sem_name, "%s-%d", DATA_SEMAPHORE_NAME, effective_user_id);
-	vs_ctx.data.sem_name[semaphore_name_len] = '\0';
+	vs_ctx.data.sem_name[semaphore_name_len - 1] = '\0';
 
 	/* Initialize data semaphore. The semaphore has to be named, because
 	 * Mac OS X (and probably other BSD like UNIXes) doesn't support unnamed
