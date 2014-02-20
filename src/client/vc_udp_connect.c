@@ -1039,6 +1039,8 @@ again:
 	}
 
 	SSL_free(dgram_conn->io_ctx.ssl);
+	dgram_conn->io_ctx.ssl = NULL;
+	dgram_conn->io_ctx.bio = NULL;
 }
 
 int vc_create_dtls_connection(struct vContext *C)

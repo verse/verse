@@ -121,6 +121,7 @@ int vs_TLS_handshake(struct vContext *C)
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
 		close(io_ctx->sockfd);
 		return 0;
 	}
@@ -131,6 +132,7 @@ int vs_TLS_handshake(struct vContext *C)
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
 		close(io_ctx->sockfd);
 		return 0;
 	}
@@ -144,6 +146,7 @@ int vs_TLS_handshake(struct vContext *C)
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
 		close(io_ctx->sockfd);
 		return 0;
 	}
@@ -184,6 +187,8 @@ int vs_TLS_teardown(struct vContext *C)
 	}
 
 	SSL_free(stream_conn->io_ctx.ssl);
+	stream_conn->io_ctx.ssl = NULL;
+	stream_conn->io_ctx.bio = NULL;
 
 	return 1;
 }

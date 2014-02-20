@@ -770,6 +770,8 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 	}
 
 	SSL_free(stream_conn->io_ctx.ssl);
+	stream_conn->io_ctx.ssl = NULL;
+	stream_conn->io_ctx.bio = NULL;
 #endif
 
 	close(stream_conn->io_ctx.sockfd);
