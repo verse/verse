@@ -115,7 +115,7 @@ START_TEST( test_Node_Destroy_out_queue )
 
 	/* Push commands to the queue */
 	for(i=0; i<CHUNK_NUM; i++) {
-		node_id = 10000+i;
+		node_id = 10000 + i;
 
 		node_destroy = v_node_destroy_create(node_id);
 		v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, node_destroy);
@@ -123,7 +123,104 @@ START_TEST( test_Node_Destroy_out_queue )
 
 	/* Pop commands from the queue */
 	for(i=0; i<CHUNK_NUM; i++) {
-		node_id = 10000+i;
+		node_id = 10000 + i;
+		count = 0;
+		share = 0;
+		len = 65535;
+
+		_node_destroy = v_out_queue_pop(out_queue, VRS_DEFAULT_PRIORITY, &count, &share, &len);
+
+		fail_unless( _node_destroy != NULL,
+				"Node_Destroy create failed");
+		fail_unless( _node_destroy->id == CMD_NODE_DESTROY,
+				"Node_Destroy OpCode: %d != %d", _node_destroy->id, CMD_NODE_DESTROY);
+
+		fail_unless( UINT32(_node_destroy->data[0]) == node_id,
+				"Node_Destroy Node_ID: %d != %d", UINT32(_node_destroy->data[0]), node_id);
+
+		v_cmd_destroy(&_node_destroy);
+
+		fail_unless( _node_destroy == NULL,
+				"Node_Destroy destroy failed");
+	}
+
+	v_out_queue_destroy(&out_queue);
+}
+END_TEST
+
+START_TEST( test_Node_Destroy_out_queue_duplicties )
+{
+	struct VOutQueue *out_queue = v_out_queue_create();
+	struct Generic_Cmd *_node_destroy, *node_destroy = NULL;
+	uint32 node_id;
+	uint16 count, len;
+	int8 share;
+	int i, cmd_count;
+
+	/* Push commands to the queue */
+	for(i=0; i<CHUNK_NUM; i++) {
+		node_id = 10000;
+
+		node_destroy = v_node_destroy_create(node_id);
+		v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, node_destroy);
+	}
+
+	cmd_count = v_out_queue_get_count(out_queue);
+
+	fail_unless( cmd_count == 1,
+			"Total number of commands in out queue is not 1");
+
+	/* Pop commands from the queue */
+	for(i=0; i < cmd_count; i++) {
+		node_id = 10000;
+		count = 0;
+		share = 0;
+		len = 65535;
+
+		_node_destroy = v_out_queue_pop(out_queue, VRS_DEFAULT_PRIORITY, &count, &share, &len);
+
+		fail_unless( _node_destroy != NULL,
+				"Node_Destroy create failed");
+		fail_unless( _node_destroy->id == CMD_NODE_DESTROY,
+				"Node_Destroy OpCode: %d != %d", _node_destroy->id, CMD_NODE_DESTROY);
+
+		fail_unless( UINT32(_node_destroy->data[0]) == node_id,
+				"Node_Destroy Node_ID: %d != %d", UINT32(_node_destroy->data[0]), node_id);
+
+		v_cmd_destroy(&_node_destroy);
+
+		fail_unless( _node_destroy == NULL,
+				"Node_Destroy destroy failed");
+	}
+
+	v_out_queue_destroy(&out_queue);
+}
+END_TEST
+
+START_TEST( test_Node_Destroy_out_queue_collisions )
+{
+	struct VOutQueue *out_queue = v_out_queue_create();
+	struct Generic_Cmd *_node_destroy, *node_destroy = NULL;
+	uint32 node_id;
+	uint16 count, len;
+	int8 share;
+	int i, cmd_count;
+
+	/* Push commands to the queue */
+	for(i=0; i < CHUNK_NUM; i++) {
+		node_id = 10000 + (i * 65536);
+
+		node_destroy = v_node_destroy_create(node_id);
+		v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, node_destroy);
+	}
+
+	cmd_count = v_out_queue_get_count(out_queue);
+	fail_unless( cmd_count == 4,
+			"Total number of commands in out queue is not 4");
+
+	/* Pop commands from the queue */
+	for(i=0; i < cmd_count; i++) {
+		node_id = 10000 + (i * 65536);
 		count = 0;
 		share = 0;
 		len = 65535;
@@ -240,6 +337,8 @@ struct Suite *node_destroy_suite(void)
 	tcase_add_test(tc_core, test_Node_Destroy_create);
 	tcase_add_test(tc_core, test_Node_Destroy_in_queue);
 	tcase_add_test(tc_core, test_Node_Destroy_out_queue);
+	tcase_add_test(tc_core, test_Node_Destroy_out_queue_duplicties);
+	tcase_add_test(tc_core, test_Node_Destroy_out_queue_collisions);
 	tcase_add_test(tc_core, test_Node_Destroy_pack_unpack);
 
 	suite_add_tcase(suite, tc_core);
