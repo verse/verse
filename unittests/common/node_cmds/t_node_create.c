@@ -147,8 +147,12 @@ START_TEST( test_Node_Create_in_queue )
 			v_in_queue_push(in_queue, node_create);
 		}
 
+		fail_unless(v_in_queue_size(in_queue) == (4 * (1 + 2 + 4 + 4 + 2)),
+				"Total size of all commands in queue is not %d",
+				(4 * (1 + 2 + 4 + 4 + 2)));
+
 		fail_unless(v_in_queue_cmd_count(in_queue) == CHUNK_SIZE,
-				"Total number of all commands in in queue is not %d",
+				"Total number of all commands in queue is not %d",
 				CHUNK_SIZE);
 
 		/* Pop commands from the queue */
