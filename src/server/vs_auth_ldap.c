@@ -112,6 +112,7 @@ int vs_ldap_auth_user(struct vContext *C, const char *username,
 	}
 	return uid;
 }
+
 /**
  * \brief Save given user's username and UID to csv file
  * \param VS_CTX *vs_ctx	The Verse server context
@@ -367,7 +368,8 @@ int vs_ldap_auth_and_add_user(struct vContext *C, const char *username,
 	if ((uid = vs_ldap_auth_user(C, username, pass)) == -1) {
 		/* User does not exist in Verse, LDAP or bad password */
 		if (vs_ldap_add_concrete_user(CTX_server_ctx(C), username, "uid=")
-				== 1) {
+				== 1)
+		{
 			uid = vs_ldap_auth_user(C, username, pass);
 		}
 	}

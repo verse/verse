@@ -42,7 +42,9 @@ typedef struct VSUser {
 	char			*password;		/* Raw password (unsecure) */
 	char			*password_hash;	/* SHA1 hash of password */
 	char			*realname;		/* Name displayed to other users */
-	char			*ldap_dn;
+#ifdef WITH_LDAP
+	char			*ldap_dn;		/* LDAP DN name */
+#endif
 	uint8			fake_user;		/* Fake user for server and other_users */
 } VSUser;
 
