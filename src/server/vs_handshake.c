@@ -127,6 +127,7 @@ int vs_TLS_handshake(struct vContext *C)
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
 		close(io_ctx->sockfd);
 		return 0;
 	}
@@ -137,6 +138,7 @@ int vs_TLS_handshake(struct vContext *C)
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
 		close(io_ctx->sockfd);
 		return 0;
 	}
@@ -150,6 +152,7 @@ int vs_TLS_handshake(struct vContext *C)
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
 		close(io_ctx->sockfd);
 		return 0;
 	}
@@ -172,7 +175,7 @@ int vs_TLS_teardown(struct vContext *C)
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
 
 	ret = SSL_shutdown(stream_conn->io_ctx.ssl);
-	if(ret!=1) {
+	if(ret != 1) {
 		ret = SSL_shutdown(stream_conn->io_ctx.ssl);
 	}
 
@@ -190,6 +193,8 @@ int vs_TLS_teardown(struct vContext *C)
 	}
 
 	SSL_free(stream_conn->io_ctx.ssl);
+	stream_conn->io_ctx.ssl = NULL;
+	stream_conn->io_ctx.bio = NULL;
 
 	return 1;
 }
@@ -270,7 +275,7 @@ void vs_CLOSING(struct vContext *C)
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
 
 #ifdef WITH_OPENSSL
-	if(stream_conn->io_ctx.ssl!=NULL) vs_TLS_teardown(C);
+	if(stream_conn->io_ctx.ssl != NULL) vs_TLS_teardown(C);
 #endif
 
 	close(stream_conn->io_ctx.sockfd);
@@ -308,7 +313,7 @@ int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 		tv.tv_sec = 0;
 		tv.tv_usec = 1000000/vsession->fps_host;
 
-		/* Wait for recieved data */
+		/* Wait for received data */
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
@@ -1088,7 +1093,8 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 
 /**
  * \brief This function handles messages received during verse handshake
- * and it can create new thread for datagram connection.
+ * and it can create new thread for datagram connection, when datagram
+ * connection was negotiated.
  */
 int vs_handle_handshake(struct vContext *C, char *u_name)
 {
@@ -1109,7 +1115,7 @@ int vs_handle_handshake(struct vContext *C, char *u_name)
 	switch(stream_conn->host_state) {
 	case TCP_SERVER_STATE_RESPOND_METHODS:
 		ret = vs_RESPOND_methods_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_RESPOND_USRAUTH;
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 				printf("%c[%d;%dm", 27, 1, 31);
@@ -1122,7 +1128,7 @@ int vs_handle_handshake(struct vContext *C, char *u_name)
 		break;
 	case TCP_SERVER_STATE_RESPOND_USRAUTH:
 		ret = vs_RESPOND_userauth_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
 
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
@@ -1156,7 +1162,7 @@ int vs_handle_handshake(struct vContext *C, char *u_name)
 #endif
 	case TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED:
 		ret = vs_NEGOTIATE_cookie_ded_loop(C);
-		if(ret==1) {
+		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_NEWHOST;
 
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {

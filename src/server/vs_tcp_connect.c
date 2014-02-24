@@ -217,7 +217,7 @@ end:
 	/* Set up TCP CLOSING state (non-blocking) */
 	vs_CLOSING(C);
 
-	/* Receive and Send messages are not neccessary any more */
+	/* Receive and Send messages are not necessary any more */
 	if(r_message != NULL) {
 		free(r_message);
 		r_message = NULL;

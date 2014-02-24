@@ -2551,13 +2551,13 @@ void initverse(void)
 	PyModule_AddIntConstant(module, "PERM_NODE_READ", VRS_PERM_NODE_READ);
 	PyModule_AddIntConstant(module, "PERM_NODE_WRITE", VRS_PERM_NODE_WRITE);
 
-	/* ID od special nodes */
+	/* ID of special nodes */
 	PyModule_AddIntConstant(module, "ROOT_NODE_ID", VRS_ROOT_NODE_ID);
 	PyModule_AddIntConstant(module, "AVATAR_PARENT_NODE_ID", VRS_AVATAR_PARENT_NODE_ID);
 	PyModule_AddIntConstant(module, "USERS_PARENT_NODE_ID", VRS_USERS_PARENT_NODE_ID);
 	PyModule_AddIntConstant(module, "SCENE_PARENT_NODE_ID", VRS_SCENE_PARENT_NODE_ID);
 
-	/* Node custom_types of specila nodes */
+	/* Node custom_types of special nodes */
 	PyModule_AddIntConstant(module, "ROOT_NODE_CT", VRS_ROOT_NODE_CT);
 	PyModule_AddIntConstant(module, "AVATAR_PARENT_NODE_CT", VRS_AVATAR_PARENT_NODE_CT);
 	PyModule_AddIntConstant(module, "USERS_PARENT_NODE_CT", VRS_USERS_PARENT_NODE_CT);
@@ -2566,7 +2566,7 @@ void initverse(void)
 	PyModule_AddIntConstant(module, "AVATAR_INFO_NODE_CT", VRS_AVATAR_INFO_NODE_CT);
 	PyModule_AddIntConstant(module, "USER_NODE_CT", VRS_USER_NODE_CT);
 
-	/* User ID os special users */
+	/* User ID of special users */
 	PyModule_AddIntConstant(module, "SUPER_USER_UID", VRS_SUPER_USER_UID);
 	PyModule_AddIntConstant(module, "OTHER_USERS_UID", VRS_OTHER_USERS_UID);
 

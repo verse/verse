@@ -62,7 +62,7 @@
 #define AUTH_METHOD_LDAP					3
 #define AUTH_METHOD_LDAP_LOAD_AT_LOGIN		4
 
-#define DATA_SEMAPHORE_NAME					"/data_sem"
+#define DATA_SEMAPHORE_NAME					"/vs_data_sem"
 
 /**
  * States of Verse server
@@ -94,6 +94,7 @@ typedef struct VSData {
 	/* Thread staff */
 	pthread_mutex_t		mutex;						/* Connection threads needs create avatar nodes occasionally */
 	sem_t				*sem;						/* Semaphore used for notification data thread (some data were added to the queue) */
+	char				*sem_name;					/* The name of named semaphore */
 } VSData;
 
 /* Verse Server Context */

@@ -1,4 +1,6 @@
-var response = (function() {
+/*globals define*/
+
+define(function() {
     'use strict';
 
     var response = {
@@ -11,7 +13,7 @@ var response = (function() {
             var version = rec_view.getUint8(buf_pos) >> 4;
             buf_pos += 2;
 
-            if (version != 1) {
+            if (version !== 1) {
                 return false;
             }
 
@@ -28,7 +30,7 @@ var response = (function() {
             
             var op_code = rec_view.getUint8(buf_pos);
             buf_pos += 1;
-            if (op_code == 8) { /* Is it command usr_auth_fail */
+            if (op_code === 8) { /* Is it command usr_auth_fail */
                 var cmd_len = rec_view.getUint8(buf_pos);
                 buf_pos += 1;
                 if (cmd_len > 2) {
@@ -37,7 +39,7 @@ var response = (function() {
                     var method = rec_view.getUint8(buf_pos);
                     buf_pos += 1;
 
-                    if (method == 2) { /* Password method */
+                    if (method === 2) { /* Password method */
                         return 'passwd';
                     }
                 } else {
@@ -50,4 +52,4 @@ var response = (function() {
 
     return response;
 
-}());
+});

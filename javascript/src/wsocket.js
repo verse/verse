@@ -1,9 +1,13 @@
-/* jshint devel: true, unused: true */
-/* global request, response*/
-var wsocket = (function(request, response) {
+/* jshint browser: true*/
+/* globals define*/
+
+
+define(['request', 'response'], function(request, response) {
     'use strict';
     window.WebSocket = window.WebSocket || window.MozWebSocket;
     var my_webscoket;
+
+    console.log(response);
 
     window.onbeforeunload = function() {
         my_webscoket.onclose = function() {}; // disable onclose handler first
@@ -55,7 +59,7 @@ var wsocket = (function(request, response) {
                 }
 
                 response_type = response.parse(message.data);
-                if (response_type == 'passwd') {
+                if (response_type === 'passwd') {
                     buf = request.userAuth(username, passwd);
                     /* Send the blob */
                     my_webscoket.send(buf);
@@ -70,4 +74,4 @@ var wsocket = (function(request, response) {
 
     return wsocket;
 
-}(request, response));
+});
