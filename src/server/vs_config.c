@@ -123,6 +123,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 
 		/* Try to load section [Users] */
 		user_auth_method = iniparser_getstring(ini_dict, "Users:Method", NULL);
+
 		if(user_auth_method != NULL &&
 				strcmp(user_auth_method, "file") == 0)
 		{
@@ -151,56 +152,76 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 
 		/* Try to load section [Users] for LDAP */
 #ifdef WITH_LDAP
-		if (user_auth_method != NULL && strcmp(user_auth_method, "ldap") == 0) {
+		if (user_auth_method != NULL &&
+				strcmp(user_auth_method, "ldap") == 0)
+		{
 			int ldap_version = 0;
 
 			v_print_log(VRS_PRINT_DEBUG_MSG, "user_auth_method: %s\n", user_auth_method);
 
-			ldap_version = iniparser_getint(ini_dict, "Users:Version", 0 );
+			ldap_version = iniparser_getint(ini_dict, "LDAP:Version", 0);
 
 			if (ldap_version > 0 && ldap_version <= 3) {
-				char *ldap_hostname, *ldap_DN, *ldap_pass, *ldap_base,
-						*ldap_LOS;
+				char *ldap_hostname;
+				char *ldap_DN;
+				char *ldap_pass;
+				char *ldap_base;
+				char *ldap_LOS;
 
 				v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP version %d\n", ldap_version);
-				vs_ctx->ldap_version = ldap_version;
 
-				ldap_hostname = iniparser_getstring(ini_dict, "Users:Hostname",
-						NULL );
-				ldap_DN = iniparser_getstring(ini_dict, "Users:UserDN",
-										NULL );
-				ldap_pass = iniparser_getstring(ini_dict, "Users:Pass",
-										NULL );
-				ldap_base = iniparser_getstring(ini_dict, "Users:Base",
-										NULL );
-				ldap_LOS = iniparser_getstring(ini_dict, "Users:LoadOnStart",
-						NULL );
+				ldap_hostname = iniparser_getstring(ini_dict,
+						"LDAP:Hostname", NULL);
+				ldap_DN = iniparser_getstring(ini_dict,
+						"LDAP:UserDN", NULL);
+				ldap_pass = iniparser_getstring(ini_dict,
+						"LDAP:Pass", NULL);
+				ldap_base = iniparser_getstring(ini_dict,
+						"LDAP:Base",NULL);
+				ldap_LOS = iniparser_getstring(ini_dict,
+						"LDAP:LoadOnStart", NULL);
 
 				if (ldap_hostname != NULL && ldap_DN != NULL
 						&& ldap_pass != NULL && ldap_base != NULL ) {
-					if (strcmp(ldap_LOS, "yes") == 0) {
-						vs_ctx->auth_type = AUTH_METHOD_LDAP;
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Users will be loaded on startup.\n");
-					} else {
-						char *cache_file;
 
-						cache_file = iniparser_getstring(ini_dict, "Users:File",
-								NULL );
-						vs_ctx->auth_type = AUTH_METHOD_LDAP_LOAD_AT_LOGIN;
-						vs_ctx->created_user_file = strdup(cache_file);
-						v_print_log(VRS_PRINT_DEBUG_MSG, "Users will be loaded at login.\n");
-						v_print_log(VRS_PRINT_DEBUG_MSG, "File for saving user accounts: %s\n",
-								cache_file);
-					}
-
+					vs_ctx->ldap_version = ldap_version;
 					vs_ctx->ldap_hostname = strdup(ldap_hostname);
 					vs_ctx->ldap_user = strdup(ldap_DN);
 					vs_ctx->ldap_passwd = strdup(ldap_pass);
 					vs_ctx->ldap_search_base = strdup(ldap_base);
-					v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP server hostname: %s\n", ldap_hostname);
-					v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP user DN: %s\n", ldap_DN);
-					v_print_log(VRS_PRINT_DEBUG_MSG, "LDAP search base: %s\n", ldap_base);
+
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"LDAP server hostname: %s\n", ldap_hostname);
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"LDAP user DN: %s\n", ldap_DN);
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"LDAP search base: %s\n", ldap_base);
+
+					if (strcmp(ldap_LOS, "yes") == 0) {
+						vs_ctx->auth_type = AUTH_METHOD_LDAP;
+						v_print_log(VRS_PRINT_DEBUG_MSG,
+								"Users will be loaded on startup.\n");
+					} else {
+						char *cache_file;
+
+						vs_ctx->auth_type = AUTH_METHOD_LDAP_LOAD_AT_LOGIN;
+						v_print_log(VRS_PRINT_DEBUG_MSG,
+								"Users will be loaded at login.\n");
+
+						cache_file = iniparser_getstring(ini_dict,
+								"LDAP:CacheFile", NULL);
+
+						if(cache_file != NULL) {
+							vs_ctx->created_user_file = strdup(cache_file);
+							v_print_log(VRS_PRINT_DEBUG_MSG,
+									"File for saving user accounts: %s\n",
+									cache_file);
+						}
+					}
 				}
+			} else {
+				v_print_log(VRS_PRINT_ERROR,
+						"Unsupported LDAP version: %s\n", ldap_version);
 			}
 		}
 #endif

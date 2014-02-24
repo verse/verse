@@ -199,73 +199,80 @@ int vs_TLS_teardown(struct vContext *C)
 	return 1;
 }
 #endif
+
 #ifdef WITH_KERBEROS
 /**
  * \brief Establishing Kerberos connection, verifies clients credentials
- * \param[in]        vContextc *C        The context of verse server
- * \param[out]        char **u_name        user name of client
- * \return        returns 1 if Kerberos authentication was OK 0 if something went wrong
+ * \param[in]	vContextc *C        The context of verse server
+ * \return Returns 1 if Kerberos authentication was OK 0 if something went wrong
  */
-int vs_kerberos_auth(struct vContext *C, char **u_name){
-        struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-        struct IO_CTX *io_ctx = CTX_io_ctx(C);
-        struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
-        int flags = 0;
-        int len = MAX_PACKET_SIZE;
-        unsigned char buffer[MAX_PACKET_SIZE];
-        char *client_principal;
-        krb5_data packet;
-        krb5_error_code krb5err;
-        int flag;
+int vs_kerberos_auth(struct vContext *C)
+{
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct IO_CTX *io_ctx = CTX_io_ctx(C);
+	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
+	struct VSession *session = CTX_current_session(C);
+	int flags = 0;
+	int len = MAX_PACKET_SIZE;
+	unsigned char buffer[MAX_PACKET_SIZE];
+	char *client_principal;
+	krb5_data packet;
+	krb5_error_code krb5err;
+	int flag;
 
-        /* Make sure socket is blocking */
-        flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
-        if ((fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK))
-                        == -1) {
-                if (is_log_level(VRS_PRINT_ERROR))
-                        v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-                return 0;
-        }
+	/* Make sure socket is blocking */
+	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
+	if ((fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK))
+			== -1) {
+		if (is_log_level(VRS_PRINT_ERROR))
+			v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		return 0;
+	}
 
-        /* Get KRB_AP_REQ message */
-        if ((len = recvfrom(stream_conn->io_ctx.sockfd, (char *) buffer,
-                        MAX_PACKET_SIZE, flags,
-                        NULL, NULL)) < 0) {
-                v_print_log(VRS_PRINT_ERROR, "recvfrom failed.\n");
-                return 0;
-        }
+	/* Get KRB_AP_REQ message */
+	if ((len = recvfrom(stream_conn->io_ctx.sockfd, (char *) buffer,
+			MAX_PACKET_SIZE, flags,
+			NULL, NULL)) < 0) {
+		v_print_log(VRS_PRINT_ERROR, "recvfrom failed.\n");
+		return 0;
+	}
 
-        packet.length = len;
-        packet.data = (krb5_pointer) buffer;
+	packet.length = len;
+	packet.data = (krb5_pointer) buffer;
 
-        io_ctx->krb5_auth_ctx = vs_ctx->tcp_io_ctx.krb5_auth_ctx;
-        io_ctx->krb5_ctx = vs_ctx->tcp_io_ctx.krb5_ctx;
-        io_ctx->krb5_ticket = vs_ctx->tcp_io_ctx.krb5_ticket;
-        io_ctx->krb5_keytab = vs_ctx->tcp_io_ctx.krb5_keytab;
+	io_ctx->krb5_auth_ctx = vs_ctx->tcp_io_ctx.krb5_auth_ctx;
+	io_ctx->krb5_ctx = vs_ctx->tcp_io_ctx.krb5_ctx;
+	io_ctx->krb5_ticket = vs_ctx->tcp_io_ctx.krb5_ticket;
+	io_ctx->krb5_keytab = vs_ctx->tcp_io_ctx.krb5_keytab;
 
-        /* Check authentication info */
-        if ((krb5err = krb5_rd_req(io_ctx->krb5_ctx,
-                        (krb5_auth_context *) &io_ctx->krb5_auth_ctx, &packet,
-                        io_ctx->krb5_principal, io_ctx->krb5_keytab,
-                        NULL, (krb5_ticket **) &io_ctx->krb5_ticket))) {
-                v_print_log(VRS_PRINT_ERROR, "krb5_rd_req %d: %s\n", (int) krb5err,
-                                krb5_get_error_message(io_ctx->krb5_ctx, krb5err));
-                return 0;
-        }
-        /* Get user name */
-        if ((krb5err = krb5_unparse_name(io_ctx->krb5_ctx,
-                        io_ctx->krb5_ticket->enc_part2->client, &client_principal))) {
-                v_print_log(VRS_PRINT_ERROR, "krb5_unparse_name %d: %s\n",
-                                (int) krb5err,
-                                krb5_get_error_message(io_ctx->krb5_ctx, krb5err));
-                return 0;
-        }
-        v_print_log(VRS_PRINT_DEBUG_MSG, "Got authentication info from %s\n", client_principal);
-        *u_name = client_principal;
+	/* Check authentication info */
+	if ((krb5err = krb5_rd_req(io_ctx->krb5_ctx,
+			(krb5_auth_context *) &io_ctx->krb5_auth_ctx, &packet,
+			io_ctx->krb5_principal, io_ctx->krb5_keytab,
+			NULL, (krb5_ticket **) &io_ctx->krb5_ticket)))
+	{
+		v_print_log(VRS_PRINT_ERROR, "krb5_rd_req %d: %s\n", (int) krb5err,
+				krb5_get_error_message(io_ctx->krb5_ctx, krb5err));
+		return 0;
+	}
 
-        return 1;
+	/* Get user name */
+	if ((krb5err = krb5_unparse_name(io_ctx->krb5_ctx,
+			io_ctx->krb5_ticket->enc_part2->client, &client_principal))) {
+		v_print_log(VRS_PRINT_ERROR, "krb5_unparse_name %d: %s\n",
+				(int) krb5err,
+				krb5_get_error_message(io_ctx->krb5_ctx, krb5err));
+		return 0;
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Got authentication info from %s\n",
+			client_principal);
+	session->username = strdup(client_principal);
+
+	return 1;
 }
 #endif
+
 /**
  * \brief This function do TLS teardown, when it is reuired and it
  * closes socket.
@@ -924,32 +931,34 @@ int vs_RESPOND_methods_loop(struct vContext *C)
  * \param[in]        const char *username        User's username
  * \return        uid of user or -1 if usere was not found
  */
-static int vs_krb_make_user(struct vContext *C, const char *username){
-        struct VS_CTX *vs_ctx = CTX_server_ctx(C);
-        struct VSUser *vsuser;
-        int uid = -1;
+static int vs_krb_make_user(struct vContext *C)
+{
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+	struct VSession *session = CTX_current_session(C);
+	struct VSUser *vsuser;
+	int uid = -1;
 
-        vsuser = vs_ctx->users.first;
+	vsuser = vs_ctx->users.first;
 
-        while (vsuser) {
-                /* Try to find record with this username. (the username has to be
-                 * unique). The user could not be fake user (super user and other users) */
-                if (vsuser->fake_user != 1) {
-                        if (strcmp(vsuser->username, username) == 0) {
-                                /* When record with username return uid */
-                                uid = vsuser->user_id;
-                                break;
-                        }
-                }
-                vsuser = vsuser->next;
-        }
-        return uid;
+	while (vsuser) {
+		/* Try to find record with this username. (the username has to be
+		 * unique). The user could not be fake user (super user and other users) */
+		if (vsuser->fake_user != 1) {
+			if (strcmp(vsuser->username, session->username) == 0) {
+				/* When record with username return uid */
+				uid = vsuser->user_id;
+				break;
+			}
+		}
+		vsuser = vsuser->next;
+	}
+	return uid;
 }
 
 /**
  *
  */
-static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
+static int vs_RESPOND_krb_auth_loop(struct vContext *C) {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VSession *vsession = CTX_current_session(C);
@@ -959,44 +968,44 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 	unsigned short buffer_pos = 0;
 	int user_id;
 
-    /* Reset content of received message */
-    memset(r_message, 0, sizeof(struct VMessage));
+	/* Reset content of received message */
+	memset(r_message, 0, sizeof(struct VMessage));
 
-    /* Unpack Verse message header */
-    buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
+	/* Unpack Verse message header */
+	buffer_pos += v_unpack_message_header(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
 
-    /* Unpack all system commands */
-    buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
+	/* Unpack all system commands */
+	buffer_pos += v_unpack_message_system_commands(&io_ctx->buf[buffer_pos], (io_ctx->buf_size - buffer_pos), r_message);
 
-    v_print_receive_message(C);
+	v_print_receive_message(C);
 
-    for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
-            switch(r_message->sys_cmd[i].cmd.id) {
-            case CMD_CHANGE_L_ID:
-                    /* Client could propose client name and version */
-                    if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
-                            if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-                                    /* Only first proposed client name will be used */
-                                    vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
-                                    client_name_proposed = 1;
-                            }
-                    } else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
-                            if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-                                    /* Only first proposed client name will be used */
-                                    vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
-                                    client_version_proposed = 1;
-                            }
-                    }
-                    break;
-            default:
-                    v_print_log(VRS_PRINT_WARNING,
-                                    "This command id: %d is not supported in this state\n",
-                                    r_message->sys_cmd[i].cmd.id);
-                    break;
-            }
-    }
+	for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
+		switch(r_message->sys_cmd[i].cmd.id) {
+		case CMD_CHANGE_L_ID:
+			/* Client could propose client name and version */
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_NAME) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_name = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_name_proposed = 1;
+				}
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_CLIENT_VERSION) {
+				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
+					/* Only first proposed client name will be used */
+					vsession->client_version = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					client_version_proposed = 1;
+				}
+			}
+			break;
+		default:
+			v_print_log(VRS_PRINT_WARNING,
+					"This command id: %d is not supported in this state\n",
+					r_message->sys_cmd[i].cmd.id);
+			break;
+		}
+	}
 
-    buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
+	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
 	/* Send confirmation about client name */
 	if (client_name_proposed == 1) {
@@ -1020,54 +1029,54 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
 	}
 
 	/* Do user authentication */
-	if ((user_id = vs_krb_make_user(C, u_name)) != -1) {
-        long int avatar_id;
+	if ((user_id = vs_krb_make_user(C)) != -1) {
+		long int avatar_id;
 
-        pthread_mutex_lock(&vs_ctx->data.mutex);
-        avatar_id = vs_create_avatar_node(vs_ctx, vsession, user_id);
-        pthread_mutex_unlock(&vs_ctx->data.mutex);
+		pthread_mutex_lock(&vs_ctx->data.mutex);
+		avatar_id = vs_create_avatar_node(vs_ctx, vsession, user_id);
+		pthread_mutex_unlock(&vs_ctx->data.mutex);
 
-        if(avatar_id == -1) {
-                v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
-                return 0;
-        }
+		if(avatar_id == -1) {
+			v_print_log(VRS_PRINT_ERROR, "Failed to create avatar node\n");
+			return 0;
+		}
 
-        /* Save user_id to the session and send it in
-         * connect_accept command */
-        vsession->user_id = user_id;
-        vsession->avatar_id = avatar_id;
+		/* Save user_id to the session and send it in
+		 * connect_accept command */
+		vsession->user_id = user_id;
+		vsession->avatar_id = avatar_id;
 
-        s_message->sys_cmd[cmd_rank].ua_succ.id = CMD_USER_AUTH_SUCCESS;
-        s_message->sys_cmd[cmd_rank].ua_succ.user_id = user_id;
-        s_message->sys_cmd[cmd_rank].ua_succ.avatar_id = avatar_id;
-        cmd_rank++;
+		s_message->sys_cmd[cmd_rank].ua_succ.id = CMD_USER_AUTH_SUCCESS;
+		s_message->sys_cmd[cmd_rank].ua_succ.user_id = user_id;
+		s_message->sys_cmd[cmd_rank].ua_succ.avatar_id = avatar_id;
+		cmd_rank++;
 
-        /* Generate random string for coockie */
-        vsession->peer_cookie.str = (char*)calloc((COOKIE_SIZE+1), sizeof(char));
-        for(i=0; i<COOKIE_SIZE; i++) {
-                /* Generate only printable characters (debug prints) */
-                vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
-        }
-        vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-        /* Set up negotiate command of the host cookie */
-        v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_COOKIE,
-                        vsession->peer_cookie.str, NULL);
+		/* Generate random string for coockie */
+		vsession->peer_cookie.str = (char*)calloc((COOKIE_SIZE+1), sizeof(char));
+		for(i=0; i<COOKIE_SIZE; i++) {
+			/* Generate only printable characters (debug prints) */
+			vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
+		}
+		vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
+		/* Set up negotiate command of the host cookie */
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_COOKIE,
+				vsession->peer_cookie.str, NULL);
 
-        /* Load DED from configuration and save it to the session */
-        vsession->ded.str = strdup(vs_ctx->ded);
-        v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_DED,
-                        vsession->ded.str, NULL);
+		/* Load DED from configuration and save it to the session */
+		vsession->ded.str = strdup(vs_ctx->ded);
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_DED,
+				vsession->ded.str, NULL);
 
-        buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
+		buffer_pos += v_pack_stream_system_commands(s_message, &io_ctx->buf[buffer_pos]);
 
-        s_message->header.len = io_ctx->buf_size = buffer_pos;
-        s_message->header.version = VRS_VERSION;
-        /* Pack header to the beginning of the buffer */
-        v_pack_message_header(s_message, io_ctx->buf);
+		s_message->header.len = io_ctx->buf_size = buffer_pos;
+		s_message->header.version = VRS_VERSION;
+		/* Pack header to the beginning of the buffer */
+		v_pack_message_header(s_message, io_ctx->buf);
 
-        v_print_send_message(C);
+		v_print_send_message(C);
 
-        return 1;
+		return 1;
 	} else {
 
 		s_message->sys_cmd[0].ua_fail.id = CMD_USER_AUTH_FAILURE;
@@ -1096,7 +1105,7 @@ static int vs_RESPOND_krb_auth_loop(struct vContext *C, const char *u_name) {
  * and it can create new thread for datagram connection, when datagram
  * connection was negotiated.
  */
-int vs_handle_handshake(struct vContext *C, char *u_name)
+int vs_handle_handshake(struct vContext *C)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
@@ -1145,7 +1154,7 @@ int vs_handle_handshake(struct vContext *C, char *u_name)
 		break;
 #ifdef WITH_KERBEROS
 	case TCP_SERVER_STATE_RESPOND_KRB_AUTH:
-		ret = vs_RESPOND_krb_auth_loop(C, u_name);
+		ret = vs_RESPOND_krb_auth_loop(C);
 		if (ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
 

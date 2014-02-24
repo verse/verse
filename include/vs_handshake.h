@@ -25,11 +25,11 @@
 int vs_user_auth(struct vContext *C, const char *username, const char *data);
 int vs_TLS_handshake(struct vContext *C);
 int vs_TLS_teardown(struct vContext *C);
-int vs_kerberos_auth(struct vContext *C, char **u_name);
+int vs_kerberos_auth(struct vContext *C);
 void vs_CLOSING(struct vContext *C);
 int vs_STREAM_OPEN_tcp_loop(struct vContext *C);
 int vs_NEGOTIATE_newhost_loop(struct vContext *C);
 int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C);
 int vs_RESPOND_userauth_loop(struct vContext *C);
 int vs_RESPOND_methods_loop(struct vContext *C);
-int vs_handle_handshake(struct vContext *C, char *u_name);
+int vs_handle_handshake(struct vContext *C);

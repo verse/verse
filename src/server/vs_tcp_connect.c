@@ -99,10 +99,6 @@ void *vs_tcp_conn_loop(void *arg)
 	int error, ret;
 	void *udp_thread_result;
 	unsigned int int_size;
-#ifdef WITH_KERBEROS
-	char **u_name;
-#endif
-
 
 	/* Try to get size of TCP buffer */
 	int_size = sizeof(int_size);
@@ -124,8 +120,7 @@ void *vs_tcp_conn_loop(void *arg)
 
 #ifdef WITH_KERBEROS
 	if (vs_ctx->use_krb5 == USE_KERBEROS) {
-		u_name = malloc(sizeof(char *));
-		if (vs_kerberos_auth(C, u_name) != 1) {
+		if (vs_kerberos_auth(C) != 1) {
 			goto end;
 		}
 	}
@@ -180,19 +175,10 @@ void *vs_tcp_conn_loop(void *arg)
 				goto end;
 			}
 			/* Handle verse handshake at TCP connection */
-#ifdef WITH_KERBEROS
-			if (vs_ctx->use_krb5 == USE_KERBEROS) {
-				if( (ret = vs_handle_handshake(C, *u_name)) == -1) {
-					goto end;
-				}
-			} else {
-#endif
-				if( (ret = vs_handle_handshake(C, NULL)) == -1) {
-					goto end;
-				}
-#ifdef WITH_KERBEROS
+			if( (ret = vs_handle_handshake(C)) == -1) {
+				goto end;
 			}
-#endif
+
 			/* When there is something to send, then send it to peer */
 			if( ret == 1 ) {
 				/* Send response message to the client */
@@ -813,7 +799,7 @@ static int vs_init_io_ctx(struct IO_CTX *io_ctx,
 	}
 
 #ifdef WITH_KERBEROS
-	io_ctx->krb5_keytab = NULL;		/* Will use defaul keytab */
+	io_ctx->krb5_keytab = NULL;		/* Will use default keytab */
 	io_ctx->krb5_auth_ctx = NULL;
 	io_ctx->krb5_ticket = NULL;
 #endif
