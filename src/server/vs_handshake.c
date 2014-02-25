@@ -327,11 +327,11 @@ int vs_NEGOTIATE_newhost_loop(struct vContext *C)
 
 
 /**
- * \brief This function is called, when server is in NEGOTIATE_cookie_ded state
+ * \brief This function is called, when server is in NEGOTIATE_token_ded state
  *
  * This function can create new thread for datagram connection
  */
-int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
+int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 {
 	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
@@ -341,8 +341,8 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	int i, j, ret;
 	unsigned short buffer_pos = 0;
 	int host_url_proposed = 0,
-			host_cookie_proposed = 0,
-			peer_cookie_confirmed = 0,
+			host_token_proposed = 0,
+			peer_token_confirmed = 0,
 			ded_confirmed = 0,
 			client_name_proposed = 0,
 			client_version_proposed = 0;
@@ -383,14 +383,14 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 					else
 						host_url_proposed = 0;
 				}
-			/* Client has to propose host cookie in this state */
-			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
+			/* Client has to propose host token in this state */
+			} else if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_TOKEN) {
 				if(r_message->sys_cmd[i].negotiate_cmd.count > 0) {
-					if(vsession->host_cookie.str != NULL) {
-						free(vsession->host_cookie.str);
+					if(vsession->host_token.str != NULL) {
+						free(vsession->host_token.str);
 					}
-					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
-					host_cookie_proposed = 1;
+					vsession->host_token.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					host_token_proposed = 1;
 				}
 			} else {
 				v_print_log(VRS_PRINT_WARNING, "This feature id: %d is not supported in this state\n",
@@ -414,16 +414,16 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 			}
 			break;
 		case CMD_CONFIRM_R_ID:
-			/* Client has to confirm peer cookie in this state */
-			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
+			/* Client has to confirm peer token in this state */
+			if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_TOKEN) {
 				if (r_message->sys_cmd[i].negotiate_cmd.count == 1) {
-					if(vsession->peer_cookie.str != NULL &&
-						strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
+					if(vsession->peer_token.str != NULL &&
+						strcmp(vsession->peer_token.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 					{
 						gettimeofday(&tv, NULL);
-						vsession->peer_cookie.tv.tv_sec = tv.tv_sec;
-						vsession->peer_cookie.tv.tv_usec = tv.tv_usec;
-						peer_cookie_confirmed = 1;
+						vsession->peer_token.tv.tv_sec = tv.tv_sec;
+						vsession->peer_token.tv.tv_usec = tv.tv_usec;
+						peer_token_confirmed = 1;
 					}
 				}
 			} else {
@@ -453,10 +453,10 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 	}
 
 
-	/* Send response on cookie request */
+	/* Send response on token request */
 	if(host_url_proposed==1 &&
-			host_cookie_proposed==1 &&
-			peer_cookie_confirmed==1 &&
+			host_token_proposed==1 &&
+			peer_token_confirmed==1 &&
 			ded_confirmed==1)
 	{
 		struct vContext *new_C;
@@ -566,14 +566,14 @@ int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C)
 		}
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_HOST_URL, vsession->host_url, NULL);
 
-		/* Set time for the host cookie */
+		/* Set time for the host token */
 		gettimeofday(&tv, NULL);
-		vsession->host_cookie.tv.tv_sec = tv.tv_sec;
-		vsession->host_cookie.tv.tv_usec = tv.tv_usec;
+		vsession->host_token.tv.tv_sec = tv.tv_sec;
+		vsession->host_token.tv.tv_usec = tv.tv_usec;
 
-		/* Send confirmation about host cookie */
-		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE,
-				vsession->host_cookie.str, NULL);
+		/* Send confirmation about host token */
+		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_TOKEN,
+				vsession->host_token.str, NULL);
 
 		/* Send confirmation about client name */
 		if(client_name_proposed == 1) {
@@ -675,16 +675,16 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 					s_message->sys_cmd[cmd_rank].ua_succ.avatar_id = avatar_id;
 					cmd_rank++;
 
-					/* Generate random string for coockie */
-					vsession->peer_cookie.str = (char*)calloc((COOKIE_SIZE+1), sizeof(char));
-					for(i=0; i<COOKIE_SIZE; i++) {
+					/* Generate random string for token */
+					vsession->peer_token.str = (char*)calloc((TOKEN_SIZE+1), sizeof(char));
+					for(i=0; i<TOKEN_SIZE; i++) {
 						/* Generate only printable characters (debug prints) */
-						vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
+						vsession->peer_token.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
 					}
-					vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-					/* Set up negotiate command of the host cookie */
-					v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_COOKIE,
-							vsession->peer_cookie.str, NULL);
+					vsession->peer_token.str[TOKEN_SIZE] = '\0';
+					/* Set up negotiate command of the host token */
+					v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_TOKEN,
+							vsession->peer_token.str, NULL);
 
 					/* Load DED from configuration and save it to the session */
 					vsession->ded.str = strdup(vs_ctx->ded);
@@ -883,11 +883,11 @@ int vs_handle_handshake(struct vContext *C)
 	case TCP_SERVER_STATE_RESPOND_USRAUTH:
 		ret = vs_RESPOND_userauth_loop(C);
 		if(ret == 1) {
-			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED;
+			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_TOKEN_DED;
 
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 				printf("%c[%d;%dm", 27, 1, 31);
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: NEGOTIATE_cookie_ded\n");
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: NEGOTIATE_token_ded\n");
 				printf("%c[%dm", 27, 0);
 			}
 		} else {
@@ -897,8 +897,8 @@ int vs_handle_handshake(struct vContext *C)
 			}
 		}
 		break;
-	case TCP_SERVER_STATE_NEGOTIATE_COOKIE_DED:
-		ret = vs_NEGOTIATE_cookie_ded_loop(C);
+	case TCP_SERVER_STATE_NEGOTIATE_TOKEN_DED:
+		ret = vs_NEGOTIATE_token_ded_loop(C);
 		if(ret == 1) {
 			stream_conn->host_state = TCP_SERVER_STATE_NEGOTIATE_NEWHOST;
 

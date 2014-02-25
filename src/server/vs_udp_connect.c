@@ -69,8 +69,8 @@ static void vs_CLOSED_init_send_packet(struct vContext *C);
 static void vs_CLOSED_init(struct vContext *C);
 
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
-static int cookie_initialized = 0;
-static unsigned char cookie_secret[COOKIE_SECRET_LENGTH];
+static int dtls_cookie_initialized = 0;
+static unsigned char dtls_cookie_secret[DTLS_COOKIE_SECRET_LENGTH];
 #endif
 
 /* Initialize VConnection at Verse server for potential clients */
@@ -216,14 +216,14 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct Negotiate_Cmd *change_l_cmd = (struct Negotiate_Cmd*)cmd;
 	int value_rank, tmp = 0;
 
-	/* This block of code checks if received cookie is the same as the
-	 * negotiated cookie. When cookie is not the same, then the server
+	/* This block of code checks if received token is the same as the
+	 * negotiated token. When token is not the same, then the server
 	 * will not response to the received packet.*/
-	if(change_l_cmd->feature == FTR_COOKIE) {
-		if( vsession->peer_cookie.str != NULL &&
+	if(change_l_cmd->feature == FTR_TOKEN) {
+		if( vsession->peer_token.str != NULL &&
 				change_l_cmd->count > 0 &&
 				change_l_cmd->value[0].string8.str != NULL &&
-				strcmp((char*)change_l_cmd->value[0].string8.str, vsession->peer_cookie.str)==0 )
+				strcmp((char*)change_l_cmd->value[0].string8.str, vsession->peer_token.str)==0 )
 		{
 			return 1;
 		} else {
@@ -426,16 +426,16 @@ static void vs_LISTEN_init_send_packet(struct vContext *C)
 	s_packet->sys_cmd[cmd_rank].ack_cmd.pay_id = r_packet->header.payload_id;
 	cmd_rank++;
 
-	/* Send confirmation about cookie */
-	if(vsession->peer_cookie.str!=NULL) {
+	/* Send confirmation about token */
+	if(vsession->peer_token.str!=NULL) {
 		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
-				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
+				CMD_CONFIRM_L_ID, FTR_TOKEN, vsession->peer_token.str, NULL);
 	}
 
-	/* Send own cookie */
-	if(vsession->host_cookie.str!=NULL) {
+	/* Send own token */
+	if(vsession->host_token.str!=NULL) {
 		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
-				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
+				CMD_CHANGE_L_ID, FTR_TOKEN, vsession->host_token.str, NULL);
 	}
 
 	/* Send confirmation about Congestion Control method if client proposed
@@ -598,7 +598,7 @@ static int vs_RESPOND_CONFIRM_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 }
 
 /**
- * \brief This function check if the client confirmed Cookie or right Flow Control.
+ * \brief This function check if the client confirmed Token or right Flow Control.
  */
 static int vs_RESPOND_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 {
@@ -608,11 +608,11 @@ static int vs_RESPOND_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct Negotiate_Cmd *confirm_l_cmd = (struct Negotiate_Cmd*)cmd;
 	int value_rank, tmp = 0;
 
-	if(confirm_l_cmd->feature == FTR_COOKIE) {
-		if( vsession->host_cookie.str != NULL &&
+	if(confirm_l_cmd->feature == FTR_TOKEN) {
+		if( vsession->host_token.str != NULL &&
 				confirm_l_cmd->count > 0 &&
 				confirm_l_cmd->value[0].string8.str != NULL &&
-				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_cookie.str)==0 )
+				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_token.str)==0 )
 		{
 			return 1;
 		} else {
@@ -1076,12 +1076,12 @@ int vs_dtls_generate_cookie(SSL *ssl, unsigned char *cookie, unsigned int *cooki
 	v_print_log(VRS_PRINT_DEBUG_MSG, "Generating cookie\n");
 
 	/* Initialize a random secret */
-	if(cookie_initialized == 0) {
-		if(!RAND_bytes(cookie_secret, COOKIE_SECRET_LENGTH)) {
+	if(dtls_cookie_initialized == 0) {
+		if(!RAND_bytes(dtls_cookie_secret, DTLS_COOKIE_SECRET_LENGTH)) {
 			v_print_log(VRS_PRINT_ERROR, "Setting random cookie secret\n");
 			return 0;
 		}
-		cookie_initialized = 1;
+		dtls_cookie_initialized = 1;
 	}
 
 	/* Read peer information */
@@ -1120,7 +1120,7 @@ int vs_dtls_generate_cookie(SSL *ssl, unsigned char *cookie, unsigned int *cooki
 	}
 
 	/* Calculate HMAC of buffer using the secret */
-	HMAC(EVP_sha1(), (const void*) cookie_secret, COOKIE_SECRET_LENGTH,
+	HMAC(EVP_sha1(), (const void*) dtls_cookie_secret, DTLS_COOKIE_SECRET_LENGTH,
 	     (const unsigned char*) buffer, length, result, &resultlength);
 	OPENSSL_free(buffer);
 
@@ -1140,10 +1140,10 @@ int vs_dtls_verify_cookie(SSL *ssl, unsigned char *cookie, unsigned int cookie_l
 		struct sockaddr_in6 	ip6;
 	} peer;
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Verifying cookie\n");
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Verifying token\n");
 
 	/* If secret isn't initialized yet, the cookie can't be valid */
-	if (!cookie_initialized)
+	if (!dtls_cookie_initialized)
 		return 0;
 
 	/* Read peer information */
@@ -1182,7 +1182,7 @@ int vs_dtls_verify_cookie(SSL *ssl, unsigned char *cookie, unsigned int cookie_l
 	}
 
 	/* Calculate HMAC of buffer using the secret */
-	HMAC(EVP_sha1(), (const void*) cookie_secret, COOKIE_SECRET_LENGTH,
+	HMAC(EVP_sha1(), (const void*) dtls_cookie_secret, DTLS_COOKIE_SECRET_LENGTH,
 	     (const unsigned char*) buffer, length, result, &resultlength);
 	OPENSSL_free(buffer);
 
@@ -1363,7 +1363,7 @@ static int vs_init_dgram_ctx(struct vContext *C)
 /**
  * \brief Main UDP thread. This thread waits for connection from client. It
  * expects connection from certain IP address and client has to send negotiated
- * cookie in its REQUEST state.
+ * token in its REQUEST state.
  * \param[in]	*arg	The void pointer is pointer at copy of Verse context.
  * \return		This thread does not return any usefull information now.
  */
@@ -1428,9 +1428,9 @@ hello:
 
 			gettimeofday(&tv, NULL);
 
-			/* Check if cookie is still fresh */
-			if((tv.tv_sec - vsession->peer_cookie.tv.tv_sec) > VRS_TIMEOUT) {
-				v_print_log(VRS_PRINT_ERROR, "Cookie timed out\n");
+			/* Check if token is still fresh */
+			if((tv.tv_sec - vsession->peer_token.tv.tv_sec) > VRS_TIMEOUT) {
+				v_print_log(VRS_PRINT_ERROR, "Token timed out\n");
 				goto end;
 			}
 
@@ -1525,10 +1525,10 @@ again:
 	while(1) {
 		gettimeofday(&tv, NULL);
 
-		/* Check if cookie is still fresh */
+		/* Check if token is still fresh */
 		if(dgram_conn->host_state == UDP_SERVER_STATE_LISTEN &&
-				(tv.tv_sec - vsession->peer_cookie.tv.tv_sec) > VRS_TIMEOUT) {
-			v_print_log(VRS_PRINT_ERROR, "Cookie timed out\n");
+				(tv.tv_sec - vsession->peer_token.tv.tv_sec) > VRS_TIMEOUT) {
+			v_print_log(VRS_PRINT_ERROR, "Token timed out\n");
 			goto end;
 		}
 

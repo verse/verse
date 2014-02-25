@@ -219,9 +219,9 @@ end:
 	/* Clear session flags */
 	vsession->flags = 0;
 
-	if(vsession->peer_cookie.str != NULL) {
-		free(vsession->peer_cookie.str);
-		vsession->peer_cookie.str = NULL;
+	if(vsession->peer_token.str != NULL) {
+		free(vsession->peer_token.str);
+		vsession->peer_token.str = NULL;
 	}
 	if(vsession->ded.str != NULL) {
 		free(vsession->ded.str);

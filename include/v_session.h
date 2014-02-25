@@ -56,7 +56,7 @@
 #include "v_out_queue.h"
 #include "v_in_queue.h"
 
-#define COOKIE_SIZE		16
+#define TOKEN_SIZE		16
 
 /* When negotiation is not used, then client and server consider
  * FPS to be 60 */
@@ -67,10 +67,10 @@ typedef struct VDED {
 	char				*str;	/* String of negotiated DED */
 } VDED;
 
-typedef struct VCookie {
+typedef struct VToken {
 	char				*str;	/* Secret string */
-	struct timeval		tv;		/* Cookie is valid since this time */
-} VCookie;
+	struct timeval		tv;		/* Token is valid since this time */
+} VToken;
 
 typedef struct VSession {
 	/* Thread stuffs */
@@ -98,8 +98,8 @@ typedef struct VSession {
 #endif
 	char					*username;		/* Username used for this connection. */
 	char					*host_url;		/* UDP connection URL negotiated during authentication */
-	struct VCookie			peer_cookie;	/* Cookie negotiated during authentication */
-	struct VCookie			host_cookie;	/* Cookie negotiated during authentication */
+	struct VToken			peer_token;		/* Token negotiated during authentication */
+	struct VToken			host_token;		/* Token negotiated during authentication */
 	/* Queues */
 	struct VOutQueue		*out_queue;		/* Queue of outgoing data (node commands) */
 	struct VInQueue			*in_queue;		/* Queue of incoming data (fake and node commands) */

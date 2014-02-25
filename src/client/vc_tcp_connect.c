@@ -236,7 +236,7 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
 /**
  *
  */
-static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
+static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
@@ -248,7 +248,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: NEGOTIATE_cookie_dtd\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Client TCP state: NEGOTIATE_token_dtd\n");
 		printf("%c[%dm", 27, 0);
 	}
 
@@ -330,23 +330,23 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 	 * (DTLS) */
 	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_HOST_URL, vsession->host_url, NULL);
 
-	/* Set time for cookie */
+	/* Set time for token */
 	gettimeofday(&tv, NULL);
-	vsession->host_cookie.tv.tv_sec = tv.tv_sec;
-	vsession->host_cookie.tv.tv_usec = tv.tv_usec;
+	vsession->host_token.tv.tv_sec = tv.tv_sec;
+	vsession->host_token.tv.tv_usec = tv.tv_usec;
 
-	/* Set up negotiate command of host Cookie */
-	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
+	/* Set up negotiate command of host Token */
+	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_TOKEN, vsession->host_token.str, NULL);
 
 	/* Generate random string */
-	vsession->peer_cookie.str = (char*)malloc((COOKIE_SIZE+1)*sizeof(char));
-	for(i=0; i<COOKIE_SIZE; i++) {
+	vsession->peer_token.str = (char*)malloc((TOKEN_SIZE+1)*sizeof(char));
+	for(i=0; i<TOKEN_SIZE; i++) {
 		/* Generate only printable characters (debug prints) */
-		vsession->peer_cookie.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
+		vsession->peer_token.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
 	}
-	vsession->peer_cookie.str[COOKIE_SIZE] = '\0';
-	/* Set up negotiate command of peer Cookie */
-	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
+	vsession->peer_token.str[TOKEN_SIZE] = '\0';
+	/* Set up negotiate command of peer Token */
+	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_R_ID, FTR_TOKEN, vsession->peer_token.str, NULL);
 
 	/* Send confirmation of proposed DED */
 	v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_DED, vsession->ded.str, NULL);
@@ -380,7 +380,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 		return 0;
 	/* Was event on the TCP socket of this session */
 	} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
-		int confirmed_cookie=0, proposed_url=0;
+		int confirmed_token=0, proposed_url=0;
 		buffer_pos = 0;
 
 		/* Try to receive data through SSL connection */
@@ -415,18 +415,18 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 					if(r_message->sys_cmd[i].negotiate_cmd.count==0) {
 						/* Correct behavior */
 					}
-				} else if(r_message->sys_cmd[i].negotiate_cmd.feature==FTR_COOKIE) {
+				} else if(r_message->sys_cmd[i].negotiate_cmd.feature==FTR_TOKEN) {
 					if(r_message->sys_cmd[i].negotiate_cmd.count>0) {
-						if(vsession->peer_cookie.str != NULL &&
-								strcmp(vsession->peer_cookie.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
+						if(vsession->peer_token.str != NULL &&
+								strcmp(vsession->peer_token.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 						{
 							gettimeofday(&tv, NULL);
-							vsession->peer_cookie.tv.tv_sec = tv.tv_sec;
-							vsession->peer_cookie.tv.tv_usec = tv.tv_usec;
-							confirmed_cookie = 1;
+							vsession->peer_token.tv.tv_sec = tv.tv_sec;
+							vsession->peer_token.tv.tv_usec = tv.tv_usec;
+							confirmed_token = 1;
 						} else {
-							v_print_log(VRS_PRINT_DEBUG_MSG, " Server confirmed wrong cookie: %s != %s\n",
-									vsession->peer_cookie.str, r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+							v_print_log(VRS_PRINT_DEBUG_MSG, " Server confirmed wrong token: %s != %s\n",
+									vsession->peer_token.str, r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 						}
 					}
 				}
@@ -445,7 +445,7 @@ static int vc_NEGOTIATE_cookie_dtd_loop(struct vContext *C)
 			}
 		}
 
-		if(confirmed_cookie==1 && proposed_url==1)
+		if(confirmed_token==1 && proposed_url==1)
 			return 1;
 		else
 			return 0;
@@ -565,12 +565,12 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 				auth_succ = 1;
 				break;
 			case CMD_CHANGE_R_ID:
-				if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_COOKIE) {
-					if(vsession->host_cookie.str!=NULL) {
-						free(vsession->host_cookie.str);
-						vsession->host_cookie.str = NULL;
+				if(r_message->sys_cmd[i].negotiate_cmd.feature == FTR_TOKEN) {
+					if(vsession->host_token.str!=NULL) {
+						free(vsession->host_token.str);
+						vsession->host_token.str = NULL;
 					}
-					vsession->host_cookie.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
+					vsession->host_token.str = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 				}
 				break;
 			case CMD_CHANGE_L_ID:
@@ -1244,7 +1244,7 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 		goto data;
 		break;
 	case CMD_USER_AUTH_SUCCESS:
-		goto cookie_ded;
+		goto token_ded;
 		break;
 	}
 
@@ -1261,17 +1261,17 @@ data:
 			error = VRS_CONN_TERM_AUTH_FAILED;
 			goto closing;
 		case CMD_USER_AUTH_SUCCESS:
-			goto cookie_ded;
+			goto token_ded;
 		default:
 			break;
 	}
 
-cookie_ded:
+token_ded:
 	/* Update client and server states */
-	stream_conn->host_state = TCP_CLIENT_STATE_NEGOTIATE_COOKIE_DED;
+	stream_conn->host_state = TCP_CLIENT_STATE_NEGOTIATE_TOKEN_DED;
 
 	/* Try to negotiate new UDP port for communication */
-	ret = vc_NEGOTIATE_cookie_dtd_loop(C);
+	ret = vc_NEGOTIATE_token_dtd_loop(C);
 	switch (ret) {
 	case 0:
 		error = VRS_CONN_TERM_ERROR;

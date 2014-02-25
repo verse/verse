@@ -79,7 +79,7 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].uint8 = *(uint8*)value;
 			break;
 		case FTR_HOST_URL:
-		case FTR_COOKIE:
+		case FTR_TOKEN:
 		case FTR_DED:
 		case FTR_CLIENT_NAME:
 		case FTR_CLIENT_VERSION:
@@ -145,8 +145,8 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 		case FTR_HOST_URL:
 			v_print_log_simple(level, "feature: HOST_URL, ");
 			break;
-		case FTR_COOKIE:
-			v_print_log_simple(level, "feature: COOKIE, ");
+		case FTR_TOKEN:
+			v_print_log_simple(level, "feature: TOKEN, ");
 			break;
 		case FTR_DED:
 			v_print_log_simple(level, "feature: DED, ");
@@ -181,7 +181,7 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 						negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
-			case FTR_COOKIE:
+			case FTR_TOKEN:
 			case FTR_DED:
 			case FTR_CLIENT_NAME:
 			case FTR_CLIENT_VERSION:
@@ -264,7 +264,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 			negotiate_cmd->count = length - (1+lenlen+1);
 			break;
 		case FTR_HOST_URL:
-		case FTR_COOKIE:
+		case FTR_TOKEN:
 		case FTR_DED:
 		case FTR_CLIENT_NAME:
 		case FTR_CLIENT_VERSION:
@@ -295,7 +295,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 						&negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
-			case FTR_COOKIE:
+			case FTR_TOKEN:
 			case FTR_DED:
 			case FTR_CLIENT_NAME:
 			case FTR_CLIENT_VERSION:
@@ -345,7 +345,7 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 	if( !(negotiate_cmd->feature == FTR_FC_ID ||
 		negotiate_cmd->feature == FTR_CC_ID ||
 		negotiate_cmd->feature == FTR_HOST_URL ||
-		negotiate_cmd->feature == FTR_COOKIE ||
+		negotiate_cmd->feature == FTR_TOKEN ||
 		negotiate_cmd->feature == FTR_DED ||
 		negotiate_cmd->feature == FTR_RWIN_SCALE ||
 		negotiate_cmd->feature == FTR_FPS ||
@@ -371,7 +371,7 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 			length = 1 + 1 + 1 + negotiate_cmd->count*sizeof(uint8);
 			break;
 		case FTR_HOST_URL:
-		case FTR_COOKIE:
+		case FTR_TOKEN:
 		case FTR_DED:
 		case FTR_CLIENT_NAME:
 		case FTR_CLIENT_VERSION:
@@ -403,7 +403,7 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 				buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
-			case FTR_COOKIE:
+			case FTR_TOKEN:
 			case FTR_DED:
 			case FTR_CLIENT_NAME:
 			case FTR_CLIENT_VERSION:

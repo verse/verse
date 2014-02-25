@@ -28,7 +28,7 @@ int vs_TLS_teardown(struct vContext *C);
 void vs_CLOSING(struct vContext *C);
 int vs_STREAM_OPEN_tcp_loop(struct vContext *C);
 int vs_NEGOTIATE_newhost_loop(struct vContext *C);
-int vs_NEGOTIATE_cookie_ded_loop(struct vContext *C);
+int vs_NEGOTIATE_token_ded_loop(struct vContext *C);
 int vs_RESPOND_userauth_loop(struct vContext *C);
 int vs_RESPOND_methods_loop(struct vContext *C);
 int vs_handle_handshake(struct vContext *C);
