@@ -1659,7 +1659,7 @@ end:
 	for(i=vs_ctx->port_low, j=0; i<vs_ctx->port_high; i++, j++) {
 		if(dgram_conn->io_ctx.host_addr.port == vs_ctx->port_list[j].port_number) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Free port: %d\n", vs_ctx->port_list[j].port_number);
-			vs_ctx->port_list[j].flag = 0;
+			vs_ctx->port_list[j].aggregation--;
 			break;
 		}
 	}

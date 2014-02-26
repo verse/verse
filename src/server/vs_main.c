@@ -166,6 +166,7 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->port_list = (struct VS_Port*)calloc(vs_ctx->max_sockets, sizeof(struct VS_Port));
 	for(i=0; i<vs_ctx->max_sockets; i++) {
 		vs_ctx->port_list[i].port_number = (unsigned short)(vs_ctx->port_low + i);
+		vs_ctx->port_list[i].aggregation = 0;
 	}
 
 	vs_ctx->tcp_io_ctx.host_addr.ip_ver = IPV6;

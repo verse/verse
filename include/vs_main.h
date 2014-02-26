@@ -48,8 +48,6 @@
 /* Flags vs_ctx->flags */
 #define SERVER_DEBUG_MODE					1		/* Server will not detach from terminal, etc. */
 
-#define SERVER_PORT_USED					1		/* Server port is in use */
-
 #define MAX_USER_AUTH_ATTEMPTS				1		/* Maximal attempts of user authentication */
 
 #define LINE_LEN							65536	/* Maximal length of the length of the CSV file */
@@ -71,11 +69,17 @@ typedef enum ServerState {
 	SERVER_STATE_CLOSED =	4
 } ServerState;
 
+/**
+ * Information about UDP port
+ */
 typedef struct VS_Port {
-	unsigned short		port_number;
-	char				flag;
+	unsigned short		port_number;	/* Number of UDP port */
+	unsigned int		aggregation;	/* How many connection uses this port */
 } VS_Port;
 
+/**
+ * Data structure holding all data shared at Verse server
+ */
 typedef struct VSData {
 	struct VHashArrayBase	nodes;					/* Hashed linked list of Verse Nodes */
 
