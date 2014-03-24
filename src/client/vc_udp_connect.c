@@ -75,18 +75,18 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct Negotiate_Cmd *change_l_cmd = (struct Negotiate_Cmd*)cmd;
 	int value_rank;
 
-	if(change_l_cmd->feature == FTR_COOKIE) {
-		/* This block of code checks, if received cookie is the same as the
-		 * negotiated cookie. When cookie is not the same, then the client
+	if(change_l_cmd->feature == FTR_TOKEN) {
+		/* This block of code checks, if received token is the same as the
+		 * negotiated token. When token is not the same, then the client
 		 * will not response to the received packet. */
-		if( vsession->peer_cookie.str != NULL &&
+		if( vsession->peer_token.str != NULL &&
 				change_l_cmd->count > 0 &&
 				change_l_cmd->value[0].string8.str != NULL )
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote COOKIE: %s proposed\n", change_l_cmd->value[0].string8.str);
+			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote TOKEN: %s proposed\n", change_l_cmd->value[0].string8.str);
 			return 1;
 		} else {
-			v_print_log(VRS_PRINT_WARNING, "Peer proposed wrong COOKIE\n");
+			v_print_log(VRS_PRINT_WARNING, "Peer proposed wrong TOKEN\n");
 			return 0;
 		}
 	}
@@ -194,21 +194,21 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	struct VDgramConn *dgram_conn = CTX_current_dgram_conn(C);
 	struct Negotiate_Cmd *confirm_l_cmd = (struct Negotiate_Cmd*)cmd;
 
-	if(confirm_l_cmd->feature == FTR_COOKIE) {
-		/* This block of code checks if the server confirmed send cookie. */
-		if( vsession->host_cookie.str != NULL &&
+	if(confirm_l_cmd->feature == FTR_TOKEN) {
+		/* This block of code checks if the server confirmed send token. */
+		if( vsession->host_token.str != NULL &&
 				confirm_l_cmd->count == 1 &&
 				confirm_l_cmd->value[0].string8.str != NULL &&
-				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_cookie.str)==0 )
+				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_token.str)==0 )
 		{
 			v_print_log(VRS_PRINT_DEBUG_MSG,
-					"Local COOKIE: %s confirmed\n",
+					"Local TOKEN: %s confirmed\n",
 					confirm_l_cmd->value[0].string8.str);
 			return 1;
 		} else {
 			v_print_log(VRS_PRINT_WARNING,
 					"COOCKIE: %s not confirmed\n",
-					vsession->peer_cookie.str);
+					vsession->peer_token.str);
 			return 0;
 		}
 	}
@@ -336,10 +336,10 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 	s_packet->header.ank_id = 0;
 
 	/* System commands */
-	if(vsession->host_cookie.str!=NULL) {
-		/* Add negotiated cookie */
+	if(vsession->host_token.str!=NULL) {
+		/* Add negotiated token */
 		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
-				CMD_CHANGE_L_ID, FTR_COOKIE, vsession->host_cookie.str, NULL);
+				CMD_CHANGE_L_ID, FTR_TOKEN, vsession->host_token.str, NULL);
 	}
 
 	/* Add CC (local) proposal */
@@ -510,10 +510,10 @@ void vc_PARTOPEN_init_send_packet(struct vContext *C)
 	s_packet->sys_cmd[cmd_rank].ack_cmd.pay_id = dgram_conn->peer_id;
 	cmd_rank++;
 
-	/* Confirm proposed COOKIE */
-	if(vsession->peer_cookie.str!=NULL) {
+	/* Confirm proposed TOKEN */
+	if(vsession->peer_token.str!=NULL) {
 		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
-				CMD_CONFIRM_L_ID, FTR_COOKIE, vsession->peer_cookie.str, NULL);
+				CMD_CONFIRM_L_ID, FTR_TOKEN, vsession->peer_token.str, NULL);
 	}
 
 	/* Confirm proposed Flow Control ID */
@@ -1039,6 +1039,8 @@ again:
 	}
 
 	SSL_free(dgram_conn->io_ctx.ssl);
+	dgram_conn->io_ctx.ssl = NULL;
+	dgram_conn->io_ctx.bio = NULL;
 }
 
 int vc_create_dtls_connection(struct vContext *C)
@@ -1087,8 +1089,8 @@ again:
 		int err = SSL_get_error(dgram_conn->io_ctx.ssl, ret);
 		if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
 			gettimeofday(&timeout, NULL);
-			if((timeout.tv_sec - vsession->peer_cookie.tv.tv_sec) > VRS_TIMEOUT) {
-				v_print_log(VRS_PRINT_ERROR, "Cookie timed out\n");
+			if((timeout.tv_sec - vsession->peer_token.tv.tv_sec) > VRS_TIMEOUT) {
+				v_print_log(VRS_PRINT_ERROR, "Token timed out\n");
 				return 0;
 			}
 			usleep(1000);

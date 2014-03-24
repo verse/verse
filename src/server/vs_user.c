@@ -39,7 +39,7 @@ struct VSUser *vs_user_find(struct VS_CTX *vs_ctx, uint16 user_id)
 	/* Find VSUser */
 	user = vs_ctx->users.first;
 
-	while(user!=NULL) {
+	while(user != NULL) {
 		if(user->user_id == user_id)
 			break;
 		user = user->next;
@@ -56,6 +56,7 @@ void vs_user_free(struct VSUser *user)
 	free(user->username);
 	free(user->realname);
 	if(user->password) free(user->password);
+	if(user->password_hash) free(user->password_hash);
 }
 
 /**
@@ -71,6 +72,7 @@ int vs_add_other_users_account(struct VS_CTX *vs_ctx)
 	if(other_users != NULL) {
 		other_users->username = strdup("others");
 		other_users->password = NULL;
+		other_users->password_hash = NULL;
 		other_users->user_id = VRS_OTHER_USERS_UID;
 		other_users->realname = strdup("Other Users");
 		other_users->fake_user = 1;
@@ -98,6 +100,7 @@ int vs_add_superuser_account(struct VS_CTX *vs_ctx)
 	if(super_user != NULL) {
 		super_user->username = strdup("superuser");
 		super_user->password = NULL;
+		super_user->password_hash = NULL;
 		super_user->user_id = VRS_SUPER_USER_UID;
 		super_user->realname = strdup("Super User");
 		super_user->fake_user = 1;

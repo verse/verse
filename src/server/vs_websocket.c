@@ -45,10 +45,6 @@
 
 #include "v_stream.h"
 
-#define BASE64_ENCODE_RAW_LENGTH(length) ((((length) + 2)/3)*4)
-#define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
-
 /*
  * Calculates SHA-1 hash of *src*. The size of *src* is *src_length* bytes.
  * *dst* must be at least SHA1_DIGEST_SIZE.
@@ -175,79 +171,109 @@ static char* http_header_find_field_value(char *header, char *field_name, char *
 
 
 /*
- * WIP: Performs simple HTTP handshake. *fd* is the file descriptor of the
+ * \brief Performs simple HTTP handshake. *fd* is the file descriptor of the
  * connection to the client. This function returns 0 if it succeeds,
  * or returns -1.
  */
 static int http_handshake(int fd)
 {
-	char header[16384], accept_key[29], *keyhdstart, *keyhdend, res_header[256];
+	char header[16384], accept_key[29], res_header[256];
+	char *keyhdstart, *keyhdend;
 	size_t header_length = 0, res_header_sent = 0, res_header_length;
-	ssize_t r;
+	ssize_t ret;
 
 	while(1) {
-		while((r = read(fd, header+header_length,
+		while((ret = read(fd, header+header_length,
 				sizeof(header)-header_length)) == -1 && errno == EINTR);
-		if(r == -1) {
+		if(ret == -1) {
 			perror("read");
 			return -1;
-		} else if(r == 0) {
+		} else if(ret == 0) {
 			v_print_log(VRS_PRINT_ERROR,
 					"HTTP Handshake: Got EOF");
 			return -1;
 		} else {
-			header_length += r;
+			header_length += ret;
 			if(header_length >= 4 &&
-					memcmp(header+header_length-4, "\r\n\r\n", 4) == 0) {
+					memcmp(header + header_length - 4, "\r\n\r\n", 4) == 0) {
 				break;
 			} else if(header_length == sizeof(header)) {
 				v_print_log(VRS_PRINT_ERROR,
-						"HTTP Handshake: Too large HTTP headers");
+						"HTTP Handshake: Too large HTTP headers\n");
 				return -1;
 			}
 		}
 	}
 
-	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL ||
-			http_header_find_field_value(header, "Connection", "Upgrade") == NULL ||
-			(keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL) {
+	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: received request\n");
+
+	/* Check if required HTTP headers were received in the request */
+	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
-				"HTTP Handshake: Missing required header fields");
+				"HTTP Handshake: Missing required header field 'Upgrade: websocket'\n");
 		return -1;
 	}
+	if(http_header_find_field_value(header, "Connection", "Upgrade") == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"HTTP Handshake: Missing required header field 'Connection: Upgrade'\n");
+		return -1;
+	}
+	if( (keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"HTTP Handshake: Missing required header field 'Sec-WebSocket-Key: SOME_SECRET_KEY'\n");
+		return -1;
+	}
+	if( http_header_find_field_value(header, "Sec-WebSocket-Protocol", WEB_SOCKET_PROTO_NAME) == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"HTTP Handshake: Missing required header field 'Sec-WebSocket-Protocol: %s'\n",
+				WEB_SOCKET_PROTO_NAME);
+		return -1;
+	}
+
+	/* Check the length of WebSocket key */
 	for(; *keyhdstart == ' '; ++keyhdstart);
 	keyhdend = keyhdstart;
 	for(; *keyhdend != '\r' && *keyhdend != ' '; ++keyhdend);
-	if(keyhdend-keyhdstart != 24) {
+	if(keyhdend - keyhdstart != 24) {
 		v_print_log(VRS_PRINT_ERROR,
-				"HTTP Handshake: Invalid value in Sec-WebSocket-Key");
+				"HTTP Handshake: Invalid value in Sec-WebSocket-Key\n");
 		return -1;
 	}
+
+	/* Create accepted key */
 	create_accept_key(accept_key, keyhdstart);
+
+	/* Create response for client */
 	snprintf(res_header, sizeof(res_header),
 			"HTTP/1.1 101 Switching Protocols\r\n"
 			"Upgrade: websocket\r\n"
 			"Connection: Upgrade\r\n"
 			"Sec-WebSocket-Accept: %s\r\n"
+			"Sec-WebSocket-Protocol: v1.verse.tul.cz\r\n"
 			"\r\n", accept_key);
+
+	/* Send response to the client */
 	res_header_length = strlen(res_header);
 	while(res_header_sent < res_header_length) {
-		while((r = write(fd, res_header+res_header_sent,
-				res_header_length-res_header_sent)) == -1 &&
+		while((ret = write(fd, res_header + res_header_sent,
+				res_header_length - res_header_sent)) == -1 &&
 				errno == EINTR);
-		if(r == -1) {
+		if(ret == -1) {
 			perror("write");
 			return -1;
 		} else {
-			res_header_sent += r;
+			res_header_sent += ret;
 		}
 	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: sent response\n");
+
 	return 0;
 }
 
 
 /**
- * \brief WIP: Wslay send callback
+ * \brief WSLay send callback
  */
 ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 		const uint8_t *data,
@@ -257,32 +283,41 @@ ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 {
 	struct vContext *C = (struct vContext*)user_data;
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	ssize_t r;
+	ssize_t ret = 0;
 	int sflags = 0;
 
 #ifdef MSG_MORE
-if(flags & WSLAY_MSG_MORE) {
-	sflags |= MSG_MORE;
-}
+	if(flags & WSLAY_MSG_MORE) {
+		sflags |= MSG_MORE;
+	}
 #endif
 
-	while((r = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
-			errno == EINTR);
-	if(r == -1) {
+	/* Try to send all data */
+	while((ret = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
+			errno == EINTR) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"WS Callback Send Data, len: %ld, flags: %d -> %ld\n",
+				len, sflags, ret);
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"WS Callback Send Data, len: %ld, flags: %d -> ret: %ld\n",
+			len, sflags, ret);
+
+	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
 		} else {
 			wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		}
 	}
-	v_print_log(VRS_PRINT_DEBUG_MSG,
-			"WS Callback Send Data\n");
-	return r;
+
+	return ret;
 }
 
 
 /**
- * \brief WIP: Wslay receive callback
+ * \brief WSLay receive callback
  */
 ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 		uint8_t *buf,
@@ -292,44 +327,53 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 {
 	struct vContext *C = (struct vContext*)user_data;
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-	ssize_t r;
+	ssize_t ret;
+
 	(void)flags;
 
-	while((r = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
-			errno == EINTR);
-	if(r == -1) {
+	/* Try to receive all data from TCP stack */
+	while((ret = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
+			errno == EINTR) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"WS Callback Received Data, len: %ld, flags: %d -> ret: %ld\n",
+				len, flags, ret);
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"WS Callback Received Data, len: %ld, flags: %d -> ret: %ld\n",
+			len, flags, ret);
+
+	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			wslay_event_set_error(ctx, WSLAY_ERR_WOULDBLOCK);
 		} else {
 			wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
 		}
-	} else if(r == 0) {
+	} else if(ret == 0) {
 		/* Unexpected EOF is also treated as an error */
 		wslay_event_set_error(ctx, WSLAY_ERR_CALLBACK_FAILURE);
-		r = -1;
+		ret = -1;
 	}
-	v_print_log(VRS_PRINT_DEBUG_MSG,
-			"WS Callback Received Data, len: %ld, flags: %d\n",
-			len, flags);
-	return r;
+
+	return ret;
 }
 
 
 /**
- * \brief WebSocket callback function for recived message
+ * \brief WebSocket callback function for received message
  */
-void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
+void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 		const struct wslay_event_on_msg_recv_arg *arg,
 		void *user_data)
 {
 	struct vContext *C = (struct vContext*)user_data;
 	struct VSession *session = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
-
-	(void)ctx;
+	int ret;
 
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
-		/* Verse server uses binary message for communication */
+
+		/* Verse server uses only binary message for communication */
 		if(arg->opcode == WSLAY_BINARY_FRAME) {
 		    struct wslay_event_msg msgarg;
 
@@ -342,21 +386,46 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 
 			if(session->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
 				if(v_STREAM_handle_messages(C) == 0) {
-					/* TODO: end connection */
+					/* End connection */
+					session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+					/* Try to close connection with WebSocket client */
+					wslay_event_queue_close(wslay_ctx,
+							WSLAY_CODE_PROTOCOL_ERROR,
+							(uint8_t*)"Wrong command",	/* Close message */
+							13);	/* The length of close message */
 					return;
 				}
 			} else {
-
 				if( vs_handle_handshake(C) == -1 ) {
-					/* TODO: end connection */
+					/* End connection */
+					session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+					/* Try to close connection with WebSocket client */
+					wslay_event_queue_close(wslay_ctx,
+							WSLAY_CODE_PROTOCOL_ERROR,
+							(uint8_t*)"Wrong command",	/* Close message */
+							13);	/* The length of close message */
 					return;
 				}
-
-			    msgarg.opcode = WSLAY_BINARY_FRAME;
-			    msgarg.msg = (uint8_t*)io_ctx->buf;
-			    msgarg.msg_length = io_ctx->buf_size;
-			    wslay_event_queue_msg(ctx, &msgarg);
 			}
+
+			/* TODO: optionally send message fragmented, when it is needed using:
+			 * wslay_event_queue_fragmented_msg() */
+
+		    msgarg.opcode = WSLAY_BINARY_FRAME;
+		    msgarg.msg = (uint8_t*)io_ctx->buf;
+		    msgarg.msg_length = io_ctx->buf_size;
+
+		    /* Queue message for sending */
+		    if((ret = wslay_event_queue_msg(wslay_ctx, &msgarg)) != 0) {
+				v_print_log(VRS_PRINT_ERROR,
+						"Unable to queue message to WebSocket: %d\n", ret);
+				return;
+		    } else {
+		    	v_print_log(VRS_PRINT_DEBUG_MSG,
+		    			"WebSocket message successfully queued\n");
+		    }
 
 		} else if(arg->opcode == WSLAY_TEXT_FRAME) {
 			v_print_log(VRS_PRINT_ERROR, "WebSocket text frame is not supported\n");
@@ -368,28 +437,36 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"WS Callback Received Ctrl Message: opcode: %d\n",
 				arg->opcode);
+
 		/* Is it closing message? */
 		if(arg->opcode & WSLAY_CONNECTION_CLOSE) {
+
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Close message with code: %d, message: %s\n",
 					arg->status_code,
 					arg->msg);
+
+			/* When this control message was received at second time, then
+			 * switch to the state CLOSED. Otherwise switch to the state
+			 * CLOSING */
 			if(session->stream_conn->host_state == TCP_SERVER_STATE_CLOSING) {
 				session->stream_conn->host_state = TCP_SERVER_STATE_CLOSED;
 			} else {
 				session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
-				wslay_event_queue_close(ctx,
+				/* When server wasn't in the state closing, then send
+				 * confirmation to the client, that this connection will be
+				 * closed */
+				wslay_event_queue_close(wslay_ctx,
 						WSLAY_CODE_NORMAL_CLOSURE,
 						(uint8_t*)"Closing connection",
 						15);
 			}
 		}
 	}
-
 }
 
 /**
- * \brief The function with websocket infinite loop
+ * \brief The function with WebSocket infinite loop
  */
 void *vs_websocket_loop(void *arg)
 {
@@ -420,7 +497,11 @@ void *vs_websocket_loop(void *arg)
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags & ~O_NONBLOCK);
 
-	http_handshake(io_ctx->sockfd);
+	/* Listen for HTTP request from web client and try to do
+	 * WebSocket handshake */
+	if(http_handshake(io_ctx->sockfd) != 0 ) {
+		goto end;
+	}
 
 	/* Try to get size of TCP buffer */
 	int_size = sizeof(int_size);
@@ -440,18 +521,31 @@ void *vs_websocket_loop(void *arg)
 		printf("%c[%dm", 27, 0);
 	}
 
-	/* Set non-blocking */
+	/* Set socket non-blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK);
 
-	wslay_event_context_server_init(&wslay_ctx, &callbacks, C);
+	/* Try to initialize WebSocket server context */
+	if(wslay_event_context_server_init(&wslay_ctx, &callbacks, C) != 0) {
+		goto end;
+	}
 
 	/* "Never ending" loop */
-	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED)
+	while(vsession->stream_conn->host_state != TCP_SERVER_STATE_CLOSED &&
+			( wslay_event_want_read(wslay_ctx) == 1 ||
+					wslay_event_want_write(wslay_ctx) == 1) )
 	{
+
+		/* When server is going to stop, then close connection with WebSocket
+		 * client */
 		if(vs_ctx->state != SERVER_STATE_READY) {
-			vsession->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
-			/* Try to close connection with websocket client */
+
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Closing WebSocket connection: Server shutdown\n");
+
+			stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+			/* Try to close connection with WebSocket client */
 			wslay_event_queue_close(wslay_ctx,
 					WSLAY_CODE_GOING_AWAY,
 					(uint8_t*)"Server shutdown",	/* Close message */
@@ -460,11 +554,19 @@ void *vs_websocket_loop(void *arg)
 
 		/* Initialize read set */
 		FD_ZERO(&read_set);
-		FD_SET(io_ctx->sockfd, &read_set);
+		if(wslay_event_want_read(wslay_ctx) == 1) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Waiting for WebSocket message ...\n");
+			FD_SET(io_ctx->sockfd, &read_set);
+		}
 
 		/* Initialize write set */
 		FD_ZERO(&write_set);
-		FD_SET(io_ctx->sockfd, &write_set);
+		if(wslay_event_want_write(wslay_ctx) == 1) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Going to write message to WebSocket ...\n");
+			FD_SET(io_ctx->sockfd, &write_set);
+		}
 
 		/* Set timeout for select() */
 		if(stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
@@ -477,29 +579,43 @@ void *vs_websocket_loop(void *arg)
 			tv.tv_usec = 0;
 		}
 
-		if( (ret = select(io_ctx->sockfd+1,
+		if( (ret = select(io_ctx->sockfd + 1,
 				&read_set,
 				&write_set,
-				NULL,			/* Exception*/
+				NULL,			/* Don't care about exception */
 				&tv)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
-		} else if(ret>0){
+		} else if(ret > 0) {
 			if(FD_ISSET(io_ctx->sockfd, &read_set)) {
 				if( wslay_event_recv(wslay_ctx) != 0 ) {
 					goto end;
 				}
-			} else if (FD_ISSET(io_ctx->sockfd, &write_set)) {
+			}
+			if (FD_ISSET(io_ctx->sockfd, &write_set)) {
 				if( wslay_event_send(wslay_ctx) != 0 ) {
 					goto end;
 				}
 			}
+		} else if(ret == 0 && stream_conn->host_state != TCP_SERVER_STATE_STREAM_OPEN) {
+			/* When handshake is not finished during VRS_TIMEOT seconds, then
+			 * close connection with WebSocket client. */
+
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Closing WebSocket connection: Handshake timed-out\n");
+
+			stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+
+			wslay_event_queue_close(wslay_ctx,
+					WSLAY_CODE_PROTOCOL_ERROR,
+					(uint8_t*)"Handshake timed-out",	/* Close message */
+					19);	/* The length of close message */
 		}
 
 		if(stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
-			/* Check if there is any command in outgouing queue
+			/* Check if there is any command in outgoing queue
 			 * and eventually pack these commands to buffer */
 			if((ret = v_STREAM_pack_message(C)) == 0 ) {
 				goto end;
@@ -527,13 +643,13 @@ end:
 	/* Set up TCP CLOSING state (non-blocking) */
 	vs_CLOSING(C);
 
-	/* Receive and Send messages are not neccessary any more */
-	if(r_message!=NULL) {
+	/* Receive and Send messages are not necessary any more */
+	if(r_message != NULL) {
 		free(r_message);
 		r_message = NULL;
 		CTX_r_message_set(C, NULL);
 	}
-	if(s_message!=NULL) {
+	if(s_message != NULL) {
 		free(s_message);
 		s_message = NULL;
 		CTX_s_message_set(C, NULL);

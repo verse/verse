@@ -41,7 +41,7 @@
 #include "v_in_queue.h"
 #include "v_out_queue.h"
 
-#define CHUNK_NUM	3
+#define CHUNK_NUM	4
 #define CHUNK_SIZE	4
 
 /* Structure for storing testing "vectors" */
@@ -74,6 +74,16 @@ static struct NC_cmd_values cmd_values[CHUNK_NUM][CHUNK_SIZE] = {
 			{1004, 5, 506, 301},
 			{1005, 6, 507, 301},
 			{1006, 7, 508, 301}
+		},
+		/* Commands with collisions in address. Hash of address is computed
+		 * using following formulae:
+		 * ((UserID << 16) + (ParrentID >> 16) + (ParentID & 0xFFFF)) % 65535
+		 */
+		{
+			{1007, 8, 509, 302},
+			{1007, 65543, 510, 302},
+			{1007, 131078, 511, 302},
+			{1007, 196613, 512, 302}
 		}
 };
 
@@ -125,6 +135,7 @@ START_TEST( test_Node_Create_in_queue )
 	int i, j;
 
 	for(i=0; i<CHUNK_NUM; i++) {
+
 		/* Push commands to the queue */
 		for(j=0; j<CHUNK_SIZE; j++) {
 			user_id = cmd_values[i][j].user_id;
@@ -135,6 +146,14 @@ START_TEST( test_Node_Create_in_queue )
 			node_create = v_node_create_create(node_id, parent_id, user_id, type);
 			v_in_queue_push(in_queue, node_create);
 		}
+
+		fail_unless(v_in_queue_size(in_queue) == (4 * (1 + 2 + 4 + 4 + 2)),
+				"Total size of all commands in queue is not %d",
+				(4 * (1 + 2 + 4 + 4 + 2)));
+
+		fail_unless(v_in_queue_cmd_count(in_queue) == CHUNK_SIZE,
+				"Total number of all commands in queue is not %d",
+				CHUNK_SIZE);
 
 		/* Pop commands from the queue */
 		for(j=0; j<CHUNK_SIZE; j++) {
@@ -184,6 +203,7 @@ START_TEST( test_Node_Create_out_queue )
 	int i, j;
 
 	for(i=0; i<CHUNK_NUM; i++) {
+
 		/* Push commands to the queue */
 		for(j=0; j<CHUNK_SIZE; j++) {
 			user_id = cmd_values[i][j].user_id;
@@ -194,6 +214,14 @@ START_TEST( test_Node_Create_out_queue )
 			node_create = v_node_create_create(node_id, parent_id, user_id, type);
 			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)node_create);
 		}
+
+		fail_unless(v_out_queue_get_count_prio(out_queue, VRS_DEFAULT_PRIORITY) == CHUNK_SIZE,
+				"Total number of commands in prio(%d) out queue is not %d",
+				VRS_DEFAULT_PRIORITY, CHUNK_NUM);
+
+		fail_unless(v_out_queue_get_count(out_queue) == CHUNK_SIZE,
+				"Total number of all commands in out queue is not %d",
+				CHUNK_SIZE);
 
 		/* Pop commands from the queue */
 		for(j=0; j<CHUNK_SIZE; j++) {

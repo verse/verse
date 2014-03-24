@@ -56,7 +56,10 @@
 
 struct VS_CTX *local_vs_ctx = NULL;
 
-
+/**
+ * \brief This function tries to stop close connections and the server
+ * is switched to CLOSING state.
+ */
 static void vs_request_terminate(struct VS_CTX *vs_ctx)
 {
 	int i;
@@ -215,14 +218,6 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->data.avatar_node = NULL;
 
 	vs_ctx->data.sem = NULL;
-
-#ifdef WITH_MONGODB
-	vs_ctx->mongo_conn = NULL;
-	vs_ctx->mongodb_server = strdup("localhost");
-	vs_ctx->mongodb_port = 27017;
-	vs_ctx->mongodb_ns = strdup("verse.server");
-#endif
-
 }
 
 /**
@@ -239,7 +234,7 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 #if WITH_INIPARSER
 	/* When no configuration file is specified, then load values from
 	 * default path */
-	if(config_file == NULL) {
+	if(config_file==NULL) {
 		/* Try to open default configuration file */
 		vs_read_config_file(vs_ctx, DEFAULT_SERVER_CONFIG_FILE);
 	} else {
@@ -355,18 +350,6 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	}
 	v_list_free(&vs_ctx->users);
 
-#ifdef WITH_MONGODB
-	if(vs_ctx->mongodb_server != NULL) {
-		free(vs_ctx->mongodb_server);
-		vs_ctx->mongodb_server = NULL;
-	}
-
-	if(vs_ctx->mongodb_ns != NULL) {
-		free(vs_ctx->mongodb_ns);
-		vs_ctx->mongodb_ns = NULL;
-	}
-#endif
-
 #ifdef WITH_OPENSSL
 	vs_destroy_stream_ctx(vs_ctx);
 #endif
@@ -455,6 +438,8 @@ int main(int argc, char *argv[])
 	char *config_file=NULL;
 	int debug_level_set = 0;
 	void *res;
+	uid_t effective_user_id;
+	int semaphore_name_len;
 
 	/* Set up initial state */
 	vs_ctx.state = SERVER_STATE_CONF;
@@ -566,7 +551,7 @@ int main(int argc, char *argv[])
 		}
 	} else {
 #if 0
-		/* Make from verse server real verse application:
+		/* Make from verse server real daemon:
 		 * - detach from standard file descriptors, terminals, PPID process etc. */
 		if(vs_init_server(&vs_ctx) == -1) {
 			vs_destroy_ctx(&vs_ctx);
@@ -575,9 +560,22 @@ int main(int argc, char *argv[])
 #endif
 	}
 
-	/* Initialize data semaphore */
-	if( (vs_ctx.data.sem = sem_open(DATA_SEMAPHORE_NAME, O_CREAT, 0644, 1)) == SEM_FAILED) {
-		v_print_log(VRS_PRINT_ERROR, "sem_init(): %s\n", strerror(errno));
+	/* Create unique semaphore name from constant and EUID */
+	effective_user_id = geteuid();
+	/* Note: uid_t is unsigned int at Linux, then there is constant 10,
+	 * but other OS can use in theory e.g.: unsigned long int for this purpose */
+	semaphore_name_len = strlen(DATA_SEMAPHORE_NAME) + 1 + 10 + 1;
+	vs_ctx.data.sem_name = (char*)malloc(semaphore_name_len * sizeof(char));
+	sprintf(vs_ctx.data.sem_name, "%s-%d", DATA_SEMAPHORE_NAME, effective_user_id);
+	vs_ctx.data.sem_name[semaphore_name_len - 1] = '\0';
+
+	/* Initialize data semaphore. The semaphore has to be named, because
+	 * Mac OS X (and probably other BSD like UNIXes) doesn't support unnamed
+	 * semaphores */
+	if( (vs_ctx.data.sem = sem_open(vs_ctx.data.sem_name, O_CREAT, 0644, 1)) == SEM_FAILED) {
+		v_print_log(VRS_PRINT_ERROR, "sem_open(%s): %s\n",
+				vs_ctx.data.sem_name, strerror(errno));
+		if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
@@ -640,16 +638,21 @@ int main(int argc, char *argv[])
 		if(res != PTHREAD_CANCELED && res != NULL) free(res);
 	}
 
-	/* Try to close named semaphore s*/
+	/* Try to close named semaphore */
 	if(sem_close(vs_ctx.data.sem) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "sem_close(): %s\n", strerror(errno));
 	}
 #endif
 
 	/* Try to unlink named semaphore */
-	if(vs_ctx.data.sem != NULL && sem_unlink(DATA_SEMAPHORE_NAME) == -1) {
+	if(vs_ctx.data.sem != NULL &&
+			vs_ctx.data.sem_name != NULL &&
+			sem_unlink(vs_ctx.data.sem_name) == -1)
+	{
 		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
 	}
+
+	if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
 
 	return EXIT_SUCCESS;
 }

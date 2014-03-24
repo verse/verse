@@ -17,4 +17,4 @@ script:
 after_script:
   - make test
   - cd ../
-  - if [ ${CC} = "gcc" ]; then coveralls --build-root "./build" --repo_token bo22n7hMuiuN2gDuqVwCNkwHMAPhBk9pe --exclude python --exclude stub --exclude doc --exclude unittest; fi
+  - if [ ${CC} = "gcc" ]; then coveralls --build-root "./build" --repo_token bo22n7hMuiuN2gDuqVwCNkwHMAPhBk9pe --exclude python --exclude stub --exclude doc --exclude unittests; fi

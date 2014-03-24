@@ -55,8 +55,8 @@ void v_init_session(struct VSession *vsession)
 	vsession->in_queue = NULL;
 	vsession->out_queue = NULL;
 	vsession->host_url = NULL;
-	vsession->peer_cookie.str = NULL;
-	vsession->host_cookie.str = NULL;
+	vsession->peer_token.str = NULL;
+	vsession->host_token.str = NULL;
 	vsession->avatar_id = -1;
 	vsession->flags = 0;
 	vsession->fps_host = DEFAULT_FPS;	/* Default value */
@@ -103,13 +103,13 @@ void v_destroy_session(struct VSession *vsession)
 		free(vsession->host_url);
 		vsession->host_url = NULL;
 	}
-	if(vsession->peer_cookie.str != NULL) {
-		free(vsession->peer_cookie.str);
-		vsession->peer_cookie.str = NULL;
+	if(vsession->peer_token.str != NULL) {
+		free(vsession->peer_token.str);
+		vsession->peer_token.str = NULL;
 	}
-	if(vsession->host_cookie.str != NULL) {
-		free(vsession->host_cookie.str);
-		vsession->host_cookie.str = NULL;
+	if(vsession->host_token.str != NULL) {
+		free(vsession->host_token.str);
+		vsession->host_token.str = NULL;
 	}
 	if(vsession->client_name != NULL) {
 		free(vsession->client_name);

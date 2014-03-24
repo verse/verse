@@ -32,7 +32,7 @@
 #include "v_connection.h"
 #include "v_context.h"
 
-#define COOKIE_SECRET_LENGTH	16
+#define DTLS_COOKIE_SECRET_LENGTH	16
 
 #if OPENSSL_VERSION_NUMBER>=0x10000000
 int vs_dtls_generate_cookie(SSL *ssl, unsigned char *cookie, unsigned int *cookie_len);

@@ -52,7 +52,7 @@
 #define FTR_FC_ID				1	/* Flow Control feature ID */
 #define FTR_CC_ID				2	/* Congestion Control feature ID */
 #define FTR_HOST_URL			3	/* Host URL defined in RFC 1738 */
-#define FTR_COOKIE				4	/* Cookie used as identifier of Verse session */
+#define FTR_TOKEN				4	/* Token used as identifier of Verse session */
 #define FTR_DED					5	/* Data Exchange Definition */
 #define FTR_RWIN_SCALE			6	/* Scale factor of rwin used for Flow Control */
 #define FTR_FPS					7	/* FPS currently used at client */

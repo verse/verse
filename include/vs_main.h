@@ -63,12 +63,12 @@
 #define AUTH_METHOD_PAM						2
 #define AUTH_METHOD_LDAP					3
 
-#define DATA_SEMAPHORE_NAME					"/data_sem"
+#define DATA_SEMAPHORE_NAME					"/vs_data_sem"
 
 /**
  * States of Verse server
  */
-typedef enum ServerState{
+typedef enum ServerState {
 	SERVER_STATE_RESERVED =	0,
 	SERVER_STATE_CONF =		1,
 	SERVER_STATE_READY =	2,
@@ -95,6 +95,7 @@ typedef struct VSData {
 	/* Thread staff */
 	pthread_mutex_t		mutex;						/* Connection threads needs create avatar nodes occasionally */
 	sem_t				*sem;						/* Semaphore used for notification data thread (some data were added to the queue) */
+	char				*sem_name;					/* The name of named semaphore */
 } VSData;
 
 /* Verse Server Context */
