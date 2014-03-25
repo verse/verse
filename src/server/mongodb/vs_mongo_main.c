@@ -29,9 +29,10 @@
 
 #include "vs_main.h"
 #include "vs_mongo_main.h"
+#include "vs_mongo_node.h"
+#include "vs_node.h"
 
 #include "v_common.h"
-
 
 /**
  * \brief This function save current server context to Mongo database
@@ -43,6 +44,8 @@
  */
 int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 {
+	struct VSNode *node;
+	struct VBucket *bucket;
 	bson b;
 	int ret;
 
@@ -50,7 +53,17 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 	bson_init(&b);
 	bson_append_new_oid(&b, "_id");
 	bson_append_string(&b, "server_id", vs_ctx->hostname);
-	/* TODO: save all nodes */
+
+	bson_append_start_array(&b, "nodes");
+	/* Go through all nodes and save changed node to the database */
+	bucket = vs_ctx->data.nodes.lb.first;
+	while(bucket != NULL) {
+		node = (struct VSNode*)bucket->data;
+		vs_mongo_node_save(vs_ctx, node);
+		bucket = bucket->next;
+	}
+	bson_append_finish_array(&b);
+
 	bson_finish(&b);
 
 	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b, NULL);
@@ -141,6 +154,7 @@ void vs_mongo_conn_destroy(struct VS_CTX *vs_ctx)
 {
 	if(vs_ctx->mongo_conn != NULL) {
 		mongo_destroy(vs_ctx->mongo_conn);
+		vs_ctx->mongo_conn = NULL;
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"Connection to MongoDB server %s:%d destroyed\n",
 				vs_ctx->mongodb_server, vs_ctx->mongodb_port);

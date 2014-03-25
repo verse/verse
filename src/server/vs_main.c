@@ -219,6 +219,13 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->data.avatar_node = NULL;
 
 	vs_ctx->data.sem = NULL;
+
+#if WITH_MONGODB
+	vs_ctx->mongo_conn = NULL;
+	vs_ctx->mongodb_server = NULL;
+	vs_ctx->mongodb_port = 0;
+	vs_ctx->mongodb_ns = NULL;
+#endif
 }
 
 /**
@@ -486,7 +493,9 @@ int main(int argc, char *argv[])
 
 #ifdef WITH_MONGODB
 	/* Try to connect to MongoDB server */
-	vs_mongo_conn_init(&vs_ctx);
+	if(vs_ctx.mongodb_server != NULL) {
+		vs_mongo_conn_init(&vs_ctx);
+	}
 #endif
 
 	/* Add superuser account to the list of users */
