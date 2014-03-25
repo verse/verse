@@ -463,6 +463,8 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 		char trans_proto[4];
 		char sec_proto[5];
 		int cmd_rank = 0;
+		unsigned int min_aggregation = UINT_MAX;
+		unsigned char la_port;	/* Port with lowest aggregation */
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
@@ -472,13 +474,25 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 		/* Do not confirm proposed URL */
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_HOST_URL, NULL);
 
-		/* Find first unused port from port range */
+		/* Find first unused port from port range or port with the lowest
+		 * aggregation */
 		for(i=vs_ctx->port_low, j=0; i<vs_ctx->port_high; i++, j++) {
-			if(!(vs_ctx->port_list[j].flag & SERVER_PORT_USED)) {
+			if(vs_ctx->port_list[j].aggregation == 0) {
 				vsession->dgram_conn->io_ctx.host_addr.port = vs_ctx->port_list[j].port_number;
-				vs_ctx->port_list[j].flag |= SERVER_PORT_USED;
+				min_aggregation = 0;
+				vs_ctx->port_list[j].aggregation++;
 				break;
+			} else {
+				if(vs_ctx->port_list[j].aggregation < min_aggregation) {
+					min_aggregation = vs_ctx->port_list[j].aggregation;
+					la_port = vs_ctx->port_list[j].port_number;
+				}
 			}
+		}
+
+		/* When all ports are used, then use port with lowest aggregation */
+		if(min_aggregation != 0) {
+			vsession->dgram_conn->io_ctx.host_addr.port = la_port;
 		}
 
 		/* Do not allow unsecure TCP data connection */

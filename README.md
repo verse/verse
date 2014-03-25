@@ -26,7 +26,8 @@ Compile
 
 Compilation of Verse 2.0 is tested only on Linux now. Some libraries
 and development tools are required. Porting to other UNIX like OS should
-be possible.
+be possible. Support for Mac OS X and other BSD like UNIXese is only
+experimental.
   
 ### Requirements ###
 
