@@ -42,7 +42,7 @@
 #include "vs_user.h"
 
 #ifdef WITH_MONGODB
-#include "vs_mongo.h"
+#include "vs_mongo_main.h"
 #endif
 
 #ifdef WITH_INIPARSER
