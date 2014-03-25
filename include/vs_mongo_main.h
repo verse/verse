@@ -29,6 +29,9 @@
 
 struct VS_CTX;
 
+int vs_mongo_context_save(struct VS_CTX *vs_ctx);
+int vs_mongo_context_load(struct VS_CTX *vs_ctx);
+
 int vs_mongo_conn_init(struct VS_CTX *vs_ctx);
 void vs_mongo_conn_destroy(struct VS_CTX *vs_ctx);
 

@@ -495,6 +495,11 @@ int main(int argc, char *argv[])
 	/* Try to connect to MongoDB server */
 	if(vs_ctx.mongodb_server != NULL) {
 		vs_mongo_conn_init(&vs_ctx);
+		/* When connection to MongoDB server was successful, then load
+		 * data from database */
+		if(vs_ctx.mongo_conn != NULL) {
+			vs_mongo_context_load(&vs_ctx);
+		}
 	}
 #endif
 
@@ -623,8 +628,11 @@ int main(int argc, char *argv[])
 	}
 
 #ifdef WITH_MONGODB
-	/* Try to connect to MongoDB server */
-	vs_mongo_conn_destroy(&vs_ctx);
+	/* Try to save data and disconnect from MongoDB server */
+	if(vs_ctx.mongo_conn != NULL) {
+		vs_mongo_context_save(&vs_ctx);
+		vs_mongo_conn_destroy(&vs_ctx);
+	}
 #endif
 
 	/* Free Verse server context */
