@@ -24,6 +24,8 @@
 
 #define MONGO_HAVE_STDINT 1
 #include <mongo.h>
+#include <bson.h>
+#include <bcon.h>
 
 #include <stdint.h>
 
@@ -33,6 +35,7 @@
 #include "vs_node.h"
 
 #include "v_common.h"
+
 
 /**
  * \brief This function save current server context to Mongo database
@@ -46,33 +49,72 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node;
 	struct VBucket *bucket;
+	mongo_cursor cursor;
+	bson_iterator iterator;
 	bson b;
-	int ret;
+	int ret, found_server_id = 0;
 
-	/* Try to find existing "server_id" and update it, when it is different */
-	bson_init(&b);
-	bson_append_new_oid(&b, "_id");
-	bson_append_string(&b, "server_id", vs_ctx->hostname);
+	/* Init cursor*/
+	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongodb_ns);
 
-	bson_append_start_array(&b, "nodes");
-	/* Go through all nodes and save changed node to the database */
-	bucket = vs_ctx->data.nodes.lb.first;
-	while(bucket != NULL) {
-		node = (struct VSNode*)bucket->data;
-		vs_mongo_node_save(vs_ctx, node);
-		bucket = bucket->next;
+	/* Try to find existing "server_id" and update content of document,
+	 * when it is different */
+	while( mongo_cursor_next(&cursor) == MONGO_OK ) {
+
+		if ( bson_find( &iterator, mongo_cursor_bson( &cursor ), "server_id" )) {
+			const char *server_id = bson_iterator_string(&iterator);
+			if(strcmp(server_id, vs_ctx->hostname) == 0) {
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Updating data in MongoDB\n");
+			}
+			found_server_id = 1;
+			break;
+		}
 	}
-	bson_append_finish_array(&b);
 
-	bson_finish(&b);
+	mongo_cursor_destroy(&cursor);
 
-	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b, NULL);
+	/* Create first version o data at MongoDB */
+	if(found_server_id == 0) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Creating first version data\n");
 
-	if(ret == MONGO_OK) {
-		return 1;
+		bson_init(&b);
+		bson_append_new_oid(&b, "_id");
+		bson_append_string(&b, "server_id", vs_ctx->hostname);
+
+		bson_append_start_array(&b, "nodes");
+		/* Go through all nodes and save node to the database */
+		bucket = vs_ctx->data.nodes.lb.first;
+		while(bucket != NULL) {
+			node = (struct VSNode*)bucket->data;
+			vs_mongo_node_save(vs_ctx, node);
+			bucket = bucket->next;
+		}
+		bson_append_finish_array(&b);
+
+		bson_finish(&b);
+
+		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b, NULL);
+
+		if(ret == MONGO_OK) {
+			return 1;
+		} else {
+			v_print_log(VRS_PRINT_ERROR,
+					"Unable to write to to MongoDB: %s to collection: %s\n",
+					vs_ctx->mongodb_server, vs_ctx->mongodb_ns);
+			return 0;
+		}
 	} else {
-		return 0;
+		/* Go through all nodes and save changed node to the database */
+		bucket = vs_ctx->data.nodes.lb.first;
+		while(bucket != NULL) {
+			node = (struct VSNode*)bucket->data;
+			vs_mongo_node_save(vs_ctx, node);
+			bucket = bucket->next;
+		}
 	}
+
+	return 1;
 }
 
 
