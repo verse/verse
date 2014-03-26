@@ -190,11 +190,11 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	hostname = getenv("HOSTNAME");
 	if(hostname != NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"Server using canonical name: %s\n", hostname);
+				"Server using hostname: %s\n", hostname);
 		vs_ctx->hostname = strdup(hostname);
 	} else {
 		v_print_log(VRS_PRINT_WARNING,
-				"Server does not have canonical name, using: localhost\n");
+				"Server does not have set hostname, using: localhost\n");
 		vs_ctx->hostname = strdup("localhost");
 	}
 
