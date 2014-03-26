@@ -143,6 +143,8 @@ static void *vs_server_cli(void *arg)
 static void vs_init(struct VS_CTX *vs_ctx)
 {
 	int i;
+	char *hostname;
+
 	vs_ctx->max_connection_attempts = 10;
 	vs_ctx->vsessions = NULL;
 	vs_ctx->max_sessions = 10;
@@ -185,7 +187,17 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->ca_cert_file = NULL;
 	vs_ctx->public_cert_file = strdup("./pki/certificate.pem");
 
-	vs_ctx->hostname = strdup("localhost");
+	hostname = getenv("HOSTNAME");
+	if(hostname != NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Server using canonical name: %s\n", hostname);
+		vs_ctx->hostname = strdup(hostname);
+	} else {
+		v_print_log(VRS_PRINT_WARNING,
+				"Server does not have canonical name, using: localhost\n");
+		vs_ctx->hostname = strdup("localhost");
+	}
+
 	vs_ctx->ded = strdup("http://uni-verse.org/verse.ded");
 
 	vs_ctx->auth_type = AUTH_METHOD_CSV_FILE;
