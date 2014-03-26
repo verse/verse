@@ -66,9 +66,9 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 			if(strcmp(server_id, vs_ctx->hostname) == 0) {
 				v_print_log(VRS_PRINT_DEBUG_MSG,
 						"Updating data in MongoDB\n");
+				found_server_id = 1;
+				break;
 			}
-			found_server_id = 1;
-			break;
 		}
 	}
 
