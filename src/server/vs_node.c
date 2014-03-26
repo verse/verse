@@ -270,6 +270,15 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 }
 
 /**
+ * \brief This function increments version of node
+ */
+void vs_node_inc_version(struct VSNode *node)
+{
+	/* TODO: compute CRC32 */
+	node->version++;
+}
+
+/**
  * \brief This function sends Node_Create command to the subscriber of parent
  * node.
  */
@@ -388,6 +397,10 @@ void vs_node_init(struct VSNode *node)
 	node->lock.session = NULL;
 
 	node->state = ENTITY_RESERVED;
+
+	node->version = 0;
+	node->saved_version = -1;
+	node->crc32 = 0;
 
 }
 

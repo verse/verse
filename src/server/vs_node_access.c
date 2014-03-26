@@ -183,6 +183,8 @@ int vs_node_set_perm(struct VSNode *node, VSUser *user, uint8 permission)
 		v_list_add_tail(&node->permissions, perm);
 	}
 
+	vs_node_inc_version(node);
+
 	return 1;
 }
 
@@ -420,6 +422,8 @@ int vs_handle_node_owner(struct VS_CTX *vs_ctx,
 
 		/* Change owner of the node */
 		node->owner = new_owner;
+
+		vs_node_inc_version(node);
 
 		/* Send node_owner to all node followers */
 		for(node_follower = node->node_folls.first;

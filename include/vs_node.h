@@ -77,6 +77,10 @@ typedef struct VSNode {
 	/* Internal staff */
 	uint32					level;			/* Level in the node tree */
 	uint8					state;			/* Node state */
+	/* Versing */
+	uint32					version;		/* Current version of node */
+	uint32					saved_version;	/* Last saved version of node */
+	uint32					crc32;			/* CRC32 of node (not supported yet) */
 } VSNode;
 
 struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
@@ -96,6 +100,8 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct Generic_Cmd *node_prio);
+
+void vs_node_inc_version(struct VSNode *node);
 
 int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,

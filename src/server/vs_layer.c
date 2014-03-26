@@ -80,6 +80,8 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 
 	layer->state = ENTITY_RESERVED;
 
+	vs_node_inc_version(node);
+
 	return layer;
 }
 
@@ -127,6 +129,8 @@ void vs_layer_destroy(struct VSNode *node, struct VSLayer *layer)
 	/* Destroy this layer itself */
 	v_hash_array_remove_item(&node->layers, layer);
 	free(layer);
+
+	vs_node_inc_version(node);
 }
 
 /**

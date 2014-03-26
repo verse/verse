@@ -217,6 +217,8 @@ struct VSTagGroup *vs_taggroup_create(struct VSNode *node, uint16 custom_type)
 	/* Copy type */
 	tg->type = custom_type;
 
+	vs_node_inc_version(node);
+
 	return tg;
 }
 
@@ -304,6 +306,8 @@ int vs_taggroup_destroy(struct VSNode *node, struct VSTagGroup *tg)
 	/* Destroy this tag group itself */
 	v_hash_array_remove_item(&node->tag_groups, tg);
 	free(tg);
+
+	vs_node_inc_version(node);
 
 	return 1;
 }
