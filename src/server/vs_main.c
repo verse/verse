@@ -361,6 +361,17 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 #ifdef WITH_OPENSSL
 	vs_destroy_stream_ctx(vs_ctx);
 #endif
+
+#ifdef WITH_MONGODB
+	if(vs_ctx->mongodb_server != NULL) {
+		free(vs_ctx->mongodb_server);
+		vs_ctx->mongodb_server = NULL;
+	}
+	if(vs_ctx->mongodb_ns != NULL) {
+		free(vs_ctx->mongodb_ns);
+		vs_ctx->mongodb_ns = NULL;
+	}
+#endif
 }
 
 #if 0

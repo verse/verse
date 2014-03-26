@@ -248,7 +248,7 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		if(mongodb_server_ns != NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"mongodb server namespace: %s\n", mongodb_server_ns);
-			vs_ctx->mongodb_ns = mongodb_server_ns;
+			vs_ctx->mongodb_ns = strdup(mongodb_server_ns);
 		}
 
 #endif
