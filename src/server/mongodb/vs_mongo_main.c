@@ -55,7 +55,7 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 	int ret, found_server_id = 0;
 
 	/* Init cursor*/
-	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongodb_ns);
+	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongodb_db_name);
 
 	/* Try to find existing "server_id" and update content of document,
 	 * when it is different */
@@ -94,14 +94,14 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 
 		bson_finish(&b);
 
-		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_ns, &b, NULL);
+		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_db_name, &b, NULL);
 
 		if(ret == MONGO_OK) {
 			return 1;
 		} else {
 			v_print_log(VRS_PRINT_ERROR,
 					"Unable to write to to MongoDB: %s to collection: %s\n",
-					vs_ctx->mongodb_server, vs_ctx->mongodb_ns);
+					vs_ctx->mongodb_server, vs_ctx->mongodb_db_name);
 			return 0;
 		}
 	} else {
@@ -180,10 +180,38 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 		mongo_dealloc(vs_ctx->mongo_conn);
 		vs_ctx->mongo_conn = NULL;
 		return 0;
-	} else {
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"Connection to MongoDB server %s:%d succeeded\n",
+			vs_ctx->mongodb_server, vs_ctx->mongodb_port);
+
+	/* Try to do  when authentication is configured */
+	if(vs_ctx->mongodb_db_name != NULL &&
+			vs_ctx->mongodb_user != NULL &&
+			vs_ctx->mongodb_pass != NULL)
+	{
+#if 0
+		status = mongo_cmd_add_user(vs_ctx->mongo_conn,
+				vs_ctx->mongodb_db_name,
+				vs_ctx->mongodb_user,
+				vs_ctx->mongodb_pass);
+#endif
+
+		status = mongo_cmd_authenticate(vs_ctx->mongo_conn,
+				vs_ctx->mongodb_db_name,
+				vs_ctx->mongodb_user,
+				vs_ctx->mongodb_pass);
+
+		if(status != MONGO_OK) {
+			mongo_dealloc(vs_ctx->mongo_conn);
+			vs_ctx->mongo_conn = NULL;
+			return 0;
+		}
+
 		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"Connection to MongoDB server %s:%d succeeded\n",
-				vs_ctx->mongodb_server, vs_ctx->mongodb_port);
+				"Authentication to %s database succeeded\n",
+				vs_ctx->mongodb_db_name);
 	}
 
 	return 1;

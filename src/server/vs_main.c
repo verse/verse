@@ -236,7 +236,9 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->mongo_conn = NULL;
 	vs_ctx->mongodb_server = NULL;
 	vs_ctx->mongodb_port = 0;
-	vs_ctx->mongodb_ns = NULL;
+	vs_ctx->mongodb_db_name = NULL;
+	vs_ctx->mongodb_user = NULL;
+	vs_ctx->mongodb_pass = NULL;
 #endif
 }
 
@@ -379,9 +381,20 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 		free(vs_ctx->mongodb_server);
 		vs_ctx->mongodb_server = NULL;
 	}
-	if(vs_ctx->mongodb_ns != NULL) {
-		free(vs_ctx->mongodb_ns);
-		vs_ctx->mongodb_ns = NULL;
+
+	if(vs_ctx->mongodb_db_name != NULL) {
+		free(vs_ctx->mongodb_db_name);
+		vs_ctx->mongodb_db_name = NULL;
+	}
+
+	if(vs_ctx->mongodb_user != NULL) {
+		free(vs_ctx->mongodb_user);
+		vs_ctx->mongodb_user = NULL;
+	}
+
+	if(vs_ctx->mongodb_pass != NULL) {
+		free(vs_ctx->mongodb_pass);
+		vs_ctx->mongodb_pass = NULL;
 	}
 #endif
 }

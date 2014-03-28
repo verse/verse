@@ -52,7 +52,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 #ifdef WITH_MONGODB
 		char *mongodb_server_hostname;
 		int mongodb_server_port;
-		char *mongodb_server_ns;
+		char *mongodb_server_db_name;
+		char *mongodb_user;
+		char *mongodb_pass;
 #endif
 		int fc_win_scale;
 		int in_queue_max_size;
@@ -242,15 +244,36 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 			vs_ctx->mongodb_port = mongodb_server_port;
 		}
 
-		/* MongoDB namespace used by Verse server */
-		mongodb_server_ns = iniparser_getstring(ini_dict,
-				"MongoDB:NameSpace", NULL);
-		if(mongodb_server_ns != NULL) {
+		/* MongoDB database name used by Verse server */
+		mongodb_server_db_name = iniparser_getstring(ini_dict,
+				"MongoDB:DatabaseName", NULL);
+		if(mongodb_server_db_name != NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
-					"mongodb server namespace: %s\n", mongodb_server_ns);
-			vs_ctx->mongodb_ns = strdup(mongodb_server_ns);
+					"mongodb server database name: %s\n", mongodb_server_db_name);
+			vs_ctx->mongodb_db_name = strdup(mongodb_server_db_name);
 		}
 
+		/* Username used for authentication at MongoDB */
+		mongodb_user = iniparser_getstring(ini_dict,
+				"MongoDB:Username", NULL);
+		if(mongodb_user != NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "mongodb server username: %s\n",
+					mongodb_user);
+			vs_ctx->mongodb_user = strdup(mongodb_user);
+		}
+
+		/* Password used for authentication at MongoDB */
+		mongodb_pass = iniparser_getstring(ini_dict,
+				"MongoDB:Password", NULL);
+		if(mongodb_user != NULL) {
+			int i;
+			v_print_log(VRS_PRINT_DEBUG_MSG, "mongodb server password: ");
+			for(i=0; mongodb_pass[i] != '\0'; i++) {
+				v_print_log_simple(VRS_PRINT_DEBUG_MSG, "*");
+			}
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
+			vs_ctx->mongodb_pass = strdup(mongodb_pass);
+		}
 #endif
 
 		iniparser_freedict(ini_dict);
