@@ -186,24 +186,28 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 			"Connection to MongoDB server %s:%d succeeded\n",
 			vs_ctx->mongodb_server, vs_ctx->mongodb_port);
 
+	/* There has to be some db name defined */
+	if(vs_ctx->mongodb_db_name == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"No database name defined\n");
+		mongo_dealloc(vs_ctx->mongo_conn);
+		vs_ctx->mongo_conn = NULL;
+		return 0;
+	}
+
 	/* Try to do  when authentication is configured */
-	if(vs_ctx->mongodb_db_name != NULL &&
-			vs_ctx->mongodb_user != NULL &&
+	if(vs_ctx->mongodb_user != NULL &&
 			vs_ctx->mongodb_pass != NULL)
 	{
-#if 0
-		status = mongo_cmd_add_user(vs_ctx->mongo_conn,
-				vs_ctx->mongodb_db_name,
-				vs_ctx->mongodb_user,
-				vs_ctx->mongodb_pass);
-#endif
-
 		status = mongo_cmd_authenticate(vs_ctx->mongo_conn,
 				vs_ctx->mongodb_db_name,
 				vs_ctx->mongodb_user,
 				vs_ctx->mongodb_pass);
 
 		if(status != MONGO_OK) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Authentication to %s database failed\n",
+					vs_ctx->mongodb_db_name);
 			mongo_dealloc(vs_ctx->mongo_conn);
 			vs_ctx->mongo_conn = NULL;
 			return 0;
@@ -212,6 +216,9 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"Authentication to %s database succeeded\n",
 				vs_ctx->mongodb_db_name);
+	} else {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"No MongoDB authentication required\n");
 	}
 
 	return 1;
