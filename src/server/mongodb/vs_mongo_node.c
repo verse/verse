@@ -32,7 +32,23 @@
 #include "v_common.h"
 
 /**
- * \brief This function write content of node to Mongo database
+ * \brief This function writes new version of node to Mongo database
+ */
+static void vs_mongo_node_save_version(bson *b, struct VSNode *node)
+{
+	bson version;
+	bson_init(&version);
+	bson_append_int(&version, "version", node->version);
+	bson_append_int(&version, "crc32", node->crc32);
+	bson_append_int(&version, "owner_id", node->owner->user_id);
+	/* TODO: save permissions, child_nodes, tag_groups, layers */
+	bson_finish(&version);
+	/* TODO: create index from node->version */
+	bson_append_bson(b, "0", &version);
+}
+
+/**
+ * \brief This function writes content of node to Mongo database
  *
  * \param vs_ctx	The Verse server context
  * \param node		The node that will be saved to the database
@@ -41,14 +57,26 @@
  */
 int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 {
-	/*
-	 * TODO:
-	 *  - Find bson object representing node
-	 *  - When such bson object doesn't exist create one
-	 *  - Append new version of node to the bson object
-	 */
-	(void)vs_ctx;
-	(void)node;
+	bson b;
+
+	/* TODO: save only nodes that are in subtree of scene node */
+
+	if((int)node->saved_version == -1) {
+		bson_init(&b);
+		bson_append_new_oid(&b, "_id");
+		/* Save Node ID and Custom Type of node */
+		bson_append_int(&b, "node_id", node->id);
+		bson_append_int(&b, "custom_type", node->type);
+		/* Create array of versions and save first version */
+		bson_append_start_array(&b, "versions");
+		vs_mongo_node_save_version(&b, node);
+		bson_append_finish_array(&b);
+		bson_finish(&b);
+		mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &b, 0);
+		bson_destroy(&b);
+	} else if(node->saved_version < node->version) {
+		/* TODO: find document and add new version */
+	}
 
 	return 1;
 }

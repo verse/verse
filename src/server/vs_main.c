@@ -239,6 +239,7 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->mongodb_db_name = NULL;
 	vs_ctx->mongodb_user = NULL;
 	vs_ctx->mongodb_pass = NULL;
+	vs_ctx->mongo_node_ns = NULL;
 #endif
 }
 

@@ -49,69 +49,15 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node;
 	struct VBucket *bucket;
-	mongo_cursor cursor;
-	bson_iterator iterator;
-	bson b;
-	int ret, found_server_id = 0;
 
-	/* Init cursor*/
-	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongodb_db_name);
-
-	/* Try to find existing "server_id" and update content of document,
-	 * when it is different */
-	while( mongo_cursor_next(&cursor) == MONGO_OK ) {
-
-		if ( bson_find( &iterator, mongo_cursor_bson( &cursor ), "server_id" )) {
-			const char *server_id = bson_iterator_string(&iterator);
-			if(strcmp(server_id, vs_ctx->hostname) == 0) {
-				v_print_log(VRS_PRINT_DEBUG_MSG,
-						"Updating data in MongoDB\n");
-				found_server_id = 1;
-				break;
-			}
-		}
-	}
-
-	mongo_cursor_destroy(&cursor);
-
-	/* Create first version o data at MongoDB */
-	if(found_server_id == 0) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Creating first version data\n");
-
-		bson_init(&b);
-		bson_append_new_oid(&b, "_id");
-		bson_append_string(&b, "server_id", vs_ctx->hostname);
-
-		bson_append_start_array(&b, "nodes");
-		/* Go through all nodes and save node to the database */
-		bucket = vs_ctx->data.nodes.lb.first;
-		while(bucket != NULL) {
-			node = (struct VSNode*)bucket->data;
-			vs_mongo_node_save(vs_ctx, node);
-			bucket = bucket->next;
-		}
-		bson_append_finish_array(&b);
-
-		bson_finish(&b);
-
-		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongodb_db_name, &b, NULL);
-
-		if(ret == MONGO_OK) {
-			return 1;
-		} else {
-			v_print_log(VRS_PRINT_ERROR,
-					"Unable to write to to MongoDB: %s to collection: %s\n",
-					vs_ctx->mongodb_server, vs_ctx->mongodb_db_name);
+	/* Go through all nodes and save changed node to the database */
+	bucket = vs_ctx->data.nodes.lb.first;
+	while(bucket != NULL) {
+		node = (struct VSNode*)bucket->data;
+		if(vs_mongo_node_save(vs_ctx, node) == 0) {
 			return 0;
 		}
-	} else {
-		/* Go through all nodes and save changed node to the database */
-		bucket = vs_ctx->data.nodes.lb.first;
-		while(bucket != NULL) {
-			node = (struct VSNode*)bucket->data;
-			vs_mongo_node_save(vs_ctx, node);
-			bucket = bucket->next;
-		}
+		bucket = bucket->next;
 	}
 
 	return 1;
@@ -220,6 +166,11 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"No MongoDB authentication required\n");
 	}
+
+	/* Namespace used for storing nodes */
+	vs_ctx->mongo_node_ns = (char*)malloc(sizeof(char) * (strlen(vs_ctx->mongodb_db_name) + 6 + 1));
+	strcpy(vs_ctx->mongo_node_ns, vs_ctx->mongodb_db_name);
+	strcat(vs_ctx->mongo_node_ns, ".nodes");
 
 	return 1;
 }

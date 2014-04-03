@@ -167,6 +167,7 @@ typedef struct VS_CTX {
 	char				*mongodb_db_name;			/* Name of MongoDB database */
 	char				*mongodb_user;				/* Username used for authentication to mongodb */
 	char				*mongodb_pass;				/* Password used for authentication to mongodb */
+	char				*mongo_node_ns;				/* Namespace used for saving nodes */
 #endif
 } VS_CTX;
 
