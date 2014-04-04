@@ -74,13 +74,14 @@ static void vs_mongo_node_save_version(bson *b, struct VSNode *node)
 	while(link != NULL) {
 		child_node = link->child;
 		sprintf(str_num, "%d", item_id);
+		/* TODO: try to save ObjectId and not node_id */
 		bson_append_int(&bson_version, str_num, child_node->id);
 		item_id++;
 		link = link->next;
 	}
 	bson_append_finish_array(&bson_version);
 
-	/* TODO: save child_nodes, tag_groups, layers */
+	/* TODO: save tag_groups, layers */
 	bson_finish(&bson_version);
 
 	bson_append_bson(b, "0", &bson_version);
