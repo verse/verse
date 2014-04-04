@@ -82,6 +82,8 @@ static void vs_link_update_child(struct VSNode *parent_node,
 	child_node->level = parent_node->level + 1;
 	child_node->flags = parent_node->flags;
 
+	link = parent_node->children_links.first;
+
 	while(link != NULL) {
 		node = link->child;
 		vs_link_update_child(child_node, node);
