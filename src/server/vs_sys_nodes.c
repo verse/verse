@@ -453,18 +453,28 @@ static struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx)
 	struct VSNode *node = NULL;
 
 	/* Try to create new node representing parent of scene nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_SCENE_PARENT_NODE_ID, VRS_SCENE_PARENT_NODE_CT)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create parent node of scene nodes\n");
+	if( (node = vs_node_create(vs_ctx,
+			vs_ctx->data.root_node,
+			vs_ctx->super_user,
+			VRS_SCENE_PARENT_NODE_ID,
+			VRS_SCENE_PARENT_NODE_CT)) == NULL)
+	{
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Could not create parent node of scene nodes\n");
 		return NULL;
 	}
 
 	/* Nobody is connected, then it is OK set this state */
 	node->state = ENTITY_CREATED;
 
+	/* Scene node should be saved */
+	node->flags |= VS_NODE_SAVEABLE;
+
 	/* Create permission for other users. Other users can only read
 	 * parent of scene nodes. It means, that they can subscribe to
 	 * this node and get list of scenes shared at this server. */
-	vs_node_set_perm(node, vs_ctx->other_users, VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
+	vs_node_set_perm(node, vs_ctx->other_users,
+			VRS_PERM_NODE_READ | VRS_PERM_NODE_WRITE);
 
 	return node;
 }

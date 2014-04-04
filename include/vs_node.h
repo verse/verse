@@ -33,6 +33,8 @@
 #include "vs_user.h"
 #include "vs_entity.h"
 
+#define VS_NODE_SAVEABLE	1	/* This flag specify that node should be saved */
+
 typedef struct VSNodeLock {
 	struct VSession			*session;
 	struct timeval			tv;
@@ -77,6 +79,7 @@ typedef struct VSNode {
 	/* Internal staff */
 	uint32					level;			/* Level in the node tree */
 	uint8					state;			/* Node state */
+	uint8					flags;
 	/* Versing */
 	uint32					version;		/* Current version of node */
 	uint32					saved_version;	/* Last saved version of node */

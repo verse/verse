@@ -70,6 +70,26 @@ int vs_link_test_nodes(struct VSNode *parent, struct VSNode *child)
 }
 
 /**
+ * \brief This function recursively updates properties in all child node
+ */
+static void vs_link_update_child(struct VSNode *parent_node,
+		struct VSNode *child_node)
+{
+	struct VSNode *node;
+	struct VSLink *link;
+
+	/* Update properties of child node */
+	child_node->level = parent_node->level + 1;
+	child_node->flags = parent_node->flags;
+
+	while(link != NULL) {
+		node = link->child;
+		vs_link_update_child(child_node, node);
+		link = link->next;
+	}
+}
+
+/**
  * \brief This function tries to create link between parent and child. This
  * function does not check, if child had permission to be linked with parent
  * node. It has to be checked before this link. If link is successfully created,
@@ -217,6 +237,9 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	/* Add link to new parent node */
 	v_list_add_tail(&parent_node->children_links, link);
 	link->parent = parent_node;
+
+	/* Update child node internal properties according new parent node */
+	vs_link_update_child(parent_node, child_node);
 
 	/* Update version in child node, parent node and old parent node */
 	vs_node_inc_version(parent_node);

@@ -397,6 +397,7 @@ void vs_node_init(struct VSNode *node)
 	node->lock.session = NULL;
 
 	node->state = ENTITY_RESERVED;
+	node->flags = 0;
 
 	node->version = 0;
 	node->saved_version = -1;

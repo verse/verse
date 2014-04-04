@@ -57,25 +57,34 @@ static void vs_mongo_node_save_version(bson *b, struct VSNode *node)
  */
 int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 {
-	bson b;
+	/* Save only node that is in subtree of scene node */
+	if(node->flags & VS_NODE_SAVEABLE) {
+		/* Create new mongo document for unsaved node */
+		if((int)node->saved_version == -1) {
+			bson b;
+			int ret;
 
-	/* TODO: save only nodes that are in subtree of scene node */
-
-	if((int)node->saved_version == -1) {
-		bson_init(&b);
-		bson_append_new_oid(&b, "_id");
-		/* Save Node ID and Custom Type of node */
-		bson_append_int(&b, "node_id", node->id);
-		bson_append_int(&b, "custom_type", node->type);
-		/* Create array of versions and save first version */
-		bson_append_start_array(&b, "versions");
-		vs_mongo_node_save_version(&b, node);
-		bson_append_finish_array(&b);
-		bson_finish(&b);
-		mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &b, 0);
-		bson_destroy(&b);
-	} else if(node->saved_version < node->version) {
-		/* TODO: find document and add new version */
+			bson_init(&b);
+			bson_append_new_oid(&b, "_id");
+			/* Save Node ID and Custom Type of node */
+			bson_append_int(&b, "node_id", node->id);
+			bson_append_int(&b, "custom_type", node->type);
+			/* Create array of versions and save first version */
+			bson_append_start_array(&b, "versions");
+			vs_mongo_node_save_version(&b, node);
+			bson_append_finish_array(&b);
+			bson_finish(&b);
+			ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &b, 0);
+			bson_destroy(&b);
+			if(ret != MONGO_OK) {
+				v_print_log(VRS_PRINT_ERROR,
+						"Unable to write node %d to mongo db: %s\n",
+						node->id, vs_ctx->mongo_node_ns);
+				return 0;
+			}
+		} else if(node->saved_version < node->version) {
+			/* TODO: find document and add new version */
+		}
 	}
 
 	return 1;
