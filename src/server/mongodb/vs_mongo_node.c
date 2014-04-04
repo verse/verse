@@ -28,6 +28,9 @@
 
 #include "vs_main.h"
 #include "vs_mongo_main.h"
+#include "vs_mongo_node.h"
+#include "vs_node.h"
+#include "vs_link.h"
 
 #include "v_common.h"
 
@@ -36,15 +39,51 @@
  */
 static void vs_mongo_node_save_version(bson *b, struct VSNode *node)
 {
-	bson version;
-	bson_init(&version);
-	bson_append_int(&version, "version", node->version);
-	bson_append_int(&version, "crc32", node->crc32);
-	bson_append_int(&version, "owner_id", node->owner->user_id);
-	/* TODO: save permissions, child_nodes, tag_groups, layers */
-	bson_finish(&version);
-	/* TODO: create index from node->version */
-	bson_append_bson(b, "0", &version);
+	VSNode *child_node;
+	VSLink *link;
+	VSNodePermission *perm;
+	bson bson_version, bson_item;
+	char str_num[15];
+	int item_id;
+
+	bson_init(&bson_version);
+	bson_append_int(&bson_version, "version", node->version);
+	bson_append_int(&bson_version, "crc32", node->crc32);
+	bson_append_int(&bson_version, "owner_id", node->owner->user_id);
+
+	/* Save permissions */
+	bson_append_start_array(&bson_version, "permissions");
+	perm = node->permissions.first;
+	item_id = 0;
+	while(perm != NULL) {
+		sprintf(str_num, "%d", item_id);
+		bson_init(&bson_item);
+		bson_append_int(&bson_item, "user_id", perm->user->user_id);
+		bson_append_int(&bson_item, "perm", perm->permissions);
+		bson_finish(&bson_item);
+		bson_append_bson(&bson_version, str_num, &bson_item);
+		item_id++;
+		perm = perm->next;
+	}
+	bson_append_finish_array(&bson_version);
+
+	/* Save child nodes */
+	bson_append_start_array(&bson_version, "child_nodes");
+	link = node->children_links.first;
+	item_id = 0;
+	while(link != NULL) {
+		child_node = link->child;
+		sprintf(str_num, "%d", item_id);
+		bson_append_int(&bson_version, str_num, child_node->id);
+		item_id++;
+		link = link->next;
+	}
+	bson_append_finish_array(&bson_version);
+
+	/* TODO: save child_nodes, tag_groups, layers */
+	bson_finish(&bson_version);
+
+	bson_append_bson(b, "0", &bson_version);
 }
 
 /**
