@@ -160,7 +160,8 @@ endif (INIPARSER_FOUND)
 if (MongoDB_FOUND)
     set (verse_server_libs ${verse_server_libs} ${MongoDB_LIBRARIES})
     set (server_src ${server_src} server/mongodb/vs_mongo_main.c
-            server/mongodb/vs_mongo_node.c)
+            server/mongodb/vs_mongo_node.c
+            server/mongodb/vs_mongo_taggroup.c)
     include_directories (${MongoDB_INCLUDE_DIR})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_MONGODB")
 endif (MongoDB_FOUND)
