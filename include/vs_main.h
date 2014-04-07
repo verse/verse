@@ -168,6 +168,8 @@ typedef struct VS_CTX {
 	char				*mongodb_user;				/* Username used for authentication to mongodb */
 	char				*mongodb_pass;				/* Password used for authentication to mongodb */
 	char				*mongo_node_ns;				/* Namespace used for saving nodes */
+	char				*mongo_tg_ns;				/* Namespace used for saving tag groups */
+	char				*mongo_layer_ns;			/* Namesapce used for saving layers */
 #endif
 } VS_CTX;
 

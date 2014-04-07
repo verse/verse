@@ -29,18 +29,24 @@
 #include "vs_main.h"
 #include "vs_mongo_main.h"
 #include "vs_mongo_node.h"
+#include "vs_mongo_taggroup.h"
 #include "vs_node.h"
 #include "vs_link.h"
+#include "vs_taggroup.h"
 
 #include "v_common.h"
 
 /**
  * \brief This function writes new version of node to Mongo database
  */
-static void vs_mongo_node_save_version(bson *b, struct VSNode *node)
+static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
+		bson *bson_node,
+		struct VSNode *node)
 {
 	VSNode *child_node;
 	VSLink *link;
+	VBucket *bucket;
+	VSTagGroup *tg;
 	VSNodePermission *perm;
 	bson bson_version, bson_item;
 	char str_num[15];
@@ -74,17 +80,33 @@ static void vs_mongo_node_save_version(bson *b, struct VSNode *node)
 	while(link != NULL) {
 		child_node = link->child;
 		sprintf(str_num, "%d", item_id);
-		/* TODO: try to save ObjectId and not node_id */
+		/* TODO: try to save ObjectId and not node ID */
 		bson_append_int(&bson_version, str_num, child_node->id);
 		item_id++;
 		link = link->next;
 	}
 	bson_append_finish_array(&bson_version);
 
-	/* TODO: save tag_groups, layers */
+	/* Save all tag groups */
+	bson_append_start_object(&bson_version, "tag_groups");
+	bucket = node->tag_groups.lb.first;
+	item_id = 0;
+	while(bucket != NULL) {
+		tg = (struct VSTagGroup*)bucket->data;
+		sprintf(str_num, "%d", item_id);
+		/* TODO: try to save ObjectId and not tag group ID */
+		bson_append_int(&bson_version, str_num, tg->id);
+		/* Save own tag group */
+		vs_mongo_taggroup_save(vs_ctx, node, tg);
+		item_id++;
+		bucket = bucket->next;
+	}
+	bson_append_finish_object(&bson_version);
+
+	/* TODO: save layers */
 	bson_finish(&bson_version);
 
-	bson_append_bson(b, "0", &bson_version);
+	bson_append_bson(bson_node, "0", &bson_version);
 }
 
 /**
@@ -101,21 +123,21 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 	if(node->flags & VS_NODE_SAVEABLE) {
 		/* Create new mongo document for unsaved node */
 		if((int)node->saved_version == -1) {
-			bson b;
+			bson bson_node;
 			int ret;
 
-			bson_init(&b);
-			bson_append_new_oid(&b, "_id");
+			bson_init(&bson_node);
+			bson_append_new_oid(&bson_node, "_id");
 			/* Save Node ID and Custom Type of node */
-			bson_append_int(&b, "node_id", node->id);
-			bson_append_int(&b, "custom_type", node->type);
+			bson_append_int(&bson_node, "node_id", node->id);
+			bson_append_int(&bson_node, "custom_type", node->type);
 			/* Create array of versions and save first version */
-			bson_append_start_array(&b, "versions");
-			vs_mongo_node_save_version(&b, node);
-			bson_append_finish_array(&b);
-			bson_finish(&b);
-			ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &b, 0);
-			bson_destroy(&b);
+			bson_append_start_array(&bson_node, "versions");
+			vs_mongo_node_save_version(vs_ctx, &bson_node, node);
+			bson_append_finish_array(&bson_node);
+			bson_finish(&bson_node);
+			ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &bson_node, 0);
+			bson_destroy(&bson_node);
 			if(ret != MONGO_OK) {
 				v_print_log(VRS_PRINT_ERROR,
 						"Unable to write node %d to mongo db: %s\n",

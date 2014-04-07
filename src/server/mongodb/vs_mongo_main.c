@@ -172,6 +172,16 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 	strcpy(vs_ctx->mongo_node_ns, vs_ctx->mongodb_db_name);
 	strcat(vs_ctx->mongo_node_ns, ".nodes");
 
+	/* Namespace used for storing tag groups and tags */
+	vs_ctx->mongo_tg_ns = (char*)malloc(sizeof(char) * (strlen(vs_ctx->mongodb_db_name) + 11 + 1));
+	strcpy(vs_ctx->mongo_tg_ns, vs_ctx->mongodb_db_name);
+	strcat(vs_ctx->mongo_tg_ns, ".tag_groups");
+
+	/* Namespace used for storing layers */
+	vs_ctx->mongo_layer_ns = (char*)malloc(sizeof(char) * (strlen(vs_ctx->mongodb_db_name) + 7 + 1));
+	strcpy(vs_ctx->mongo_layer_ns, vs_ctx->mongodb_db_name);
+	strcat(vs_ctx->mongo_layer_ns, ".layers");
+
 	return 1;
 }
 

@@ -240,6 +240,8 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->mongodb_user = NULL;
 	vs_ctx->mongodb_pass = NULL;
 	vs_ctx->mongo_node_ns = NULL;
+	vs_ctx->mongo_tg_ns = NULL;
+	vs_ctx->mongo_layer_ns = NULL;
 #endif
 }
 
@@ -396,6 +398,21 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 	if(vs_ctx->mongodb_pass != NULL) {
 		free(vs_ctx->mongodb_pass);
 		vs_ctx->mongodb_pass = NULL;
+	}
+
+	if(vs_ctx->mongo_node_ns != NULL) {
+		free(vs_ctx->mongo_node_ns);
+		vs_ctx->mongo_node_ns = NULL;
+	}
+
+	if(vs_ctx->mongo_tg_ns != NULL) {
+		free(vs_ctx->mongo_tg_ns);
+		vs_ctx->mongo_tg_ns = NULL;
+	}
+
+	if(vs_ctx->mongo_layer_ns != NULL) {
+		free(vs_ctx->mongo_layer_ns);
+		vs_ctx->mongo_layer_ns = NULL;
 	}
 #endif
 }
