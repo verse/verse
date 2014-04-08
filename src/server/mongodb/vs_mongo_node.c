@@ -30,9 +30,11 @@
 #include "vs_mongo_main.h"
 #include "vs_mongo_node.h"
 #include "vs_mongo_taggroup.h"
+#include "vs_mongo_layer.h"
 #include "vs_node.h"
 #include "vs_link.h"
 #include "vs_taggroup.h"
+#include "vs_layer.h"
 
 #include "v_common.h"
 
@@ -47,6 +49,7 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	VSLink *link;
 	VBucket *bucket;
 	VSTagGroup *tg;
+	VSLayer *layer;
 	VSNodePermission *perm;
 	bson bson_version, bson_item;
 	char str_num[15];
@@ -103,7 +106,21 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	}
 	bson_append_finish_object(&bson_version);
 
-	/* TODO: save layers */
+	/* Save all layers */
+	bson_append_start_object(&bson_version, "layers");
+	bucket = node->layers.lb.first;
+	item_id = 0;
+	while(bucket != NULL) {
+		layer = (struct VSLayer*)bucket->data;
+		vs_mongo_layer_save(vs_ctx, node, layer);
+		sprintf(str_num, "%d", item_id);
+		/* TODO: try to save ObjectId and not layer ID */
+		bson_append_int(&bson_version, str_num, tg->id);
+		item_id++;
+		bucket = bucket->next;
+	}
+	bson_append_finish_object(&bson_version);
+
 	bson_finish(&bson_version);
 
 	bson_append_bson(bson_node, "0", &bson_version);

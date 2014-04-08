@@ -31,6 +31,15 @@
 #include "vs_node_access.h"
 
 /**
+ * \brief This function increments version of layer
+ */
+void vs_layer_inc_version(struct VSLayer *layer)
+{
+	/* TODO: computer CRC32 */
+	layer->version++;
+}
+
+/**
  * \brief This function creates new layer
  *
  * \param[in]	*node		The pointer at node, where layer will be created
@@ -71,6 +80,7 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 	 * of child layers */
 	if(parent != NULL) {
 		v_list_add_tail(&parent->child_layers, layer);
+		vs_layer_inc_version(parent);
 	}
 	/* Initialize linked list of child layers */
 	layer->child_layers.first = layer->child_layers.last = NULL;
@@ -79,6 +89,10 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 	layer->layer_subs.first = layer->layer_subs.last = NULL;
 
 	layer->state = ENTITY_RESERVED;
+
+	layer->version = 0;
+	layer->saved_version = -1;
+	layer->crc32 = 0;
 
 	vs_node_inc_version(node);
 
@@ -941,6 +955,8 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		}
 	}
 
+	vs_layer_inc_version(layer);
+
 	/* Send item value set to all layer subscribers */
 	layer_subscriber = layer->layer_subs.first;
 	while(layer_subscriber != NULL) {
@@ -1002,6 +1018,8 @@ static int vs_layer_unset_value(struct VSNode *node,
 	} else {
 		return 0;
 	}
+
+	vs_layer_inc_version(layer);
 
 	/* Try to unset values in all child values, but don't send unset_value command
 	 * about this unsetting, because client will receive layer_unset of parent
