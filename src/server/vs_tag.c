@@ -244,6 +244,8 @@ struct VSTag *vs_tag_create(struct VSTagGroup *tg,
 			break;
 	}
 
+	vs_taggroup_inc_version(tg);
+
 	return tag;
 }
 
@@ -267,6 +269,8 @@ int vs_tag_destroy(struct VSTagGroup *tg, struct VSTag *tag)
 		v_hash_array_remove_item(&tg->tags, tag);
 
 		free(tag);
+
+		vs_taggroup_inc_version(tg);
 
 		return 1;
 	} else {
@@ -724,6 +728,8 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 
 	/* Set this tag as initialized, because value of this tag was set. */
 	tag->flag = TAG_INITIALIZED;
+
+	vs_taggroup_inc_version(tg);
 
 	/* Send this tag to all client subscribed to the TagGroup */
 	tg_subscriber = tg->tg_subs.first;

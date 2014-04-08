@@ -33,6 +33,15 @@
 #include "v_fake_commands.h"
 
 /**
+ * \brief This function increments version of tag group
+ */
+void vs_taggroup_inc_version(struct VSTagGroup *tg)
+{
+	/* TODO: Compute CRC32 of tag group */
+	tg->version++;
+}
+
+/**
  * \brief This function finds tag group in node using tag group id
  *
  * \param[in] *node			The pointer at VSNode
@@ -162,6 +171,10 @@ static void vs_taggroup_init(struct VSTagGroup *tg)
 	tg->tg_subs.last = NULL;
 
 	tg->state = ENTITY_RESERVED;
+
+	tg->version = 0;
+	tg->saved_version = -1;
+	tg->crc32 = 0;
 }
 
 /**

@@ -93,11 +93,11 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	item_id = 0;
 	while(bucket != NULL) {
 		tg = (struct VSTagGroup*)bucket->data;
+		/* Save own tag group to mongo db */
+		vs_mongo_taggroup_save(vs_ctx, node, tg);
 		sprintf(str_num, "%d", item_id);
 		/* TODO: try to save ObjectId and not tag group ID */
 		bson_append_int(&bson_version, str_num, tg->id);
-		/* Save own tag group */
-		vs_mongo_taggroup_save(vs_ctx, node, tg);
 		item_id++;
 		bucket = bucket->next;
 	}

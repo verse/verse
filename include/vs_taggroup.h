@@ -47,12 +47,17 @@ typedef struct VSTagGroup {
 	struct VHashArrayBase	tags;
 	uint16					last_tag_id;	/* Last used tag id */
 	/* Subscribing */
-	struct VListBase		tg_folls;		/* List of clients that know about this taggroup */
-	struct VListBase		tg_subs;		/* List of clients that are subscribed to this taggroup */
+	struct VListBase		tg_folls;		/* List of clients that know about this tag group */
+	struct VListBase		tg_subs;		/* List of clients that are subscribed to this tag group */
 	/* Internal stuff */
 	uint8					state;
+	/* Versing */
+	uint32					version;
+	uint32					saved_version;
+	uint32					crc32;
 } VSTagGroup;
 
+void vs_taggroup_inc_version(struct VSTagGroup *tg);
 
 struct VSTagGroup *vs_taggroup_find(struct VSNode *node,
 		uint16 taggroup_id);
