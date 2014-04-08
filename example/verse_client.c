@@ -362,7 +362,7 @@ static void cb_receive_tag_set_value(const uint8_t session_id,
 	printf("\n");
 
 	if(node_id == my_test_node_id && taggroup_id == my_test_taggroup_id) {
-		/* Test of tag create */
+		/* Test of tag destroy */
 		vrs_send_tag_destroy(session_id, my_test_node_prio, node_id, taggroup_id, tag_id);
 	}
 
@@ -405,7 +405,7 @@ static void cb_receive_tag_create(const uint8_t session_id,
 		float real16_t_val[4] = {123.45, 678.90, -123.45, -678.90};
 		float real32_t_val[4] = {1234.567, -8901.234, 5678.901, -2345.678};
 		double real64_t_val[4] = {-1234567.890, 0.1234, 100000.9999, -0.000001234};
-		char *string8_t_val = "Ahoj";
+		char *string8_t_val = "Ahoy!";
 
 		/* Test sending some values of tag types */
 		switch(data_type) {
