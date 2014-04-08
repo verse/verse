@@ -56,7 +56,6 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	int item_id;
 
 	bson_init(&bson_version);
-	bson_append_int(&bson_version, "version", node->version);
 	bson_append_int(&bson_version, "crc32", node->crc32);
 	bson_append_int(&bson_version, "owner_id", node->owner->user_id);
 
@@ -123,7 +122,8 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 
 	bson_finish(&bson_version);
 
-	bson_append_bson(bson_node, "0", &bson_version);
+	sprintf(str_num, "%d", item_id);
+	bson_append_bson(bson_node, str_num, &bson_version);
 }
 
 /**
@@ -148,10 +148,13 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 			/* Save Node ID and Custom Type of node */
 			bson_append_int(&bson_node, "node_id", node->id);
 			bson_append_int(&bson_node, "custom_type", node->type);
-			/* Create array of versions and save first version */
-			bson_append_start_array(&bson_node, "versions");
+			bson_append_int(&bson_node, "current_version", node->version);
+
+			/* Create object of versions and save first version */
+			bson_append_start_object(&bson_node, "versions");
 			vs_mongo_node_save_version(vs_ctx, &bson_node, node);
-			bson_append_finish_array(&bson_node);
+			bson_append_finish_object(&bson_node);
+
 			bson_finish(&bson_node);
 			ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &bson_node, 0);
 			bson_destroy(&bson_node);
@@ -188,10 +191,12 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 		uint32 version)
 {
 	struct VSNode *node = NULL;
-	bson query;
-	bson_iterator iterator;
+	bson query, bson_versions;
+	bson_iterator iterator, version_iter;
 	mongo_cursor cursor;
-	uint32 custom_type;
+	uint32 custom_type, current_version;
+	char str_num[15];
+	int ret;
 
 	bson_init(&query);
 	bson_append_int(&query, "node_id", node_id);
@@ -209,14 +214,33 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 			custom_type = bson_iterator_int(&iterator);
 		}
 
+		/* Try to get current version of node */
+		if( bson_find(&iterator, bson_node, "current_version") == BSON_INT) {
+			current_version = bson_iterator_int(&iterator);
+		}
+
 		/* Try to get versions of node */
 		if( bson_find(&iterator, bson_node, "versions") == BSON_ARRAY) {
-			/* TODO: Try to find required version of node */
-			(void)version;
+
+			/* Try to find required version of node */
+			bson_iterator_subiterator(&iterator, &version_iter);
+			bson_iterator_subobject_init(&iterator, &bson_versions, 0);
+
+			if((int)version == -1) {
+				sprintf(str_num, "%d", current_version);
+			} else {
+				sprintf(str_num, "%d", version);
+			}
+
+			ret = bson_find(&version_iter, &bson_versions, str_num);
+			if(ret == BSON_OBJECT) {
+
+			}
 		}
 
 		/* TODO: Create new VSNode from corresponding bson object */
 		(void)parent_node;
+		(void)custom_type;
 	}
 
 	bson_destroy(&query);
