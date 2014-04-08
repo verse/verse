@@ -155,6 +155,7 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 		bson_append_int(&bson_tg, "node_id", node->id);
 		bson_append_int(&bson_tg, "taggroup_id", tg->id);
 		bson_append_int(&bson_tg, "custom_type", tg->type);
+
 		bson_append_start_array(&bson_tg, "versions");
 		vs_mongo_taggroup_save_version(&bson_tg, tg);
 		bson_append_finish_array(&bson_tg);
