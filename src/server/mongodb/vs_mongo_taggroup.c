@@ -147,27 +147,33 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 	bson_oid_t oid;
 	int ret;
 
-	bson_init(&bson_tg);
+	if((int)tg->saved_version == -1) {
+		bson_init(&bson_tg);
 
-	bson_oid_gen(&oid);
-	bson_append_oid(&bson_tg, "_id", &oid);
-	bson_append_int(&bson_tg, "node_id", node->id);
-	bson_append_int(&bson_tg, "taggroup_id", tg->id);
-	bson_append_int(&bson_tg, "custom_type", tg->type);
-	bson_append_start_array(&bson_tg, "versions");
-	vs_mongo_taggroup_save_version(&bson_tg, tg);
-	bson_append_finish_array(&bson_tg);
+		bson_oid_gen(&oid);
+		bson_append_oid(&bson_tg, "_id", &oid);
+		bson_append_int(&bson_tg, "node_id", node->id);
+		bson_append_int(&bson_tg, "taggroup_id", tg->id);
+		bson_append_int(&bson_tg, "custom_type", tg->type);
+		bson_append_start_array(&bson_tg, "versions");
+		vs_mongo_taggroup_save_version(&bson_tg, tg);
+		bson_append_finish_array(&bson_tg);
 
-	bson_finish(&bson_tg);
+		bson_finish(&bson_tg);
 
-	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &bson_tg, 0);
-	bson_destroy(&bson_tg);
-	if(ret != MONGO_OK) {
-		v_print_log(VRS_PRINT_ERROR,
-				"Unable to write tag group %d of node %d to mongo db: %s\n",
-				tg->id, node->id, vs_ctx->mongo_node_ns);
-		return 0;
+		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &bson_tg, 0);
+		bson_destroy(&bson_tg);
+		if(ret != MONGO_OK) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Unable to write tag group %d of node %d to mongo db: %s\n",
+					tg->id, node->id, vs_ctx->mongo_node_ns);
+			return 0;
+		}
+	} else {
+		/* TODO: update item in database */
 	}
+
+	tg->saved_version = tg->version;
 
 	return 1;
 }

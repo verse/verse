@@ -147,6 +147,8 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 		} else if(node->saved_version < node->version) {
 			/* TODO: find document and add new version */
 		}
+
+		node->saved_version = node->version;
 	}
 
 	return 1;
