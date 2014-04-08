@@ -545,18 +545,6 @@ int main(int argc, char *argv[])
 		v_init_print_log(vs_ctx.print_log_level, vs_ctx.log_file);
 	}
 
-#ifdef WITH_MONGODB
-	/* Try to connect to MongoDB server */
-	if(vs_ctx.mongodb_server != NULL) {
-		vs_mongo_conn_init(&vs_ctx);
-		/* When connection to MongoDB server was successful, then load
-		 * data from database */
-		if(vs_ctx.mongo_conn != NULL) {
-			vs_mongo_context_load(&vs_ctx);
-		}
-	}
-#endif
-
 	/* Add superuser account to the list of users */
 	vs_add_superuser_account(&vs_ctx);
 
@@ -599,6 +587,18 @@ int main(int argc, char *argv[])
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
+
+#ifdef WITH_MONGODB
+	/* Try to connect to MongoDB server */
+	if(vs_ctx.mongodb_server != NULL) {
+		vs_mongo_conn_init(&vs_ctx);
+		/* When connection to MongoDB server was successful, then try to load
+		 * nodes, tag groups and layers from database */
+		if(vs_ctx.mongo_conn != NULL) {
+			vs_mongo_context_load(&vs_ctx);
+		}
+	}
+#endif
 
 	if(vs_ctx.stream_protocol == TCP) {
 		/* Initialize Verse server context */

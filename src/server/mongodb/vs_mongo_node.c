@@ -180,20 +180,47 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
  * \param version	The number of node version that is requested from database
  *
  * \return The function returns pointer at found node. When node with requested
- * version or id is not found in databse, then NULL is returned.
+ * version or id is not found in database, then NULL is returned.
  */
 struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
+		struct VSNode *parent_node,
 		uint32 node_id,
 		uint32 version)
 {
-	/*
-	 * TODO:
-	 *  - Try to find bson object representing node with node_id
-	 *  - Try to find version of node
-	 *  - Create new VSNode from corresponding bson object and return it
-	 */
-	(void)vs_ctx;
-	(void)node_id;
-	(void)version;
-	return NULL;
+	struct VSNode *node = NULL;
+	bson query;
+	bson_iterator iterator;
+	mongo_cursor cursor;
+	uint32 custom_type;
+
+	bson_init(&query);
+	bson_append_int(&query, "node_id", node_id);
+	bson_finish(&query);
+
+	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongo_node_ns);
+	mongo_cursor_set_query(&cursor, &query);
+
+	/* Node ID should be unique */
+	if( mongo_cursor_next(&cursor) == MONGO_OK ) {
+		const bson *bson_node = mongo_cursor_bson(&cursor);
+
+		/* Try to get custom type of node */
+		if( bson_find(&iterator, bson_node, "custom_type") == BSON_INT) {
+			custom_type = bson_iterator_int(&iterator);
+		}
+
+		/* Try to get versions of node */
+		if( bson_find(&iterator, bson_node, "versions") == BSON_ARRAY) {
+			/* TODO: Try to find required version of node */
+			(void)version;
+		}
+
+		/* TODO: Create new VSNode from corresponding bson object */
+		(void)parent_node;
+	}
+
+	bson_destroy(&query);
+	mongo_cursor_destroy(&cursor);
+
+	return node;
 }

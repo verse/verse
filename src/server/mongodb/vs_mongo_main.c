@@ -70,7 +70,7 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
  * This function has to be called during start of Verse server, when no client
  * is connected yet. This function doesn't restore whole verse server context,
  * but it only loads nodes shared in parent node of scene nodes. Thus system
- * nodes like avatar nodes, user nodes are not loaded. Finaly there has to be
+ * nodes like avatar nodes, user nodes are not loaded. Finally, there has to be
  * basic nodes structure (nodes: 1, 2, 3).
  *
  * \param[in] *vs_ctx The pointer at current verse server context
@@ -78,6 +78,7 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 {
 	(void)vs_ctx;
+
 	return 1;
 }
 
