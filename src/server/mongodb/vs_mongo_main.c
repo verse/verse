@@ -33,6 +33,7 @@
 #include "vs_mongo_main.h"
 #include "vs_mongo_node.h"
 #include "vs_node.h"
+#include "vs_sys_nodes.h"
 
 #include "v_common.h"
 
@@ -89,6 +90,12 @@ int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 		/* Try to load node from database and all child nodes */
 		node = vs_mongo_node_load(vs_ctx, vs_ctx->data.root_node,
 				VRS_SCENE_PARENT_NODE_ID, -1);
+
+		/* When loading of node failed, then recreate new default parent node
+		 * of scene nodes */
+		if(node == NULL) {
+			vs_node_create_scene_parent(vs_ctx);
+		}
 	}
 
 

@@ -178,7 +178,8 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
  * \brief This function returns 1, when node with node_id exist in mongo db.
  * Otherwise it returns 0.
  */
-int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx, uint32 node_id)
+int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx,
+		uint32 node_id)
 {
 	bson query;
 	mongo_cursor cursor;

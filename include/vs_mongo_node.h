@@ -29,7 +29,8 @@
 struct VS_CTX;
 struct VSNode;
 
-int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx, uint32 node_id);
+int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx,
+		uint32 node_id);
 
 int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node);
 
