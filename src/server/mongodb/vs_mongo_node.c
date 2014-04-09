@@ -35,6 +35,7 @@
 #include "vs_link.h"
 #include "vs_taggroup.h"
 #include "vs_layer.h"
+#include "vs_node_access.h"
 
 #include "v_common.h"
 
@@ -122,7 +123,7 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 
 	bson_finish(&bson_version);
 
-	sprintf(str_num, "%d", item_id);
+	sprintf(str_num, "%d", node->version);
 	bson_append_bson(bson_node, str_num, &bson_version);
 }
 
@@ -217,15 +218,13 @@ int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx,
 struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 		struct VSNode *parent_node,
 		uint32 node_id,
-		uint32 version)
+		uint32 req_version)
 {
 	struct VSNode *node = NULL;
-	bson query, bson_versions;
-	bson_iterator iterator, version_iter;
+	bson query;
 	mongo_cursor cursor;
-	uint32 custom_type, current_version;
+	uint32 custom_type, current_version, version, owner_id;
 	char str_num[15];
-	int ret;
 
 	bson_init(&query);
 	bson_append_int(&query, "node_id", node_id);
@@ -237,38 +236,109 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 	/* Node ID should be unique */
 	if( mongo_cursor_next(&cursor) == MONGO_OK ) {
 		const bson *bson_node = mongo_cursor_bson(&cursor);
+		bson_iterator node_data_iter;
 
 		/* Try to get custom type of node */
-		if( bson_find(&iterator, bson_node, "custom_type") == BSON_INT) {
-			custom_type = bson_iterator_int(&iterator);
+		if( bson_find(&node_data_iter, bson_node, "custom_type") == BSON_INT ) {
+			custom_type = bson_iterator_int(&node_data_iter);
 		}
 
 		/* Try to get current version of node */
-		if( bson_find(&iterator, bson_node, "current_version") == BSON_INT) {
-			current_version = bson_iterator_int(&iterator);
-		}
-
-		/* Try to get versions of node */
-		if( bson_find(&iterator, bson_node, "versions") == BSON_ARRAY) {
-
-			/* Try to find required version of node */
-			bson_iterator_subiterator(&iterator, &version_iter);
-			bson_iterator_subobject_init(&iterator, &bson_versions, 0);
-
-			if((int)version == -1) {
-				sprintf(str_num, "%d", current_version);
-			} else {
-				sprintf(str_num, "%d", version);
-			}
-
-			ret = bson_find(&version_iter, &bson_versions, str_num);
-			if(ret == BSON_OBJECT) {
-
-			}
+		if( bson_find(&node_data_iter, bson_node, "current_version") == BSON_INT ) {
+			current_version = bson_iterator_int(&node_data_iter);
 		}
 
 		printf(" >>>> Node: %d, custom_type: %d, current_ version: %d\n",
 				node_id, custom_type, current_version);
+
+		/* Try to get versions of node */
+		if( bson_find(&node_data_iter, bson_node, "versions") == BSON_OBJECT ) {
+			bson bson_versions;
+			bson_iterator version_iter;
+
+			printf(" >>>> Versions item FOUND\n");
+
+			/* Initialize sub-object of versions */
+			bson_iterator_subobject_init(&node_data_iter, &bson_versions, 0);
+
+			if((int)req_version == -1) {
+				version = current_version;
+			} else {
+				version = req_version;
+			}
+
+			sprintf(str_num, "%d", version);
+
+			/* Try to find required version of node */
+			if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
+				bson bson_version;
+				bson_iterator version_data_iter;
+				VSUser *owner;
+
+				printf(" >>>> Version: %s FOUND\n", str_num);
+
+				bson_iterator_subobject_init(&version_iter, &bson_version, 0);
+
+				/* Try to get owner of node */
+				if( bson_find(&version_data_iter, &bson_version, "owner_id") == BSON_INT ) {
+					owner_id = bson_iterator_int(&version_data_iter);
+				}
+
+				printf(" >>>> Owner_ID: %d\n", owner_id);
+
+				owner = vs_user_find(vs_ctx, owner_id);
+
+				/* Try to find owner object */
+				if(owner != NULL) {
+
+					/* Create node */
+					node = vs_node_create_linked(vs_ctx, parent_node, owner, node_id, custom_type);
+
+					if(node != NULL) {
+
+						node->version = version;
+						node->saved_version = version;
+						node->flags |= VS_NODE_SAVEABLE;
+
+						/* Try to get permission of node */
+						if( bson_find(&version_data_iter, &bson_version, "permissions") == BSON_ARRAY ) {
+							bson bson_perm;
+							bson_iterator perms_iter, perm_data_iter;
+							uint32 user_id, perm;
+							VSUser *user;
+
+							printf(" >>>> Permissions: %s FOUND\n", str_num);
+
+							bson_iterator_subiterator(&version_data_iter, &perms_iter);
+
+							/* Go through all permissions */
+							while( bson_iterator_next(&perms_iter) == BSON_OBJECT ) {
+								bson_iterator_subobject_init(&perms_iter, &bson_perm, 0);
+
+								if( bson_find(&perm_data_iter, &bson_perm, "user_id") == BSON_INT) {
+									user_id = bson_iterator_int(&perm_data_iter);
+								}
+
+								if( bson_find(&perm_data_iter, &bson_perm, "perm") == BSON_INT) {
+									perm = bson_iterator_int(&perm_data_iter);
+								}
+
+								printf(" >>>> Perm, user_id: %d, perm: %d\n",
+										user_id, perm);
+
+								user = vs_user_find(vs_ctx, user_id);
+
+								if(user != NULL) {
+									vs_node_set_perm(node, user, perm);
+								}
+							}
+						}
+
+						/* TODO: load child nodes, tag groups and layers */
+					}
+				}
+			}
+		}
 
 		/* TODO: Create new VSNode from corresponding bson object */
 		(void)parent_node;

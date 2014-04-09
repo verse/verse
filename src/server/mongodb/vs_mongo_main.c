@@ -94,7 +94,14 @@ int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 		/* When loading of node failed, then recreate new default parent node
 		 * of scene nodes */
 		if(node == NULL) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Restoring data from MongoDB: %s Failed\n",
+					vs_ctx->mongodb_db_name);
 			vs_node_create_scene_parent(vs_ctx);
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Data restored from MongoDB: %s\n",
+					vs_ctx->mongodb_db_name);
 		}
 	}
 
