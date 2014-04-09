@@ -408,7 +408,7 @@ void vs_node_init(struct VSNode *node)
 /**
  * \brief This function creates new VSNode at Verse server
  */
-struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
+struct VSNode *vs_node_create_linked(struct VS_CTX *vs_ctx,
 		struct VSNode *parent_node,
 		struct VSUser *owner,
 		uint32 node_id,
@@ -673,7 +673,7 @@ static struct VSNode *vs_node_new(struct VS_CTX *vs_ctx,
 	}
 
 	/* Try to create new verse node */
-	if( (node = vs_node_create(vs_ctx, avatar_node, owner, VRS_RESERVED_NODE_ID, type)) == NULL) {
+	if( (node = vs_node_create_linked(vs_ctx, avatar_node, owner, VRS_RESERVED_NODE_ID, type)) == NULL) {
 		goto end;
 	}
 

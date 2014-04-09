@@ -174,6 +174,34 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 	return 1;
 }
 
+/**
+ * \brief This function returns 1, when node with node_id exist in mongo db.
+ * Otherwise it returns 0.
+ */
+int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx, uint32 node_id)
+{
+	bson query;
+	mongo_cursor cursor;
+	int ret = 0;
+
+	bson_init(&query);
+	bson_append_int(&query, "node_id", node_id);
+	bson_finish(&query);
+
+	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongo_node_ns);
+	mongo_cursor_set_query(&cursor, &query);
+
+	/* Node ID should be unique */
+	if( mongo_cursor_next(&cursor) == MONGO_OK ) {
+		ret = 1;
+	}
+
+	bson_destroy(&query);
+	mongo_cursor_destroy(&cursor);
+
+	return ret;
+}
+
 
 /**
  * \brief This function read concrete version of node from Mongo database
@@ -237,6 +265,9 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 
 			}
 		}
+
+		printf(" >>>> Node: %d, custom_type: %d, current_ version: %d\n",
+				node_id, custom_type, current_version);
 
 		/* TODO: Create new VSNode from corresponding bson object */
 		(void)parent_node;

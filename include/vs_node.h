@@ -86,7 +86,7 @@ typedef struct VSNode {
 	uint32					crc32;			/* CRC32 of node (not supported yet) */
 } VSNode;
 
-struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
+struct VSNode *vs_node_create_linked(struct VS_CTX *vs_ctx,
 		struct VSNode *parent_node,
 		struct VSUser *owner,
 		uint32 node_id,

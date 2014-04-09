@@ -300,7 +300,7 @@ static void vs_create_client_info_node(struct VS_CTX *vs_ctx,
 	struct timeval tv;
 
 	/* Try to create child node of avatar node with information about connected verse client */
-	if( (client_info_node = vs_node_create(vs_ctx, avatar_node, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_INFO_NODE_CT)) == NULL) {
+	if( (client_info_node = vs_node_create_linked(vs_ctx, avatar_node, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_INFO_NODE_CT)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar info node for user: %d\n", vsession->user_id);
 		return;
 	}
@@ -383,7 +383,7 @@ long int vs_create_avatar_node(struct VS_CTX *vs_ctx,
 	}
 
 	/* Try to create new node representing avatar */
-	if( (avatar_node = vs_node_create(vs_ctx, avatar_parent, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_NODE_CT)) == NULL) {
+	if( (avatar_node = vs_node_create_linked(vs_ctx, avatar_parent, vs_ctx->super_user, VRS_RESERVED_NODE_ID, VRS_AVATAR_NODE_CT)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create avatar node for user: %d\n", user_id);
 		return -1;
 	}
@@ -429,7 +429,7 @@ static struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
 	struct VSNode *node = NULL;
 
 	/* Try to create new node representing parent of avatar nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_AVATAR_PARENT_NODE_ID, VRS_AVATAR_PARENT_NODE_CT)) == NULL) {
+	if( (node = vs_node_create_linked(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_AVATAR_PARENT_NODE_ID, VRS_AVATAR_PARENT_NODE_CT)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create parent node of avatar nodes\n");
 		return NULL;
 	}
@@ -448,12 +448,12 @@ static struct VSNode *vs_create_avatar_parent(struct VS_CTX *vs_ctx)
 /**
  * \brief This function create parent node for all scenes
  */
-static struct VSNode *vs_create_scene_parent(struct VS_CTX *vs_ctx)
+struct VSNode *vs_node_create_scene_parent(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node = NULL;
 
 	/* Try to create new node representing parent of scene nodes */
-	if( (node = vs_node_create(vs_ctx,
+	if( (node = vs_node_create_linked(vs_ctx,
 			vs_ctx->data.root_node,
 			vs_ctx->super_user,
 			VRS_SCENE_PARENT_NODE_ID,
@@ -491,7 +491,7 @@ struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 	struct VSTag *tag;
 
 	/* Try to create new node representing user nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.user_node, vs_ctx->super_user, user->user_id, VRS_USER_NODE_CT)) == NULL) {
+	if( (node = vs_node_create_linked(vs_ctx, vs_ctx->data.user_node, vs_ctx->super_user, user->user_id, VRS_USER_NODE_CT)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create user node\n");
 		return NULL;
 	}
@@ -529,7 +529,7 @@ static struct VSNode *vs_create_user_parent(struct VS_CTX *vs_ctx)
 	struct VSNode *node = NULL;
 
 	/* Try to create new node representing parent of user nodes */
-	if( (node = vs_node_create(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_USERS_PARENT_NODE_ID, VRS_USERS_PARENT_NODE_CT)) == NULL) {
+	if( (node = vs_node_create_linked(vs_ctx, vs_ctx->data.root_node, vs_ctx->super_user, VRS_USERS_PARENT_NODE_ID, VRS_USERS_PARENT_NODE_CT)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create parent node of user nodes\n");
 		return NULL;
 	}
@@ -553,7 +553,7 @@ static struct VSNode *vs_create_root_node(struct VS_CTX *vs_ctx)
 	struct VSNode *node = NULL;
 
 	/* Try to create new node representing root node */
-	if( (node = vs_node_create(vs_ctx, NULL, vs_ctx->super_user, VRS_ROOT_NODE_ID, VRS_ROOT_NODE_CT)) == NULL) {
+	if( (node = vs_node_create_linked(vs_ctx, NULL, vs_ctx->super_user, VRS_ROOT_NODE_ID, VRS_ROOT_NODE_CT)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Could not create root node\n");
 		return NULL;
 	}
@@ -596,7 +596,7 @@ int vs_nodes_init(struct VS_CTX *vs_ctx)
 			vs_ctx->data.user_node = node;
 		}
 
-		node = vs_create_scene_parent(vs_ctx);
+		node = vs_node_create_scene_parent(vs_ctx);
 		if(node != NULL) {
 			vs_ctx->data.scene_node = node;
 		}

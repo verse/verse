@@ -71,13 +71,26 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
  * is connected yet. This function doesn't restore whole verse server context,
  * but it only loads nodes shared in parent node of scene nodes. Thus system
  * nodes like avatar nodes, user nodes are not loaded. Finally, there has to be
- * basic nodes structure (nodes: 1, 2, 3).
+ * basic nodes structure (nodes: 1, 2, 3). The node 3 will be removed with node
+ * from mongo db.
  *
  * \param[in] *vs_ctx The pointer at current verse server context
  */
 int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 {
-	(void)vs_ctx;
+	struct VSNode *node = NULL;
+
+	/* Try to find parent of scene nodes in mongo db */
+	if(vs_mongo_node_node_exist(vs_ctx, VRS_SCENE_PARENT_NODE_ID) == 1) {
+
+		/* When node exist, then destroy existing parent node of scene nodes */
+		vs_node_destroy_branch(vs_ctx, vs_ctx->data.scene_node, 0);
+
+		/* Try to load node from database and all child nodes */
+		node = vs_mongo_node_load(vs_ctx, vs_ctx->data.root_node,
+				VRS_SCENE_PARENT_NODE_ID, -1);
+	}
+
 
 	return 1;
 }

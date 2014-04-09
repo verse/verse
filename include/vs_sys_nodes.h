@@ -25,6 +25,8 @@
 #ifndef VS_SYS_NODES_H_
 #define VS_SYS_NODES_H_
 
+struct VSNode *vs_node_create_scene_parent(struct VS_CTX *vs_ctx);
+
 int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
 		struct VSession *session);
 
