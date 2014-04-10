@@ -96,7 +96,7 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	item_id = 0;
 	while(bucket != NULL) {
 		tg = (struct VSTagGroup*)bucket->data;
-		/* Save own tag group to mongo db */
+		/* Save own tag group to MongoDB */
 		vs_mongo_taggroup_save(vs_ctx, node, tg);
 		sprintf(str_num, "%d", item_id);
 		/* TODO: try to save ObjectId and not tag group ID */
@@ -161,7 +161,7 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 			bson_destroy(&bson_node);
 			if(ret != MONGO_OK) {
 				v_print_log(VRS_PRINT_ERROR,
-						"Unable to write node %d to mongo db: %s\n",
+						"Unable to write node %d to MongoDB: %s\n",
 						node->id, vs_ctx->mongo_node_ns);
 				return 0;
 			}
@@ -176,7 +176,7 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 }
 
 /**
- * \brief This function returns 1, when node with node_id exist in mongo db.
+ * \brief This function returns 1, when node with node_id exist in MongoDB.
  * Otherwise it returns 0.
  */
 int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx,
@@ -215,7 +215,7 @@ int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx,
  * \return The function returns pointer at found node. When node with requested
  * version or id is not found in database, then NULL is returned.
  */
-struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
+struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 		struct VSNode *parent_node,
 		uint32 node_id,
 		uint32 req_version)
@@ -223,7 +223,6 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 	struct VSNode *node = NULL;
 	bson query;
 	mongo_cursor cursor;
-	uint32 custom_type, current_version, version, owner_id;
 	char str_num[15];
 
 	bson_init(&query);
@@ -237,6 +236,7 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 	if( mongo_cursor_next(&cursor) == MONGO_OK ) {
 		const bson *bson_node = mongo_cursor_bson(&cursor);
 		bson_iterator node_data_iter;
+		uint32 custom_type = -1, current_version = -1;
 
 		/* Try to get custom type of node */
 		if( bson_find(&node_data_iter, bson_node, "custom_type") == BSON_INT ) {
@@ -255,6 +255,7 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 		if( bson_find(&node_data_iter, bson_node, "versions") == BSON_OBJECT ) {
 			bson bson_versions;
 			bson_iterator version_iter;
+			uint32 version;
 
 			printf(" >>>> Versions item FOUND\n");
 
@@ -274,6 +275,7 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 				bson bson_version;
 				bson_iterator version_data_iter;
 				VSUser *owner;
+				uint32 owner_id = -1;
 
 				printf(" >>>> Version: %s FOUND\n", str_num);
 
@@ -314,6 +316,8 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 							/* Go through all permissions */
 							while( bson_iterator_next(&perms_iter) == BSON_OBJECT ) {
 								bson_iterator_subobject_init(&perms_iter, &bson_perm, 0);
+								user_id = -1;
+								perm = 0;
 
 								if( bson_find(&perm_data_iter, &bson_perm, "user_id") == BSON_INT) {
 									user_id = bson_iterator_int(&perm_data_iter);
@@ -326,23 +330,33 @@ struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
 								printf(" >>>> Perm, user_id: %d, perm: %d\n",
 										user_id, perm);
 
+								/* Try to find object of user */
 								user = vs_user_find(vs_ctx, user_id);
 
+								/* Set permission for the user */
 								if(user != NULL) {
 									vs_node_set_perm(node, user, perm);
+								} else {
+									v_print_log(VRS_PRINT_WARNING,
+											"Verse user %d does not exist\n",
+											user_id);
 								}
+
+								bson_destroy(&bson_perm);
 							}
 						}
 
 						/* TODO: load child nodes, tag groups and layers */
 					}
+				} else {
+					v_print_log(VRS_PRINT_WARNING,
+							"Verse owner %d does not exist\n",
+							owner_id);
 				}
+				bson_destroy(&bson_version);
 			}
+			bson_destroy(&bson_versions);
 		}
-
-		/* TODO: Create new VSNode from corresponding bson object */
-		(void)parent_node;
-		(void)custom_type;
 	}
 
 	bson_destroy(&query);

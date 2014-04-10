@@ -34,7 +34,7 @@ int vs_mongo_node_node_exist(struct VS_CTX *vs_ctx,
 
 int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node);
 
-struct VSNode *vs_mongo_node_load(struct VS_CTX *vs_ctx,
+struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 		struct VSNode *parent_node,
 		uint32 node_id,
 		uint32 version);

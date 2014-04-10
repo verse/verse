@@ -158,8 +158,8 @@ int vs_mongo_layer_save(struct VS_CTX *vs_ctx,
 
 		if(ret != MONGO_OK) {
 			v_print_log(VRS_PRINT_ERROR,
-					"Unable to write layer %d of node %d to mongo db: %s\n",
-					layer->id, node->id, vs_ctx->mongo_node_ns);
+					"Unable to write layer %d of node %d to MongoDB: %s\n",
+					layer->id, node->id, vs_ctx->mongo_layer_ns);
 			return 0;
 		}
 	} else {

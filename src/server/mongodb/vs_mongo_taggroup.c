@@ -37,7 +37,7 @@
 
 
 /**
- * \brief This function save current version o tag group to mongo db
+ * \brief This function save current version o tag group to MongoDB
  */
 static void vs_mongo_taggroup_save_version(bson *bson_tg,
 		struct VSTagGroup *tg)
@@ -166,8 +166,8 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 		bson_destroy(&bson_tg);
 		if(ret != MONGO_OK) {
 			v_print_log(VRS_PRINT_ERROR,
-					"Unable to write tag group %d of node %d to mongo db: %s\n",
-					tg->id, node->id, vs_ctx->mongo_node_ns);
+					"Unable to write tag group %d of node %d to MongoDB: %s\n",
+					tg->id, node->id, vs_ctx->mongo_tg_ns);
 			return 0;
 		}
 	} else {

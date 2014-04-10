@@ -56,10 +56,17 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
 	while(bucket != NULL) {
 		node = (struct VSNode*)bucket->data;
 		if(vs_mongo_node_save(vs_ctx, node) == 0) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Saving data to MongoDB: %s failed\n",
+					vs_ctx->mongodb_db_name);
 			return 0;
 		}
 		bucket = bucket->next;
 	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"Data saved to MongoDB: %s\n",
+			vs_ctx->mongodb_db_name);
 
 	return 1;
 }
@@ -73,7 +80,7 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
  * but it only loads nodes shared in parent node of scene nodes. Thus system
  * nodes like avatar nodes, user nodes are not loaded. Finally, there has to be
  * basic nodes structure (nodes: 1, 2, 3). The node 3 will be removed with node
- * from mongo db.
+ * from MongoDB.
  *
  * \param[in] *vs_ctx The pointer at current verse server context
  */
@@ -81,14 +88,14 @@ int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 {
 	struct VSNode *node = NULL;
 
-	/* Try to find parent of scene nodes in mongo db */
+	/* Try to find parent of scene nodes in MongoDB */
 	if(vs_mongo_node_node_exist(vs_ctx, VRS_SCENE_PARENT_NODE_ID) == 1) {
 
 		/* When node exist, then destroy existing parent node of scene nodes */
 		vs_node_destroy_branch(vs_ctx, vs_ctx->data.scene_node, 0);
 
 		/* Try to load node from database and all child nodes */
-		node = vs_mongo_node_load(vs_ctx, vs_ctx->data.root_node,
+		node = vs_mongo_node_load_linked(vs_ctx, vs_ctx->data.root_node,
 				VRS_SCENE_PARENT_NODE_ID, -1);
 
 		/* When loading of node failed, then recreate new default parent node
