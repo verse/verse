@@ -240,7 +240,7 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	/* Send node_create of all child nodes of this node and corresponding
 	 * links */
 	link = node->children_links.first;
-	while(link!=NULL) {
+	while(link != NULL) {
 		child_node = link->child;
 		vs_node_send_create(node_subscriber, child_node, NULL);
 		link = link->next;
