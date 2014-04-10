@@ -55,6 +55,9 @@ typedef struct VSTagGroup {
 	uint32					version;
 	uint32					saved_version;
 	uint32					crc32;
+#ifdef WITH_MONGODB
+	bson_oid_t				oid;
+#endif
 } VSTagGroup;
 
 void vs_taggroup_inc_version(struct VSTagGroup *tg);

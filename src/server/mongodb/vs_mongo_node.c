@@ -83,7 +83,6 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	while(link != NULL) {
 		child_node = link->child;
 		sprintf(str_num, "%d", item_id);
-		/* TODO: try to save ObjectId and not node ID */
 		bson_append_int(&bson_version, str_num, child_node->id);
 		item_id++;
 		link = link->next;
@@ -93,15 +92,13 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	/* Save all tag groups */
 	bson_append_start_object(&bson_version, "tag_groups");
 	bucket = node->tag_groups.lb.first;
-	item_id = 0;
 	while(bucket != NULL) {
 		tg = (struct VSTagGroup*)bucket->data;
 		/* Save own tag group to MongoDB */
 		vs_mongo_taggroup_save(vs_ctx, node, tg);
-		sprintf(str_num, "%d", item_id);
-		/* TODO: try to save ObjectId and not tag group ID */
-		bson_append_int(&bson_version, str_num, tg->id);
-		item_id++;
+		sprintf(str_num, "%d", tg->id);
+		/* Save direct reference at tag group using ObjectId */
+		bson_append_oid(&bson_version, str_num, &tg->oid);
 		bucket = bucket->next;
 	}
 	bson_append_finish_object(&bson_version);
@@ -109,14 +106,12 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	/* Save all layers */
 	bson_append_start_object(&bson_version, "layers");
 	bucket = node->layers.lb.first;
-	item_id = 0;
 	while(bucket != NULL) {
 		layer = (struct VSLayer*)bucket->data;
 		vs_mongo_layer_save(vs_ctx, node, layer);
-		sprintf(str_num, "%d", item_id);
-		/* TODO: try to save ObjectId and not layer ID */
-		bson_append_int(&bson_version, str_num, tg->id);
-		item_id++;
+		sprintf(str_num, "%d", layer->id);
+		/* Save direct reference at layer using ObjectId */
+		bson_append_oid(&bson_version, str_num, &layer->oid);
 		bucket = bucket->next;
 	}
 	bson_append_finish_object(&bson_version);
@@ -223,7 +218,6 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 	struct VSNode *node = NULL;
 	bson query;
 	mongo_cursor cursor;
-	char str_num[15];
 
 	bson_init(&query);
 	bson_append_int(&query, "node_id", node_id);
@@ -252,6 +246,7 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 		if( bson_find(&node_data_iter, bson_node, "versions") == BSON_OBJECT ) {
 			bson bson_versions;
 			bson_iterator version_iter;
+			char str_num[15];
 			uint32 version;
 
 			/* Initialize sub-object of versions */
@@ -349,7 +344,30 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 
 						}
 
-						/* TODO: load tag groups and layers */
+						/* Try to get tag groups */
+						if( bson_find(&version_data_iter, &bson_version, "tag_groups") == BSON_OBJECT ) {
+							bson_iterator tg_ids_iter;
+							bson_oid_t *oid;
+							uint32 tg_id;
+							const char *key;
+
+							bson_iterator_subiterator(&version_data_iter, &tg_ids_iter);
+
+							/* Go through all tag group ObjectIDs */
+							while( bson_iterator_next(&tg_ids_iter) == BSON_OID) {
+								key = bson_iterator_key(&tg_ids_iter);
+								oid = bson_iterator_oid(&tg_ids_iter);
+
+								sscanf(key, "%ud", &tg_id);
+
+								vs_mongo_taggroup_load_linked(vs_ctx, oid, node, (uint16)tg_id, -1);
+							}
+						}
+
+						/* Try to get layers */
+						if( bson_find(&version_data_iter, &bson_version, "layers") == BSON_OBJECT ) {
+
+						}
 					}
 				} else {
 					v_print_log(VRS_PRINT_WARNING,

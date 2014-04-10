@@ -67,6 +67,9 @@ typedef struct VSLayer {
 	uint32					version;		/**< Current version of layer */
 	uint32					saved_version;	/**< last saved version of layer */
 	uint32					crc32;			/**< CRC32 of current layer version */
+#ifdef WITH_MONGODB
+	bson_oid_t				oid;
+#endif
 } VSLayer;
 
 void vs_layer_inc_version(struct VSLayer *layer);

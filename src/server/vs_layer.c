@@ -56,6 +56,9 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 		uint8 count,
 		uint16 type)
 {
+#ifdef WITH_MONGODB
+	int i;
+#endif
 	struct VSLayer *layer = calloc(1, sizeof(struct VSLayer));
 
 	if(layer == NULL) {
@@ -93,6 +96,12 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 	layer->version = 0;
 	layer->saved_version = -1;
 	layer->crc32 = 0;
+
+#ifdef WITH_MONGODB
+	for(i=0; i<3; i++) {
+		layer->oid.ints[i] = 0;
+	}
+#endif
 
 	vs_node_inc_version(node);
 

@@ -155,6 +155,10 @@ int vs_taggroup_send_destroy(struct VSNode *node,
  */
 static void vs_taggroup_init(struct VSTagGroup *tg)
 {
+#ifdef WITH_MONGODB
+	int i;
+#endif
+
 	tg->id = 0;
 	tg->type = 0;
 
@@ -175,6 +179,12 @@ static void vs_taggroup_init(struct VSTagGroup *tg)
 	tg->version = 0;
 	tg->saved_version = -1;
 	tg->crc32 = 0;
+
+#ifdef WITH_MONGODB
+	for(i=0; i<3; i++) {
+		tg->oid.ints[i] = 0;
+	}
+#endif
 }
 
 /**

@@ -47,22 +47,19 @@ static void vs_mongo_taggroup_save_version(bson *bson_tg,
 	struct VBucket *bucket;
 	struct VSTag *tag;
 	char str_num[15];
-	int item_id, data_id;
+	int item_id;
 
 	bson_init(&bson_version);
 
-	bson_append_int(&bson_version, "version", tg->version);
 	bson_append_int(&bson_version, "crc32", tg->crc32);
 
-	bson_append_start_array(&bson_version, "tags");
+	bson_append_start_object(&bson_version, "tags");
 
 	bucket = tg->tags.lb.first;
-	item_id = 0;
 	while(bucket != NULL) {
 		tag = (struct VSTag*)bucket->data;
 
 		bson_init(&bson_tag);
-		bson_append_int(&bson_tag, "tag_id", tag->id);
 		bson_append_int(&bson_tag, "data_type", tag->data_type);
 		bson_append_int(&bson_tag, "count", tag->count);
 		bson_append_int(&bson_tag, "custom_type", tag->type);
@@ -70,42 +67,42 @@ static void vs_mongo_taggroup_save_version(bson *bson_tg,
 		bson_append_start_array(&bson_tag, "data");
 		switch(tag->data_type) {
 		case VRS_VALUE_TYPE_UINT8:
-			for(data_id = 0; data_id < tag->count; data_id++) {
-				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_tag, str_num, ((uint8*)tag->value)[data_id]);
+			for(item_id = 0; item_id < tag->count; item_id++) {
+				sprintf(str_num, "%d", item_id);
+				bson_append_int(&bson_tag, str_num, ((uint8*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_UINT16:
-			for(data_id = 0; data_id < tag->count; data_id++) {
-				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_tag, str_num, ((uint16*)tag->value)[data_id]);
+			for(item_id = 0; item_id < tag->count; item_id++) {
+				sprintf(str_num, "%d", item_id);
+				bson_append_int(&bson_tag, str_num, ((uint16*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_UINT32:
-			for(data_id = 0; data_id < tag->count; data_id++) {
-				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_tag, str_num, ((uint32*)tag->value)[data_id]);
+			for(item_id = 0; item_id < tag->count; item_id++) {
+				sprintf(str_num, "%d", item_id);
+				bson_append_int(&bson_tag, str_num, ((uint32*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_UINT64:
-			for(data_id = 0; data_id < tag->count; data_id++) {
-				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_tag, str_num, ((uint64*)tag->value)[data_id]);
+			for(item_id = 0; item_id < tag->count; item_id++) {
+				sprintf(str_num, "%d", item_id);
+				bson_append_int(&bson_tag, str_num, ((uint64*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_REAL16:
 			/* TODO */
 			break;
 		case VRS_VALUE_TYPE_REAL32:
-			for(data_id = 0; data_id < tag->count; data_id++) {
-				sprintf(str_num, "%d", data_id);
-				bson_append_double(&bson_tag, str_num, ((float*)tag->value)[data_id]);
+			for(item_id = 0; item_id < tag->count; item_id++) {
+				sprintf(str_num, "%d", item_id);
+				bson_append_double(&bson_tag, str_num, ((float*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_REAL64:
-			for(data_id = 0; data_id < tag->count; data_id++) {
-				sprintf(str_num, "%d", data_id);
-				bson_append_double(&bson_tag, str_num, ((double*)tag->value)[data_id]);
+			for(item_id = 0; item_id < tag->count; item_id++) {
+				sprintf(str_num, "%d", item_id);
+				bson_append_double(&bson_tag, str_num, ((double*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_STRING8:
@@ -116,22 +113,22 @@ static void vs_mongo_taggroup_save_version(bson *bson_tg,
 
 		bson_finish(&bson_tag);
 
-		sprintf(str_num, "%d", item_id);
+		sprintf(str_num, "%d", tag->id);
 		bson_append_bson(&bson_version, str_num, &bson_tag);
 
-		item_id++;
 		bucket = bucket->next;
 	}
 
-	bson_append_finish_array(&bson_version);
+	bson_append_finish_object(&bson_version);
 
 	bson_finish(&bson_version);
 
-	bson_append_bson(bson_tg, "0", &bson_version);
+	sprintf(str_num, "%d", tg->version);
+	bson_append_bson(bson_tg, str_num, &bson_version);
 }
 
 /**
- * \brief This function saves tag group to the mongo database
+ * \brief This function saves tag group to the MongoDB
  *
  * \param[in] *vs_ctx	The verse server context
  * \param[in] *node		The node containing tag group
@@ -144,21 +141,21 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 		struct VSTagGroup *tg)
 {
 	bson bson_tg;
-	bson_oid_t oid;
 	int ret;
 
 	if((int)tg->saved_version == -1) {
 		bson_init(&bson_tg);
 
-		bson_oid_gen(&oid);
-		bson_append_oid(&bson_tg, "_id", &oid);
+		bson_oid_gen(&tg->oid);
+		bson_append_oid(&bson_tg, "_id", &tg->oid);
 		bson_append_int(&bson_tg, "node_id", node->id);
 		bson_append_int(&bson_tg, "taggroup_id", tg->id);
 		bson_append_int(&bson_tg, "custom_type", tg->type);
+		bson_append_int(&bson_tg, "current_version", tg->version);
 
-		bson_append_start_array(&bson_tg, "versions");
+		bson_append_start_object(&bson_tg, "versions");
 		vs_mongo_taggroup_save_version(&bson_tg, tg);
-		bson_append_finish_array(&bson_tg);
+		bson_append_finish_object(&bson_tg);
 
 		bson_finish(&bson_tg);
 
@@ -180,25 +177,108 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 }
 
 /**
- * \brief This function tries to load tag group from mongo database
+ * \brief This function tries to load tag group from MongoDB
  *
  * \param[in] *vs_ctx		The verse server context
+ * \param[in] *oid			The pointer at ObjectID of tag group in MongoDB
  * \param[in] *node			The node containing tag group
  * \param[in] taggroup_id	The tag group ID that is requested from database
  * \param[in] version		The version of tag group id that is requested
- * 							from database
+ * 							from database. When version is equal to -1, then
+ * 							current version is loaded from MongoDB.
+ *
  * \return This function returns pointer at tag group, when tag group is found.
  * Otherwise it returns NULL.
  */
-struct VSTagGroup *vs_mongo_taggroup_load(struct VS_CTX *vs_ctx,
+struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
+		bson_oid_t *oid,
 		struct VSNode *node,
 		uint16 taggroup_id,
-		uint32 version)
+		uint32 req_version)
 {
-	(void)vs_ctx;
-	(void)node;
-	(void)taggroup_id;
-	(void)version;
+	struct VSTagGroup *tg = NULL;
+	bson query;
+	mongo_cursor cursor;
+	uint32 node_id, tg_id, found = 0, current_version, custom_type;
+	bson_iterator tg_data_iter;
+	const bson *bson_tg;
 
-	return NULL;
+	bson_init(&query);
+	bson_append_oid(&query, "_id", oid);
+	bson_finish(&query);
+
+	mongo_cursor_init(&cursor, vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns);
+	mongo_cursor_set_query(&cursor, &query);
+
+	/* ObjectID should be unique */
+	while( mongo_cursor_next(&cursor) == MONGO_OK ) {
+		bson_tg = mongo_cursor_bson(&cursor);
+
+		/* Try to get node id */
+		if( bson_find(&tg_data_iter, bson_tg, "node_id") == BSON_INT ) {
+			node_id = bson_iterator_int(&tg_data_iter);
+		}
+
+		/* Try to get tag group id */
+		if( bson_find(&tg_data_iter, bson_tg, "taggroup_id") == BSON_INT ) {
+			tg_id = bson_iterator_int(&tg_data_iter);
+		}
+
+		/* ObjectID is ALMOST unique. So it is check, if node id and
+		 * tag group id matches */
+		if(node_id == node->id && tg_id == taggroup_id) {
+			found = 1;
+			break;
+		}
+	}
+
+	/* When tag group was found, then load required data from MongoDB */
+	if(found == 1) {
+
+		/* Try to get current version of tag group */
+		if( bson_find(&tg_data_iter, bson_tg, "current_version") == BSON_INT ) {
+			current_version = bson_iterator_int(&tg_data_iter);
+		}
+
+		/* Try to get custom type of tag group */
+		if( bson_find(&tg_data_iter, bson_tg, "custom_type") == BSON_INT ) {
+			custom_type = bson_iterator_int(&tg_data_iter);
+		}
+
+		/* Try to get versions of node */
+		if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
+			bson bson_versions;
+			bson_iterator version_iter;
+			char str_num[15];
+			uint32 version;
+
+			/* Initialize sub-object of versions */
+			bson_iterator_subobject_init(&tg_data_iter, &bson_versions, 0);
+
+			if((int)req_version == -1) {
+				version = current_version;
+			} else {
+				version = req_version;
+			}
+			sprintf(str_num, "%d", version);
+
+			/* Try to find required version of tag group */
+			if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
+				bson bson_version;
+				bson_iterator version_data_iter;
+
+				bson_iterator_subobject_init(&version_iter, &bson_version, 0);
+
+				/* Try to get tags og tag group */
+				if( bson_find(&version_data_iter, &bson_version, "tags") == BSON_OBJECT ) {
+					/* TODO: get all tags from this bson */
+				}
+			}
+		}
+	}
+
+	bson_destroy(&query);
+	mongo_cursor_destroy(&cursor);
+
+	return tg;
 }

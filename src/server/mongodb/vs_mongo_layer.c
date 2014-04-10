@@ -52,7 +52,6 @@ static void vs_mongo_layer_save_version(bson *bson_layer,
 
 	bson_init(&bson_version);
 
-	bson_append_int(&bson_version, "version", layer->version);
 	bson_append_int(&bson_version, "crc32", layer->crc32);
 
 	bson_append_start_array(&bson_version, "child_layers");
@@ -122,34 +121,35 @@ static void vs_mongo_layer_save_version(bson *bson_layer,
 
 	bson_finish(&bson_version);
 
-	bson_append_bson(bson_layer, "0", &bson_version);
+	sprintf(str_num, "%d", layer->version);
+	bson_append_bson(bson_layer, str_num, &bson_version);
 }
 
 /**
- * \brief This function tries to save layer into the mongo databse
+ * \brief This function tries to save layer into the MongoDB
  */
 int vs_mongo_layer_save(struct VS_CTX *vs_ctx,
 		struct VSNode *node,
 		struct VSLayer *layer)
 {
 	bson bson_layer;
-	bson_oid_t oid;
 	int ret;
 
 	if((int)layer->saved_version == -1) {
 		bson_init(&bson_layer);
 
-		bson_oid_gen(&oid);
-		bson_append_oid(&bson_layer, "_id", &oid);
+		bson_oid_gen(&layer->oid);
+		bson_append_oid(&bson_layer, "_id", &layer->oid);
 		bson_append_int(&bson_layer, "node_id", node->id);
 		bson_append_int(&bson_layer, "layer_id", layer->id);
 		bson_append_int(&bson_layer, "custom_type", layer->type);
 		bson_append_int(&bson_layer, "data_type", layer->data_type);
 		bson_append_int(&bson_layer, "vec_size", layer->num_vec_comp);
+		bson_append_int(&bson_layer, "current_version", layer->version);
 
-		bson_append_start_array(&bson_layer, "versions");
+		bson_append_start_object(&bson_layer, "versions");
 		vs_mongo_layer_save_version(&bson_layer, layer);
-		bson_append_finish_array(&bson_layer);
+		bson_append_finish_object(&bson_layer);
 
 		bson_finish(&bson_layer);
 
@@ -166,11 +166,13 @@ int vs_mongo_layer_save(struct VS_CTX *vs_ctx,
 		/* TODO: update item in database */
 	}
 
+	layer->saved_version = layer->version;
+
 	return 1;
 }
 
 /**
- * \brief This function tries to load layer from the mongo database
+ * \brief This function tries to load layer from the MongoDB
  */
 struct VSLayer *vs_mongo_layer_load(struct VS_CTX *vs_ctx,
 		struct VSNode *node,

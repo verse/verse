@@ -34,7 +34,8 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 		struct VSNode *node,
 		struct VSTagGroup *tg);
 
-struct VSTagGroup *vs_mongo_taggroup_load(struct VS_CTX *vs_ctx,
+struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
+		bson_oid_t *oid,
 		struct VSNode *node,
 		uint16 taggroup_id,
 		uint32 version);
