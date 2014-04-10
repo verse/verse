@@ -86,8 +86,6 @@ int vs_mongo_context_save(struct VS_CTX *vs_ctx)
  */
 int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 {
-	struct VSNode *node = NULL;
-
 	/* Try to find parent of scene nodes in MongoDB */
 	if(vs_mongo_node_node_exist(vs_ctx, VRS_SCENE_PARENT_NODE_ID) == 1) {
 
@@ -95,23 +93,24 @@ int vs_mongo_context_load(struct VS_CTX *vs_ctx)
 		vs_node_destroy_branch(vs_ctx, vs_ctx->data.scene_node, 0);
 
 		/* Try to load node from database and all child nodes */
-		node = vs_mongo_node_load_linked(vs_ctx, vs_ctx->data.root_node,
-				VRS_SCENE_PARENT_NODE_ID, -1);
+		vs_ctx->data.scene_node = vs_mongo_node_load_linked(vs_ctx,
+				vs_ctx->data.root_node,
+				VRS_SCENE_PARENT_NODE_ID,
+				-1);
 
 		/* When loading of node failed, then recreate new default parent node
 		 * of scene nodes */
-		if(node == NULL) {
+		if(vs_ctx->data.scene_node == NULL) {
 			v_print_log(VRS_PRINT_ERROR,
 					"Restoring data from MongoDB: %s Failed\n",
 					vs_ctx->mongodb_db_name);
-			vs_node_create_scene_parent(vs_ctx);
+			vs_ctx->data.scene_node = vs_node_create_scene_parent(vs_ctx);
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Data restored from MongoDB: %s\n",
 					vs_ctx->mongodb_db_name);
 		}
 	}
-
 
 	return 1;
 }

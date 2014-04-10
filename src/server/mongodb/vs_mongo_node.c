@@ -248,16 +248,11 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 			current_version = bson_iterator_int(&node_data_iter);
 		}
 
-		printf(" >>>> Node: %d, custom_type: %d, current_ version: %d\n",
-				node_id, custom_type, current_version);
-
 		/* Try to get versions of node */
 		if( bson_find(&node_data_iter, bson_node, "versions") == BSON_OBJECT ) {
 			bson bson_versions;
 			bson_iterator version_iter;
 			uint32 version;
-
-			printf(" >>>> Versions item FOUND\n");
 
 			/* Initialize sub-object of versions */
 			bson_iterator_subobject_init(&node_data_iter, &bson_versions, 0);
@@ -267,7 +262,6 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 			} else {
 				version = req_version;
 			}
-
 			sprintf(str_num, "%d", version);
 
 			/* Try to find required version of node */
@@ -277,16 +271,12 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 				VSUser *owner;
 				uint32 owner_id = -1;
 
-				printf(" >>>> Version: %s FOUND\n", str_num);
-
 				bson_iterator_subobject_init(&version_iter, &bson_version, 0);
 
 				/* Try to get owner of node */
 				if( bson_find(&version_data_iter, &bson_version, "owner_id") == BSON_INT ) {
 					owner_id = bson_iterator_int(&version_data_iter);
 				}
-
-				printf(" >>>> Owner_ID: %d\n", owner_id);
 
 				owner = vs_user_find(vs_ctx, owner_id);
 
@@ -301,6 +291,8 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 						node->version = version;
 						node->saved_version = version;
 						node->flags |= VS_NODE_SAVEABLE;
+						/* Nobody is connected, then it is OK set this state */
+						node->state = ENTITY_CREATED;
 
 						/* Try to get permission of node */
 						if( bson_find(&version_data_iter, &bson_version, "permissions") == BSON_ARRAY ) {
@@ -308,8 +300,6 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 							bson_iterator perms_iter, perm_data_iter;
 							uint32 user_id, perm;
 							VSUser *user;
-
-							printf(" >>>> Permissions: %s FOUND\n", str_num);
 
 							bson_iterator_subiterator(&version_data_iter, &perms_iter);
 
@@ -327,9 +317,6 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 									perm = bson_iterator_int(&perm_data_iter);
 								}
 
-								printf(" >>>> Perm, user_id: %d, perm: %d\n",
-										user_id, perm);
-
 								/* Try to find object of user */
 								user = vs_user_find(vs_ctx, user_id);
 
@@ -346,7 +333,23 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 							}
 						}
 
-						/* TODO: load child nodes, tag groups and layers */
+						/* Try to get child nodes of node */
+						if( bson_find(&version_data_iter, &bson_version, "child_nodes") == BSON_ARRAY ) {
+							bson_iterator node_ids_iter;
+							uint32 child_node_id;
+
+							bson_iterator_subiterator(&version_data_iter, &node_ids_iter);
+
+							/* Go through all node IDs */
+							while( bson_iterator_next(&node_ids_iter) == BSON_INT ) {
+								child_node_id = bson_iterator_int(&node_ids_iter);
+
+								vs_mongo_node_load_linked(vs_ctx, node, child_node_id, -1);
+							}
+
+						}
+
+						/* TODO: load tag groups and layers */
 					}
 				} else {
 					v_print_log(VRS_PRINT_WARNING,
