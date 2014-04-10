@@ -245,33 +245,100 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 			custom_type = bson_iterator_int(&tg_data_iter);
 		}
 
-		/* Try to get versions of node */
-		if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
-			bson bson_versions;
-			bson_iterator version_iter;
-			char str_num[15];
-			uint32 version;
+		/* TODO: add support for creating tag group with specific ID */
+		tg = vs_taggroup_create(node, custom_type);
 
-			/* Initialize sub-object of versions */
-			bson_iterator_subobject_init(&tg_data_iter, &bson_versions, 0);
+		tg->state = ENTITY_CREATED;
 
-			if((int)req_version == -1) {
-				version = current_version;
-			} else {
-				version = req_version;
-			}
-			sprintf(str_num, "%d", version);
+		if(tg != NULL) {
+			/* Try to get versions of node */
+			if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
+				bson bson_versions;
+				bson_iterator version_iter;
+				char str_num[15];
+				uint32 version;
 
-			/* Try to find required version of tag group */
-			if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
-				bson bson_version;
-				bson_iterator version_data_iter;
+				/* Initialize sub-object of versions */
+				bson_iterator_subobject_init(&tg_data_iter, &bson_versions, 0);
 
-				bson_iterator_subobject_init(&version_iter, &bson_version, 0);
+				if((int)req_version == -1) {
+					version = current_version;
+				} else {
+					version = req_version;
+				}
+				sprintf(str_num, "%d", version);
 
-				/* Try to get tags og tag group */
-				if( bson_find(&version_data_iter, &bson_version, "tags") == BSON_OBJECT ) {
-					/* TODO: get all tags from this bson */
+				/* Try to find required version of tag group */
+				if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
+					bson bson_version;
+					bson_iterator version_data_iter;
+
+					bson_iterator_subobject_init(&version_iter, &bson_version, 0);
+
+					/* Try to get tags of tag group */
+					if( bson_find(&version_data_iter, &bson_version, "tags") == BSON_OBJECT ) {
+						struct VSTag *tag;
+						bson bson_tag;
+						bson_iterator tags_iter, tag_iter;
+						const char *key, *str_value;
+						int tag_id, data_type, count, tag_custom_type;
+
+						bson_iterator_subiterator(&version_data_iter, &tags_iter);
+
+						while( bson_iterator_next(&tags_iter) == BSON_OBJECT ) {
+							key = bson_iterator_key(&tags_iter);
+							bson_iterator_subobject_init(&tags_iter, &bson_tag, 0);
+
+							sscanf(key, "%d", &tag_id);
+
+							if( bson_find(&tag_iter, &bson_tag, "data_type") == BSON_INT) {
+								data_type = bson_iterator_int(&tag_iter);
+							}
+
+							if( bson_find(&tag_iter, &bson_tag, "count") == BSON_INT) {
+								count = bson_iterator_int(&tag_iter);
+							}
+
+							if( bson_find(&tag_iter, &bson_tag, "custom_type") == BSON_INT) {
+								tag_custom_type = bson_iterator_int(&tag_iter);
+							}
+
+							/* TODO: add support for creating tag with specific ID */
+							tag = vs_tag_create(tg, data_type, count, tag_custom_type);
+
+							if( bson_find(&tag_iter, &bson_tag, "data") == BSON_ARRAY) {
+								bson_iterator data_iter;
+								bson_iterator_subiterator(&tag_iter, &data_iter);
+
+								switch(data_type) {
+								case VRS_VALUE_TYPE_UINT8:
+								case VRS_VALUE_TYPE_UINT16:
+								case VRS_VALUE_TYPE_UINT32:
+								case VRS_VALUE_TYPE_UINT64:
+									/* Go through all permissions */
+									while( bson_iterator_next(&data_iter) == BSON_INT ) {
+										/* TODO: copy values */
+									}
+									break;
+								case VRS_VALUE_TYPE_REAL16:
+									/* TODO: add support for float16 */
+									break;
+								case VRS_VALUE_TYPE_REAL32:
+								case VRS_VALUE_TYPE_REAL64:
+									/* Go through all permissions */
+									while( bson_iterator_next(&data_iter) == BSON_INT ) {
+										/* TODO: copy values */
+									}
+									break;
+								case VRS_VALUE_TYPE_STRING8:
+									str_value = bson_iterator_string(&data_iter);
+									strcpy(tag->value, str_value);
+									break;
+								}
+
+							}
+						}
+					}
 				}
 			}
 		}
