@@ -168,6 +168,7 @@ static void vs_tag_init(struct VSTag *tag)
  * \brief This function creates new Verse Tag
  */
 struct VSTag *vs_tag_create(struct VSTagGroup *tg,
+		uint16 tag_id,
 		uint8 data_type,
 		uint8 count,
 		uint16 custom_type)
@@ -184,16 +185,20 @@ struct VSTag *vs_tag_create(struct VSTagGroup *tg,
 	/* Initialize new tag */
 	vs_tag_init(tag);
 
-	/* Try to find first free id for tag */
-	tag->id = tg->last_tag_id;
-	while( v_hash_array_find_item(&tg->tags, tag) != NULL ) {
-		tag->id++;
+	if(tag_id == RESERVED_TAG_ID) {
+		/* Try to find first free id for tag */
+		tag->id = tg->last_tag_id;
+		while( v_hash_array_find_item(&tg->tags, tag) != NULL ) {
+			tag->id++;
 
-		if(tag->id > LAST_TAG_ID) {
-			tag->id = FIRST_TAG_ID;
+			if(tag->id > LAST_TAG_ID) {
+				tag->id = FIRST_TAG_ID;
+			}
+
+			/* TODO: previous code could be more effective */
 		}
-
-		/* TODO: this could be more effective */
+	} else {
+		tag->id = tag_id;
 	}
 	tg->last_tag_id = tag->id;
 
@@ -468,7 +473,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Try to create new tag */
-	tag = vs_tag_create(tg, data_type, count, type);
+	tag = vs_tag_create(tg, RESERVED_TAG_ID, data_type, count, type);
 	if(tag == NULL) {
 		return 0;
 	}

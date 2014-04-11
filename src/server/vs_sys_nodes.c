@@ -314,12 +314,12 @@ static void vs_create_client_info_node(struct VS_CTX *vs_ctx,
 	client_info_node->state = ENTITY_CREATED;
 
 	/* Create tag group with client information */
-	tg = vs_taggroup_create(client_info_node, 0);
+	tg = vs_taggroup_create(client_info_node, VRS_RESERVED_TAGGROUP_ID, 0);
 	if(tg != NULL) {
 		tg->state = ENTITY_CREATED;
 
 		/* Create tag holding real name in the tag group */
-		tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 0);
+		tag = vs_tag_create(tg, RESERVED_TAG_ID, VRS_VALUE_TYPE_STRING8, 1, 0);
 		if(tag != NULL) {
 			tag->state = ENTITY_CREATED;
 			tag->value = strdup(vsession->peer_hostname);
@@ -328,7 +328,7 @@ static void vs_create_client_info_node(struct VS_CTX *vs_ctx,
 
 		/* Create tag holding time of login */
 		gettimeofday(&tv, NULL);
-		tag = vs_tag_create(tg, VRS_VALUE_TYPE_UINT64, 1, 1);
+		tag = vs_tag_create(tg, RESERVED_TAG_ID, VRS_VALUE_TYPE_UINT64, 1, 1);
 		if(tag != NULL) {
 			uint64 sec = (uint64)tv.tv_sec;
 			tag->state = ENTITY_CREATED;
@@ -338,7 +338,7 @@ static void vs_create_client_info_node(struct VS_CTX *vs_ctx,
 
 		if(vsession->client_name != NULL) {
 			/* Create tag holding client name */
-			tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 2);
+			tag = vs_tag_create(tg, RESERVED_TAG_ID, VRS_VALUE_TYPE_STRING8, 1, 2);
 			if(tag != NULL) {
 				tag->state = ENTITY_CREATED;
 				tag->value = strdup(vsession->client_name);
@@ -348,7 +348,7 @@ static void vs_create_client_info_node(struct VS_CTX *vs_ctx,
 
 		if(vsession->client_version != NULL) {
 			/* Create tag holding client version */
-			tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 3);
+			tag = vs_tag_create(tg, RESERVED_TAG_ID, VRS_VALUE_TYPE_STRING8, 1, 3);
 			if(tag != NULL) {
 				tag->state = ENTITY_CREATED;
 				tag->value = strdup(vsession->client_version);
@@ -504,12 +504,12 @@ struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
 	vs_node_set_perm(node, vs_ctx->other_users, VRS_PERM_NODE_READ);
 
 	/* Create tag group with user information */
-	tg = vs_taggroup_create(node, 0);
+	tg = vs_taggroup_create(node, VRS_RESERVED_TAGGROUP_ID, 0);
 	if(tg != NULL) {
 		tg->state = ENTITY_CREATED;
 
 		/* Create tag holding real name in the tag group */
-		tag = vs_tag_create(tg, VRS_VALUE_TYPE_STRING8, 1, 0);
+		tag = vs_tag_create(tg, RESERVED_TAG_ID, VRS_VALUE_TYPE_STRING8, 1, 0);
 		if(tag != NULL) {
 			tag->state = ENTITY_CREATED;
 			tag->value = strdup(user->realname);

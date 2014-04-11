@@ -33,8 +33,6 @@
 #define FIRST_TAGGROUP_ID		0
 #define LAST_TAGGROUP_ID		65534	/* 2^16 - 2 */
 
-#define VRS_RESERVED_TAGGROUP_ID	0xFFFF	/* This ID sends client in TagGroupCreate command */
-
 #define MAX_TAGGROUPS_COUNT		65534	/* Maximal number of tag groups in one node */
 
 /**
@@ -72,6 +70,7 @@ int vs_taggroup_send_destroy(struct VSNode *node,
 		struct VSTagGroup *tg);
 
 struct VSTagGroup *vs_taggroup_create(struct VSNode *node,
+		uint16 tg_id,
 		uint16 custom_type);
 int vs_taggroup_destroy(struct VSNode *node,
 		struct VSTagGroup *tg);

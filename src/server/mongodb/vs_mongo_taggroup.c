@@ -245,8 +245,8 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 			custom_type = bson_iterator_int(&tg_data_iter);
 		}
 
-		/* TODO: add support for creating tag group with specific ID */
-		tg = vs_taggroup_create(node, custom_type);
+		/* Create tag group with specific ID */
+		tg = vs_taggroup_create(node, taggroup_id, custom_type);
 
 		tg->state = ENTITY_CREATED;
 
@@ -303,8 +303,9 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 								tag_custom_type = bson_iterator_int(&tag_iter);
 							}
 
-							/* TODO: add support for creating tag with specific ID */
-							tag = vs_tag_create(tg, data_type, count, tag_custom_type);
+							/* Create tag with specific ID */
+							tag = vs_tag_create(tg, tag_id, data_type, count, tag_custom_type);
+							tag->state = ENTITY_CREATED;
 
 							if( bson_find(&tag_iter, &bson_tag, "data") == BSON_ARRAY) {
 								bson_iterator data_iter;

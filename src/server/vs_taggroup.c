@@ -190,7 +190,9 @@ static void vs_taggroup_init(struct VSTagGroup *tg)
 /**
  * \brief This function create new tag group
  */
-struct VSTagGroup *vs_taggroup_create(struct VSNode *node, uint16 custom_type)
+struct VSTagGroup *vs_taggroup_create(struct VSNode *node,
+		uint16 tg_id,
+		uint16 custom_type)
 {
 	struct VSTagGroup *tg = NULL;
 	struct VBucket *tg_bucket;
@@ -212,17 +214,21 @@ struct VSTagGroup *vs_taggroup_create(struct VSNode *node, uint16 custom_type)
 	/* Initialize new tag group */
 	vs_taggroup_init(tg);
 
-	/* Try to find first free taggroup_id */
-	tg->id = node->last_tg_id;
-	while( v_hash_array_find_item(&node->tag_groups, tg) != NULL) {
-		/* When not found, then try higher value */
-		tg->id++;
+	if(tg_id == VRS_RESERVED_TAGGROUP_ID) {
+		/* Try to find first free taggroup_id */
+		tg->id = node->last_tg_id;
+		while( v_hash_array_find_item(&node->tag_groups, tg) != NULL) {
+			/* When not found, then try higher value */
+			tg->id++;
 
-		/* Skip IDs with special purpose */
-		if(tg->id > LAST_TAGGROUP_ID)
-			tg->id = FIRST_TAGGROUP_ID;
+			/* Skip IDs with special purpose */
+			if(tg->id > LAST_TAGGROUP_ID)
+				tg->id = FIRST_TAGGROUP_ID;
 
-		/* TODO: make this faster */
+			/* TODO: make this faster */
+		}
+	} else {
+		tg->id = tg_id;
 	}
 	node->last_tg_id = tg->id;
 
@@ -554,7 +560,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Try to create new tag group */
-	tg = vs_taggroup_create(node, type);
+	tg = vs_taggroup_create(node, VRS_RESERVED_TAGGROUP_ID, type);
 	if(tg == NULL) {
 		return 0;
 	} else {
