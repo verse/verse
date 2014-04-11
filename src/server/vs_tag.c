@@ -171,25 +171,25 @@ void vs_tag_set_values(struct VSTag *tag, uint8 count, uint8 index, void *data)
 	/* Set value in tag */
 	switch(tag->data_type) {
 	case VRS_VALUE_TYPE_UINT8:
-		memcpy(&tag->value[index], data, UINT8_SIZE*count);
+		memcpy(&((uint8*)tag->value)[index], data, UINT8_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_UINT16:
-		memcpy(&tag->value[index], data, UINT16_SIZE*count);
+		memcpy(&((uint16*)tag->value)[index], data, UINT16_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_UINT32:
-		memcpy(&tag->value[index], data, UINT32_SIZE*count);
+		memcpy(&((uint32*)tag->value)[index], data, UINT32_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_UINT64:
-		memcpy(&tag->value[index], data, UINT64_SIZE*count);
+		memcpy(&((uint64*)tag->value)[index], data, UINT64_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_REAL16:
-		memcpy(&tag->value[index], data, REAL16_SIZE*count);
+		memcpy(&((real16*)tag->value)[index], data, REAL16_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_REAL32:
-		memcpy(&tag->value[index], data, REAL32_SIZE*count);
+		memcpy(&((real32*)tag->value)[index], data, REAL32_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_REAL64:
-		memcpy(&tag->value[index], data, REAL64_SIZE*count);
+		memcpy(&((real64*)tag->value)[index], data, REAL64_SIZE*count);
 		break;
 	case VRS_VALUE_TYPE_STRING8:
 		if(tag->value == NULL) {
