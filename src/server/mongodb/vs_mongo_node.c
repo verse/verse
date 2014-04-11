@@ -40,7 +40,7 @@
 #include "v_common.h"
 
 /**
- * \brief This function writes new version of node to Mongo database
+ * \brief This function writes new version of node to MongoDB
  */
 static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 		bson *bson_node,
@@ -123,6 +123,135 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 }
 
 /**
+ * \brief This function adds new node to MongoDB
+ *
+ * \param vs_ctx	The Verse server context
+ * \param node		The node that will be saved to the database
+ *
+ * \return The function return 1 on success. Otherwise it returns 0.
+ */
+int vs_mongo_node_add_new(struct VS_CTX *vs_ctx, struct VSNode *node)
+{
+	bson bson_node;
+	int ret;
+
+	bson_init(&bson_node);
+	/* Object ID has to be in every document */
+	bson_append_new_oid(&bson_node, "_id");
+	/* Save Node ID, Custom Type of node and current version */
+	bson_append_int(&bson_node, "node_id", node->id);
+	bson_append_int(&bson_node, "custom_type", node->type);
+	bson_append_int(&bson_node, "current_version", node->version);
+
+	/* Create object of versions and save first version */
+	bson_append_start_object(&bson_node, "versions");
+	vs_mongo_node_save_version(vs_ctx, &bson_node, node);
+	bson_append_finish_object(&bson_node);
+
+	bson_finish(&bson_node);
+	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &bson_node, 0);
+	bson_destroy(&bson_node);
+	if(ret != MONGO_OK) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to write node %d to MongoDB: %s\n",
+				node->id, vs_ctx->mongo_node_ns);
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * \brief This function tries to update data stored in node (tag groups and
+ * layers). When tag groups and layers are same, then nothing happens.
+ */
+int vs_mongo_node_update_data(struct VS_CTX *vs_ctx, struct VSNode *node)
+{
+	struct VSTagGroup *tg;
+	struct VSLayer *layer;
+	struct VBucket *bucket;
+
+
+	bucket = node->tag_groups.lb.first;
+	while(bucket != NULL) {
+		tg = (struct VSTagGroup*)bucket->data;
+		if(vs_mongo_taggroup_save(vs_ctx, node, tg) != 1) {
+			return 0;
+		}
+		bucket = bucket->next;
+	}
+
+	bucket = node->layers.lb.first;
+	while(bucket != NULL) {
+		layer = (struct VSLayer*)bucket->data;
+		if(vs_mongo_layer_save(vs_ctx, node, layer) != 1) {
+			return 0;
+		}
+		bucket = bucket->next;
+	}
+
+	return 1;
+}
+
+/**
+ * \brief This function tries to update node in MongoDB
+ */
+int vs_mongo_node_update(struct VS_CTX *vs_ctx, struct VSNode *node)
+{
+	bson cond, op;
+	bson bson_version;
+	int ret;
+
+	/* TODO: delete old version, when there is too much versions:
+	int old_saved_version = node->saved_version;
+	*/
+
+	bson_init(&cond);
+	{
+		bson_append_int(&cond, "node_id", node->id);
+	}
+	bson_finish(&cond);
+
+	bson_init(&op);
+	{
+		/* Update item current_version in document */
+		bson_append_start_object(&op, "$set");
+		{
+			bson_append_int(&op, "current_version", node->version);
+		}
+		bson_append_finish_object(&op);
+		/* Create new bson object representing current version and add it to
+		 * the object versions */
+		bson_append_start_object(&op, "$set");
+		{
+			bson_init(&bson_version);
+			{
+				vs_mongo_node_save_version(vs_ctx, &bson_version, node);
+			}
+			bson_finish(&bson_version);
+			bson_append_bson(&op, "versions", &bson_version);
+		}
+		bson_append_finish_object(&op);
+	}
+	bson_finish(&op);
+
+	ret = mongo_update(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &cond, &op, MONGO_UPDATE_BASIC, 0);
+
+	bson_destroy(&bson_version);
+	bson_destroy(&cond);
+	bson_destroy(&op);
+
+	if(ret != MONGO_OK) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to update node %d to MongoDB: %s, error: %s\n",
+				node->id, vs_ctx->mongo_node_ns, mongo_get_server_err_string(vs_ctx->mongo_conn));
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
  * \brief This function writes content of node to Mongo database
  *
  * \param vs_ctx	The Verse server context
@@ -132,42 +261,27 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
  */
 int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 {
+	int ret = 1;
+
 	/* Save only node that is in subtree of scene node */
 	if(node->flags & VS_NODE_SAVEABLE) {
-		/* Create new mongo document for unsaved node */
+
 		if((int)node->saved_version == -1) {
-			bson bson_node;
-			int ret;
-
-			bson_init(&bson_node);
-			bson_append_new_oid(&bson_node, "_id");
-			/* Save Node ID and Custom Type of node */
-			bson_append_int(&bson_node, "node_id", node->id);
-			bson_append_int(&bson_node, "custom_type", node->type);
-			bson_append_int(&bson_node, "current_version", node->version);
-
-			/* Create object of versions and save first version */
-			bson_append_start_object(&bson_node, "versions");
-			vs_mongo_node_save_version(vs_ctx, &bson_node, node);
-			bson_append_finish_object(&bson_node);
-
-			bson_finish(&bson_node);
-			ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_node_ns, &bson_node, 0);
-			bson_destroy(&bson_node);
-			if(ret != MONGO_OK) {
-				v_print_log(VRS_PRINT_ERROR,
-						"Unable to write node %d to MongoDB: %s\n",
-						node->id, vs_ctx->mongo_node_ns);
-				return 0;
-			}
+			/* Create new mongo document for unsaved node */
+			ret = vs_mongo_node_add_new(vs_ctx, node);
 		} else if(node->saved_version < node->version) {
-			/* TODO: find document and add new version */
+			/* Try to find document and add update current version */
+			ret = vs_mongo_node_update(vs_ctx, node);
+		} else {
+			/* When structure of node is same, then tag groups or layers can
+			 * be changed. Let's try to update tag groups and layers. */
+			ret = vs_mongo_node_update_data(vs_ctx, node);
 		}
 
 		node->saved_version = node->version;
 	}
 
-	return 1;
+	return ret;
 }
 
 /**

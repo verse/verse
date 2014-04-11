@@ -167,8 +167,8 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 					tg->id, node->id, vs_ctx->mongo_tg_ns);
 			return 0;
 		}
-	} else {
-		/* TODO: update item in database */
+	} else if(tg->saved_version < tg->version) {
+		/* TODO: update document in database */
 	}
 
 	tg->saved_version = tg->version;
