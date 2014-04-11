@@ -44,7 +44,8 @@
  */
 static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 		bson *bson_node,
-		struct VSNode *node)
+		struct VSNode *node,
+		uint32 version)
 {
 	VSNode *child_node;
 	VSLink *link;
@@ -118,7 +119,7 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 
 	bson_finish(&bson_version);
 
-	sprintf(str_num, "%d", node->version);
+	sprintf(str_num, "%u", version);
 	bson_append_bson(bson_node, str_num, &bson_version);
 }
 
@@ -145,7 +146,7 @@ int vs_mongo_node_add_new(struct VS_CTX *vs_ctx, struct VSNode *node)
 
 	/* Create object of versions and save first version */
 	bson_append_start_object(&bson_node, "versions");
-	vs_mongo_node_save_version(vs_ctx, &bson_node, node);
+	vs_mongo_node_save_version(vs_ctx, &bson_node, node, UINT32_MAX);
 	bson_append_finish_object(&bson_node);
 
 	bson_finish(&bson_node);
@@ -153,8 +154,9 @@ int vs_mongo_node_add_new(struct VS_CTX *vs_ctx, struct VSNode *node)
 	bson_destroy(&bson_node);
 	if(ret != MONGO_OK) {
 		v_print_log(VRS_PRINT_ERROR,
-				"Unable to write node %d to MongoDB: %s\n",
-				node->id, vs_ctx->mongo_node_ns);
+				"Unable to write node %d to MongoDB: %s, error: %s\n",
+				node->id, vs_ctx->mongo_node_ns,
+				mongo_get_server_err_string(vs_ctx->mongo_conn));
 		return 0;
 	}
 
@@ -226,7 +228,7 @@ int vs_mongo_node_update(struct VS_CTX *vs_ctx, struct VSNode *node)
 		{
 			bson_init(&bson_version);
 			{
-				vs_mongo_node_save_version(vs_ctx, &bson_version, node);
+				vs_mongo_node_save_version(vs_ctx, &bson_version, node, UINT32_MAX);
 			}
 			bson_finish(&bson_version);
 			bson_append_bson(&op, "versions", &bson_version);
@@ -244,7 +246,8 @@ int vs_mongo_node_update(struct VS_CTX *vs_ctx, struct VSNode *node)
 	if(ret != MONGO_OK) {
 		v_print_log(VRS_PRINT_ERROR,
 				"Unable to update node %d to MongoDB: %s, error: %s\n",
-				node->id, vs_ctx->mongo_node_ns, mongo_get_server_err_string(vs_ctx->mongo_conn));
+				node->id, vs_ctx->mongo_node_ns,
+				mongo_get_server_err_string(vs_ctx->mongo_conn));
 		return 0;
 	}
 
@@ -361,17 +364,11 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 			bson bson_versions;
 			bson_iterator version_iter;
 			char str_num[15];
-			uint32 version;
 
 			/* Initialize sub-object of versions */
 			bson_iterator_subobject_init(&node_data_iter, &bson_versions, 0);
 
-			if((int)req_version == -1) {
-				version = current_version;
-			} else {
-				version = req_version;
-			}
-			sprintf(str_num, "%d", version);
+			sprintf(str_num, "%u", req_version);
 
 			/* Try to find required version of node */
 			if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
@@ -397,8 +394,10 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 
 					if(node != NULL) {
 
-						node->version = version;
-						node->saved_version = version;
+						/* Set version of node */
+						node->version = node->saved_version = current_version;
+						/* When node was loaded from MongoDB, then it is OK
+						 * to save to MongoDB again in future */
 						node->flags |= VS_NODE_SAVEABLE;
 						/* Nobody is connected, then it is OK set this state */
 						node->state = ENTITY_CREATED;

@@ -186,8 +186,9 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 
 		if(status != MONGO_OK) {
 			v_print_log(VRS_PRINT_ERROR,
-					"Authentication to %s database failed\n",
-					vs_ctx->mongodb_db_name);
+					"Authentication to %s database failed, error: %s\n",
+					vs_ctx->mongodb_db_name,
+					mongo_get_server_err_string(vs_ctx->mongo_conn));
 			mongo_dealloc(vs_ctx->mongo_conn);
 			vs_ctx->mongo_conn = NULL;
 			return 0;

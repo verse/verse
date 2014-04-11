@@ -40,7 +40,8 @@
  * \brief This function save current version o tag group to MongoDB
  */
 static void vs_mongo_taggroup_save_version(bson *bson_tg,
-		struct VSTagGroup *tg)
+		struct VSTagGroup *tg,
+		uint32 version)
 {
 	bson bson_version;
 	bson bson_tag;
@@ -123,8 +124,103 @@ static void vs_mongo_taggroup_save_version(bson *bson_tg,
 
 	bson_finish(&bson_version);
 
-	sprintf(str_num, "%d", tg->version);
+	sprintf(str_num, "%u", version);
 	bson_append_bson(bson_tg, str_num, &bson_version);
+}
+
+/**
+ * \brief This function tries to update tag group in MongoDB. It adds new
+ * version of data.
+ */
+int vs_mongo_taggroup_update(struct VS_CTX *vs_ctx,
+		struct VSTagGroup *tg)
+{
+	bson cond, op;
+	bson bson_version;
+	int ret;
+
+	bson_init(&cond);
+	{
+		bson_append_oid(&cond, "_id", &tg->oid);
+	}
+	bson_finish(&cond);
+
+	bson_init(&op);
+	{
+		/* Update item current_version in document */
+		bson_append_start_object(&op, "$set");
+		{
+			bson_append_int(&op, "current_version", tg->version);
+		}
+		bson_append_finish_object(&op);
+		/* Create new bson object representing current version and add it to
+		 * the object versions */
+		bson_append_start_object(&op, "$set");
+		{
+			bson_init(&bson_version);
+			{
+				vs_mongo_taggroup_save_version(&bson_version, tg, UINT32_MAX);
+			}
+			bson_finish(&bson_version);
+			bson_append_bson(&op, "versions", &bson_version);
+		}
+		bson_append_finish_object(&op);
+	}
+	bson_finish(&op);
+
+	ret = mongo_update(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &cond, &op,
+			MONGO_UPDATE_BASIC, 0);
+
+	bson_destroy(&bson_version);
+	bson_destroy(&cond);
+	bson_destroy(&op);
+
+	if(ret != MONGO_OK) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to update tag group %d to MongoDB: %s, error: %s\n",
+				tg->id, vs_ctx->mongo_tg_ns,
+				mongo_get_server_err_string(vs_ctx->mongo_conn));
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * \brief This function tries to add new tag group to MongoDB
+ */
+int vs_mongo_taggroup_add_new(struct VS_CTX *vs_ctx,
+		struct VSNode *node,
+		struct VSTagGroup *tg)
+{
+	bson bson_tg;
+	int ret;
+	bson_init(&bson_tg);
+
+	bson_oid_gen(&tg->oid);
+	bson_append_oid(&bson_tg, "_id", &tg->oid);
+	bson_append_int(&bson_tg, "node_id", node->id);
+	bson_append_int(&bson_tg, "taggroup_id", tg->id);
+	bson_append_int(&bson_tg, "custom_type", tg->type);
+	bson_append_int(&bson_tg, "current_version", tg->version);
+
+	bson_append_start_object(&bson_tg, "versions");
+	vs_mongo_taggroup_save_version(&bson_tg, tg, UINT32_MAX);
+	bson_append_finish_object(&bson_tg);
+
+	bson_finish(&bson_tg);
+
+	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &bson_tg, 0);
+	bson_destroy(&bson_tg);
+	if(ret != MONGO_OK) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to write tag group %d of node %d to MongoDB: %s, error: %s\n",
+				tg->id, node->id, vs_ctx->mongo_tg_ns,
+				mongo_get_server_err_string(vs_ctx->mongo_conn));
+		return 0;
+	}
+
+	return 1;
 }
 
 /**
@@ -140,40 +236,19 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 		struct VSNode *node,
 		struct VSTagGroup *tg)
 {
-	bson bson_tg;
-	int ret;
+	int ret = 1;
 
 	if((int)tg->saved_version == -1) {
-		bson_init(&bson_tg);
-
-		bson_oid_gen(&tg->oid);
-		bson_append_oid(&bson_tg, "_id", &tg->oid);
-		bson_append_int(&bson_tg, "node_id", node->id);
-		bson_append_int(&bson_tg, "taggroup_id", tg->id);
-		bson_append_int(&bson_tg, "custom_type", tg->type);
-		bson_append_int(&bson_tg, "current_version", tg->version);
-
-		bson_append_start_object(&bson_tg, "versions");
-		vs_mongo_taggroup_save_version(&bson_tg, tg);
-		bson_append_finish_object(&bson_tg);
-
-		bson_finish(&bson_tg);
-
-		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &bson_tg, 0);
-		bson_destroy(&bson_tg);
-		if(ret != MONGO_OK) {
-			v_print_log(VRS_PRINT_ERROR,
-					"Unable to write tag group %d of node %d to MongoDB: %s\n",
-					tg->id, node->id, vs_ctx->mongo_tg_ns);
-			return 0;
-		}
+		/* Add new tag group to MongoDB */
+		ret = vs_mongo_taggroup_add_new(vs_ctx, node, tg);
 	} else if(tg->saved_version < tg->version) {
-		/* TODO: update document in database */
+		/* Update document in database */
+		ret = vs_mongo_taggroup_update(vs_ctx, tg);
 	}
 
 	tg->saved_version = tg->version;
 
-	return 1;
+	return ret;
 }
 
 /**
@@ -250,28 +325,28 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 
 		tg->state = ENTITY_CREATED;
 
+		/* Save ObjectID to tag group */
+		memcpy(&tg->oid, oid, sizeof(bson_oid_t));
+
 		if(tg != NULL) {
-			/* Try to get versions of node */
+			/* Try to get versions of tag group */
 			if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
 				bson bson_versions;
 				bson_iterator version_iter;
 				char str_num[15];
-				uint32 version;
 
 				/* Initialize sub-object of versions */
 				bson_iterator_subobject_init(&tg_data_iter, &bson_versions, 0);
 
-				if((int)req_version == -1) {
-					version = current_version;
-				} else {
-					version = req_version;
-				}
-				sprintf(str_num, "%d", version);
+				sprintf(str_num, "%u", req_version);
 
 				/* Try to find required version of tag group */
 				if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
 					bson bson_version;
 					bson_iterator version_data_iter;
+
+					/* Set version of tag group */
+					tg->version = tg->saved_version = current_version;
 
 					bson_iterator_subobject_init(&version_iter, &bson_version, 0);
 
