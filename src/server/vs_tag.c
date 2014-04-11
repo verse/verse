@@ -163,6 +163,54 @@ static void vs_tag_init(struct VSTag *tag)
 	tag->state = ENTITY_RESERVED;
 }
 
+/**
+ * \brief This function tries to set data in tag
+ */
+void vs_tag_set_values(struct VSTag *tag, uint8 count, uint8 index, void *data)
+{
+	/* Set value in tag */
+	switch(tag->data_type) {
+	case VRS_VALUE_TYPE_UINT8:
+		memcpy(&tag->value[index], data, UINT8_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_UINT16:
+		memcpy(&tag->value[index], data, UINT16_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_UINT32:
+		memcpy(&tag->value[index], data, UINT32_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_UINT64:
+		memcpy(&tag->value[index], data, UINT64_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_REAL16:
+		memcpy(&tag->value[index], data, REAL16_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_REAL32:
+		memcpy(&tag->value[index], data, REAL32_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_REAL64:
+		memcpy(&tag->value[index], data, REAL64_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_STRING8:
+		if(tag->value == NULL) {
+			tag->value = strdup((char*)data);
+		} else {
+			size_t new_str_len = strlen((char*)data);
+			size_t old_str_len = strlen((char*)tag->value);
+			/* Rewrite old string */
+			if(new_str_len == old_str_len) {
+				strcpy((char*)tag->value, (char*)data);
+			} else {
+				tag->value = (char*)realloc(tag->value, new_str_len*sizeof(char));
+				strcpy((char*)tag->value, (char*)data);
+			}
+		}
+		break;
+	default:
+		assert(0);
+		break;
+	}
+}
 
 /**
  * \brief This function creates new Verse Tag

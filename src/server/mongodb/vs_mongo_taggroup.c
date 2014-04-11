@@ -87,7 +87,7 @@ static void vs_mongo_taggroup_save_version(bson *bson_tg,
 		case VRS_VALUE_TYPE_UINT64:
 			for(item_id = 0; item_id < tag->count; item_id++) {
 				sprintf(str_num, "%d", item_id);
-				bson_append_int(&bson_tag, str_num, ((uint64*)tag->value)[item_id]);
+				bson_append_long(&bson_tag, str_num, ((uint64*)tag->value)[item_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_REAL16:
@@ -309,26 +309,61 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 
 							if( bson_find(&tag_iter, &bson_tag, "data") == BSON_ARRAY) {
 								bson_iterator data_iter;
+								uint8 val_uint8;
+								uint16 val_uint16;
+								uint32 val_uint32;
+								uint64 val_uint64;
+								real32 val_real32;
+								real64 val_real64;
+								int value_index = 0;
+
 								bson_iterator_subiterator(&tag_iter, &data_iter);
 
+								/* Go through all values */
 								switch(data_type) {
 								case VRS_VALUE_TYPE_UINT8:
-								case VRS_VALUE_TYPE_UINT16:
-								case VRS_VALUE_TYPE_UINT32:
-								case VRS_VALUE_TYPE_UINT64:
-									/* Go through all permissions */
 									while( bson_iterator_next(&data_iter) == BSON_INT ) {
-										/* TODO: copy values */
+										val_uint8 = (uint8)bson_iterator_int(&data_iter);
+										vs_tag_set_values(tag, 1, value_index, &val_uint8);
+										value_index++;
+									}
+									break;
+								case VRS_VALUE_TYPE_UINT16:
+									while( bson_iterator_next(&data_iter) == BSON_INT ) {
+										val_uint16 = (uint16)bson_iterator_int(&data_iter);
+										vs_tag_set_values(tag, 1, value_index, &val_uint16);
+										value_index++;
+									}
+									break;
+								case VRS_VALUE_TYPE_UINT32:
+									while( bson_iterator_next(&data_iter) == BSON_INT ) {
+										val_uint32 = (uint32)bson_iterator_int(&data_iter);
+										vs_tag_set_values(tag, 1, value_index, &val_uint32);
+										value_index++;
+									}
+									break;
+								case VRS_VALUE_TYPE_UINT64:
+									while( bson_iterator_next(&data_iter) == BSON_LONG ) {
+										val_uint64 = (uint64)bson_iterator_long(&data_iter);
+										vs_tag_set_values(tag, 1, value_index, &val_uint64);
+										value_index++;
 									}
 									break;
 								case VRS_VALUE_TYPE_REAL16:
 									/* TODO: add support for float16 */
 									break;
 								case VRS_VALUE_TYPE_REAL32:
+									while( bson_iterator_next(&data_iter) == BSON_DOUBLE ) {
+										val_real32 = (real32)bson_iterator_double(&data_iter);
+										vs_tag_set_values(tag, 1, value_index, &val_real32);
+										value_index++;
+									}
+									break;
 								case VRS_VALUE_TYPE_REAL64:
-									/* Go through all permissions */
-									while( bson_iterator_next(&data_iter) == BSON_INT ) {
-										/* TODO: copy values */
+									while( bson_iterator_next(&data_iter) == BSON_DOUBLE ) {
+										val_real64 = (real64)bson_iterator_double(&data_iter);
+										vs_tag_set_values(tag, 1, value_index, &val_real64);
+										value_index++;
 									}
 									break;
 								case VRS_VALUE_TYPE_STRING8:
@@ -337,6 +372,7 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 									break;
 								}
 
+								tag->flag = TAG_INITIALIZED;
 							}
 						}
 					}
