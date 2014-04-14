@@ -38,7 +38,12 @@
 void vs_taggroup_inc_version(struct VSTagGroup *tg)
 {
 	/* TODO: Compute CRC32 of tag group */
-	tg->version++;
+	if( (tg->version + 1 ) < UINT32_MAX ) {
+		tg->version++;
+	} else {
+		tg->version = 1;
+		tg->saved_version = 0;
+	}
 }
 
 /**

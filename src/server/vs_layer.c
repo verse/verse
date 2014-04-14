@@ -36,7 +36,12 @@
 void vs_layer_inc_version(struct VSLayer *layer)
 {
 	/* TODO: computer CRC32 */
-	layer->version++;
+	if( (layer->version + 1 ) < UINT32_MAX ) {
+		layer->version++;
+	} else {
+		layer->version = 1;
+		layer->saved_version = 0;
+	}
 }
 
 /**

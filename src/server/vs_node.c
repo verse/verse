@@ -275,7 +275,12 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 void vs_node_inc_version(struct VSNode *node)
 {
 	/* TODO: compute CRC32 */
-	node->version++;
+	if( (node->version + 1) < UINT32_MAX) {
+		node->version++;
+	} else {
+		node->version = 1;
+		node->saved_version = 0;
+	}
 }
 
 /**
