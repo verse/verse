@@ -38,9 +38,12 @@
 
 /**
  * \brief This function tries to save current version of layer to the database
+ *
+ * TODO: use GridFS for storing large layers
  */
 static void vs_mongo_layer_save_version(bson *bson_layer,
-		struct VSLayer *layer)
+		struct VSLayer *layer,
+		uint32 version)
 {
 	bson bson_version;
 	bson bson_value;
@@ -59,7 +62,7 @@ static void vs_mongo_layer_save_version(bson *bson_layer,
 	item_id = 0;
 	while(child_layer != NULL) {
 		sprintf(str_num, "%d", item_id);
-		bson_append_int(&bson_version, str_num, child_layer->id);
+		bson_append_oid(&bson_version, str_num, &child_layer->oid);
 		child_layer = child_layer->next;
 	}
 	bson_append_finish_array(&bson_version);
@@ -121,8 +124,114 @@ static void vs_mongo_layer_save_version(bson *bson_layer,
 
 	bson_finish(&bson_version);
 
-	sprintf(str_num, "%d", layer->version);
+	sprintf(str_num, "%d", version);
 	bson_append_bson(bson_layer, str_num, &bson_version);
+}
+
+/**
+ * \brief This function tries to update layer stored in MongoDB
+ */
+int vs_mongo_layer_update(struct VS_CTX *vs_ctx,
+		struct VSNode *node,
+		struct VSLayer *layer)
+{
+	bson cond, op;
+	bson bson_version;
+	int ret;
+
+	/* TODO: delete old version, when there is too much versions:
+	int old_saved_version = layer->saved_version;
+	*/
+
+	bson_init(&cond);
+	{
+		bson_append_oid(&cond, "_id", &layer->oid);
+		/* To be sure that right layer will be updated */
+		bson_append_int(&cond, "node_id", node->id);
+		bson_append_int(&cond, "layer_id", layer->id);
+	}
+	bson_finish(&cond);
+
+	bson_init(&op);
+	{
+		/* Update item current_version in document */
+		bson_append_start_object(&op, "$set");
+		{
+			bson_append_int(&op, "current_version", layer->version);
+		}
+		bson_append_finish_object(&op);
+		/* Create new bson object representing current version and add it to
+		 * the object versions */
+		bson_append_start_object(&op, "$set");
+		{
+			bson_init(&bson_version);
+			{
+				vs_mongo_layer_save_version(&bson_version, layer, UINT32_MAX);
+			}
+			bson_finish(&bson_version);
+			bson_append_bson(&op, "versions", &bson_version);
+		}
+		bson_append_finish_object(&op);
+	}
+	bson_finish(&op);
+
+	ret = mongo_update(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &cond, &op,
+			MONGO_UPDATE_BASIC, 0);
+
+	bson_destroy(&bson_version);
+	bson_destroy(&cond);
+	bson_destroy(&op);
+
+	if(ret != MONGO_OK) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to update layer %d to MongoDB: %s, error: %s\n",
+				layer->id, vs_ctx->mongo_tg_ns,
+				mongo_get_server_err_string(vs_ctx->mongo_conn));
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * \brief This function tries to save new layer to MongoDB
+ */
+int vs_mongo_layer_add_new(struct VS_CTX *vs_ctx,
+		struct VSNode *node,
+		struct VSLayer *layer)
+{
+	bson bson_layer;
+	int ret;
+
+	bson_init(&bson_layer);
+
+	bson_oid_gen(&layer->oid);
+	bson_append_oid(&bson_layer, "_id", &layer->oid);
+	bson_append_int(&bson_layer, "node_id", node->id);
+	bson_append_int(&bson_layer, "layer_id", layer->id);
+	bson_append_int(&bson_layer, "custom_type", layer->type);
+	bson_append_int(&bson_layer, "data_type", layer->data_type);
+	bson_append_int(&bson_layer, "vec_size", layer->num_vec_comp);
+	bson_append_int(&bson_layer, "current_version", layer->version);
+
+	bson_append_start_object(&bson_layer, "versions");
+	vs_mongo_layer_save_version(&bson_layer, layer, UINT32_MAX);
+	bson_append_finish_object(&bson_layer);
+
+	bson_finish(&bson_layer);
+
+	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_layer_ns, &bson_layer, NULL);
+	bson_destroy(&bson_layer);
+
+	if(ret != MONGO_OK) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to write layer %d of node %d to MongoDB: %s, error: %s\n",
+				layer->id, node->id, vs_ctx->mongo_layer_ns,
+				mongo_get_server_err_string(vs_ctx->mongo_conn));
+		return 0;
+	}
+
+	return 1;
 }
 
 /**
@@ -132,43 +241,21 @@ int vs_mongo_layer_save(struct VS_CTX *vs_ctx,
 		struct VSNode *node,
 		struct VSLayer *layer)
 {
-	bson bson_layer;
-	int ret;
+	int ret = 1;
 
 	if((int)layer->saved_version == -1) {
-		bson_init(&bson_layer);
-
-		bson_oid_gen(&layer->oid);
-		bson_append_oid(&bson_layer, "_id", &layer->oid);
-		bson_append_int(&bson_layer, "node_id", node->id);
-		bson_append_int(&bson_layer, "layer_id", layer->id);
-		bson_append_int(&bson_layer, "custom_type", layer->type);
-		bson_append_int(&bson_layer, "data_type", layer->data_type);
-		bson_append_int(&bson_layer, "vec_size", layer->num_vec_comp);
-		bson_append_int(&bson_layer, "current_version", layer->version);
-
-		bson_append_start_object(&bson_layer, "versions");
-		vs_mongo_layer_save_version(&bson_layer, layer);
-		bson_append_finish_object(&bson_layer);
-
-		bson_finish(&bson_layer);
-
-		ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_layer_ns, &bson_layer, NULL);
-		bson_destroy(&bson_layer);
-
-		if(ret != MONGO_OK) {
-			v_print_log(VRS_PRINT_ERROR,
-					"Unable to write layer %d of node %d to MongoDB: %s\n",
-					layer->id, node->id, vs_ctx->mongo_layer_ns);
-			return 0;
-		}
+		/* Save new layer to MongoDB */
+		ret = vs_mongo_layer_add_new(vs_ctx, node, layer);
 	} else {
-		/* TODO: update item in database */
+		/* Update item in database */
+		ret = vs_mongo_layer_update(vs_ctx, node, layer);
 	}
 
-	layer->saved_version = layer->version;
+	if(ret == 1) {
+		layer->saved_version = layer->version;
+	}
 
-	return 1;
+	return ret;
 }
 
 /**

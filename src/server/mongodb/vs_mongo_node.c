@@ -281,7 +281,9 @@ int vs_mongo_node_save(struct VS_CTX *vs_ctx, struct VSNode *node)
 			ret = vs_mongo_node_update_data(vs_ctx, node);
 		}
 
-		node->saved_version = node->version;
+		if(ret == 1) {
+			node->saved_version = node->version;
+		}
 	}
 
 	return ret;

@@ -133,15 +133,23 @@ static void vs_mongo_taggroup_save_version(bson *bson_tg,
  * version of data.
  */
 int vs_mongo_taggroup_update(struct VS_CTX *vs_ctx,
+		struct VSNode *node,
 		struct VSTagGroup *tg)
 {
 	bson cond, op;
 	bson bson_version;
 	int ret;
 
+	/* TODO: delete old version, when there is too much versions:
+	int old_saved_version = tg->saved_version;
+	*/
+
 	bson_init(&cond);
 	{
 		bson_append_oid(&cond, "_id", &tg->oid);
+		/* To be sure that right tag group will be updated */
+		bson_append_int(&cond, "node_id", node->id);
+		bson_append_int(&cond, "taggroup_id", tg->id);
 	}
 	bson_finish(&cond);
 
@@ -243,10 +251,12 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 		ret = vs_mongo_taggroup_add_new(vs_ctx, node, tg);
 	} else if(tg->saved_version < tg->version) {
 		/* Update document in database */
-		ret = vs_mongo_taggroup_update(vs_ctx, tg);
+		ret = vs_mongo_taggroup_update(vs_ctx, node, tg);
 	}
 
-	tg->saved_version = tg->version;
+	if(ret == 1) {
+		tg->saved_version = tg->version;
+	}
 
 	return ret;
 }
