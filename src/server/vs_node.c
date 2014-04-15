@@ -45,6 +45,25 @@
 static int vs_node_send_destroy(struct VSNode *node);
 
 /**
+ * \brief This function tries to find node subscriber corresponding to the
+ * session. When subscriber is not foun, then return NULL
+ */
+static struct VSNodeSubscriber* vs_node_get_subscriber(struct VSNode *node,
+		struct VSession *vsession)
+{
+	struct VSNodeSubscriber *node_subscriber = node->node_subs.first;
+
+	while(node_subscriber != NULL) {
+		if(node_subscriber->session->session_id == vsession->session_id) {
+			break;
+		}
+		node_subscriber = node_subscriber->next;
+	}
+
+	return node_subscriber;
+}
+
+/**
  * \brief This function do recursive setting new node priority
  */
 static int vs_node_prio(struct VSession *vsession,
@@ -56,13 +75,7 @@ static int vs_node_prio(struct VSession *vsession,
 	struct VSLink *link;
 
 	/* Is client subscribed to this node? */
-	node_subscriber = node->node_subs.first;
-	while(node_subscriber != NULL) {
-		if(node_subscriber->session->session_id == vsession->session_id) {
-			break;
-		}
-		node_subscriber = node_subscriber->next;
-	}
+	node_subscriber = vs_node_get_subscriber(node, vsession);
 
 	/* If client is subscribed, then set up new priority */
 	if(node_subscriber != NULL) {
@@ -368,6 +381,8 @@ struct VSNode *vs_node_find(struct VS_CTX *vs_ctx, uint32 node_id)
  */
 void vs_node_init(struct VSNode *node)
 {
+	int res;
+
 	node->id = 0xFFFFFFFF;
 	node->type = 0;
 
@@ -403,6 +418,14 @@ void vs_node_init(struct VSNode *node)
 
 	node->state = ENTITY_RESERVED;
 	node->flags = 0;
+
+	/* Initialize mutex of this node */
+	if((res = pthread_mutex_init(&node->mutex, NULL)) != 0) {
+		/* This function always return 0 on Linux */
+		if(is_log_level(VRS_PRINT_ERROR)) {
+			v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
+		}
+	}
 
 	node->version = 0;
 	node->saved_version = -1;
@@ -712,6 +735,23 @@ end:
 }
 
 /**
+ * \brief This function checks if node is in created/creating state and could
+ * be used.
+ */
+int vs_node_is_created(struct VSNode *node)
+{
+	/* Node has to be created */
+	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"node, id: %d is not in CREATED/CREATING state: %d\n",
+				__FUNCTION__, node->id, node->state);
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
  * \brief This function handle Node_Priority command
  */
 int vs_handle_node_prio(struct VS_CTX *vs_ctx,
@@ -722,44 +762,37 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 	struct VSNodeSubscriber *node_subscriber;
 	uint8 prio = UINT8(node_prio->data[0]);
 	uint32 node_id = UINT32(node_prio->data[UINT8_SIZE]);
+	int ret = 1;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
-		return 0;
+		ret = 0;
 	}
 
-	/* Node has to be created */
-	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
+	if(node != NULL) {
+		/* Node has to be created */
+		if(vs_node_is_created(node) == 1) {
 
-	/* Is client subscribed to this node? */
-	node_subscriber = node->node_subs.first;
-	while(node_subscriber != NULL) {
-		if(node_subscriber->session->session_id == vsession->session_id) {
-			break;
+			/* Is client subscribed to this node? */
+			node_subscriber = vs_node_get_subscriber(node, vsession);
+
+			/* When client is subscribed to this node, then change node priority */
+			if(node_subscriber != NULL) {
+				node_subscriber->prio = prio;
+				/* Change priority for this node and all child nodes */
+				vs_node_prio(vsession, node, prio);
+			} else {
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"%s() client not subscribed to this node (id: %d)\n",
+						__FUNCTION__, node_id);
+				ret = 0;
+			}
 		}
-		node_subscriber = node_subscriber->next;
 	}
 
-	/* When client is subscribed to this node, then change node priority */
-	if(node_subscriber != NULL) {
-		node_subscriber->prio = prio;
-		/* Change priority for this node and all child nodes */
-		vs_node_prio(vsession, node, prio);
-	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() client not subscribed to this node (id: %d)\n",
-				__FUNCTION__, node_id);
-		return 0;
-	}
-
-	return 0;
+	return ret;
 }
 
 /**
@@ -791,16 +824,10 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING) {
+	if(vs_node_is_created(node) == 1) {
 		/* Is client subscribed to this node? */
-		node_subscriber = node->node_subs.first;
-		while(node_subscriber != NULL) {
-			if(node_subscriber->session->session_id == vsession->session_id) {
-				break;
-			}
-			node_subscriber = node_subscriber->next;
-		}
-		if(node_subscriber!= NULL) {
+		node_subscriber = vs_node_get_subscriber(node, vsession);
+		if(node_subscriber != NULL) {
 			return vs_node_unsubscribe(node, node_subscriber, 0);
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
@@ -809,13 +836,10 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 			return 0;
 		}
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 
@@ -840,28 +864,23 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING) {
-		/* Isn't client already subscribed to this node? */
-		node_subscriber = node->node_subs.first;
-		while(node_subscriber != NULL) {
-			if(node_subscriber->session->session_id == vsession->session_id) {
-				v_print_log(VRS_PRINT_DEBUG_MSG,
-						"%s() client %d is already subscribed to the node (id: %d)\n",
-						__FUNCTION__, vsession->session_id, node->id);
-				return 0;
-			}
-			node_subscriber = node_subscriber->next;
-		}
+	if( vs_node_is_created(node) == 1) {
 
-		return vs_node_subscribe(vs_ctx, vsession, node, version);
+		/* Isn't client already subscribed to this node? */
+		node_subscriber = vs_node_get_subscriber(node, vsession);
+
+		if(node_subscriber != NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() client %d is already subscribed to the node (id: %d)\n",
+					__FUNCTION__, vsession->session_id, node->id);
+		} else {
+			return vs_node_subscribe(vs_ctx, vsession, node, version);
+		}
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
 		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 /**
@@ -927,24 +946,23 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
+	if(vs_node_is_created(node) == 1) {
 
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->user_id: %d not found\n", vsession->user_id);
-		return 0;
-	}
+		/* Try to find user */
+		if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"vsession->user_id: %d not found\n", vsession->user_id);
+			return 0;
+		}
 
-	/* Is this user owner of this node? */
-	if(user != node->owner) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
-				vsession->user_id, node->id);
+		/* Is this user owner of this node? */
+		if(user != node->owner) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
+					vsession->user_id, node->id);
+			return 0;
+		}
+	} else {
 		return 0;
 	}
 
@@ -1019,7 +1037,7 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 		node->state = ENTITY_CREATED;
 	}
 
-	return 0;
+	return 1;
 }
 
 /**
@@ -1044,14 +1062,16 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 
 	/* Client has to send node_create with parent_id equal to its avatar_id */
 	if(parent_id != vsession->avatar_id) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() parent_id: %d is not equal to session avatar id %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() parent_id: %d is not equal to session avatar id %d\n",
 				__FUNCTION__, parent_id, vsession->avatar_id);
 		return 0;
 	}
 
 	/* Client has to send node_create command with his user_id */
 	if(user_id != vsession->user_id) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() user_id: %d is not equal to session user id %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() user_id: %d is not equal to session user id %d\n",
 				__FUNCTION__, user_id, vsession->user_id);
 		return 0;
 	}
@@ -1059,7 +1079,8 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	/* Client has to send node_create command with custom_type bigger or
 	 * equal 32, because lower values are reserved for special nodes */
 	if( custom_type < 32 ) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() custom_type: %d is smaller then 32\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() custom_type: %d is smaller then 32\n",
 				__FUNCTION__, custom_type);
 		return 0;
 	}

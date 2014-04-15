@@ -86,6 +86,7 @@ typedef struct VSession {
 	struct VDgramConn		*dgram_conn;	/* Datagram (UDP) connection for real-time data exchange */
 	struct VStreamConn		*stream_conn;	/* Stream (TCP) connection for authentication and new port negotiation */
 	uint16					user_id;		/* Unique ID of the user at Verse server */
+	void					*user;			/* Cached pointer at session user structure */
 	uint32					avatar_id;		/* Unique ID of session of this verse client */
 	struct VDED				ded;			/* Data Exchange Definition */
 	uint16					flags;			/* Flags from verse_send_connect_request function */

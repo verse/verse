@@ -139,9 +139,11 @@ int v_in_queue_init(struct VInQueue *in_queue, int max_size)
 	int id, res;
 
 	/* Initialize mutex of this queue */
-	if((res=pthread_mutex_init(&in_queue->lock, NULL))!=0) {
+	if((res = pthread_mutex_init(&in_queue->lock, NULL)) != 0) {
 		/* This function always return 0 on Linux */
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
+		if(is_log_level(VRS_PRINT_ERROR)) {
+			v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
+		}
 		return 0;
 	}
 

@@ -27,6 +27,7 @@
 #include <bson.h>
 #include <bcon.h>
 
+#include <unistd.h>
 #include <stdint.h>
 
 #include "vs_main.h"
@@ -232,4 +233,22 @@ void vs_mongo_conn_destroy(struct VS_CTX *vs_ctx)
 				"Connection to MongoDB server %s:%d destroyed\n",
 				vs_ctx->mongodb_server, vs_ctx->mongodb_port);
 	}
+}
+
+/**
+ * \brief This function tries to do continuous saving of data to MongoDB and
+ * it frees nodes from memory, when node does not have any subscriber.
+ */
+void *vs_mongo_save_loop(void *arg)
+{
+	struct VS_CTX *vs_ctx = (struct VS_CTX *)arg;
+
+	while(vs_ctx->state != SERVER_STATE_CLOSED) {
+		sleep(1);
+	}
+
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Exiting saving thread\n");
+
+	pthread_exit(NULL);
+	return NULL;
 }

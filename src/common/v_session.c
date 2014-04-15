@@ -44,6 +44,7 @@ void v_init_session(struct VSession *vsession)
 	vsession->peer_hostname = NULL;
 	vsession->service = NULL;
 	vsession->session_id = 0;
+	vsession->user = NULL;
 	vsession->dgram_conn = NULL;
 	vsession->stream_conn = NULL;
 	vsession->ded.str = NULL;
@@ -70,6 +71,8 @@ void v_destroy_session(struct VSession *vsession)
 {
 	vsession->tcp_thread = 0;
 	vsession->udp_thread = 0;
+
+	vsession->user = NULL;
 
 	if(vsession->dgram_conn != NULL) {
 		v_conn_dgram_destroy(vsession->dgram_conn);

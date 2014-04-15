@@ -683,6 +683,8 @@ int vs_RESPOND_userauth_loop(struct vContext *C)
 					 * connect_accept command */
 					vsession->user_id = user_id;
 					vsession->avatar_id = avatar_id;
+					/* Save cached pointer at user binded with the session */
+					vsession->user = vs_user_find(vs_ctx, user_id);
 
 					s_message->sys_cmd[cmd_rank].ua_succ.id = CMD_USER_AUTH_SUCCESS;
 					s_message->sys_cmd[cmd_rank].ua_succ.user_id = user_id;

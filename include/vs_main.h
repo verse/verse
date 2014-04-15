@@ -161,6 +161,7 @@ typedef struct VS_CTX {
 	pthread_t			websocket_thread;			/* WebSocket thread */
 	pthread_attr_t		websocket_thread_attr;		/* The attribute of WebSocket thread*/
 #ifdef WITH_MONGODB
+	pthread_t			save_thread;				/* Thread for continuous saving of shared data */
 	mongo				*mongo_conn;				/* Connection to MongoDB server */
 	char				*mongodb_server;			/* Hostname of MongoDB server */
 	unsigned short		mongodb_port;				/* Port of MongoDB server is listening on */

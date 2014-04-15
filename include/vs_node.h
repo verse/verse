@@ -79,7 +79,8 @@ typedef struct VSNode {
 	/* Internal staff */
 	uint32					level;			/* Level in the node tree */
 	uint8					state;			/* Node state */
-	uint8					flags;
+	uint8					flags;			/* Several flags */
+	pthread_mutex_t			mutex;			/* Internal locking of node */
 	/* Versing */
 	uint32					version;		/* Current version of node */
 	uint32					saved_version;	/* Last saved version of node */
@@ -105,6 +106,8 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 		struct Generic_Cmd *node_prio);
 
 void vs_node_inc_version(struct VSNode *node);
+
+int vs_node_is_created(struct VSNode *node);
 
 int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,

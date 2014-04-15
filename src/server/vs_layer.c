@@ -444,7 +444,6 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		struct Generic_Cmd *layer_create_cmd)
 {
 	struct VSNode *node;
-	struct VSUser *user;
 	struct VSLayer *parent_layer;
 	struct VSLayer *layer;
 	struct VBucket *vbucket;
@@ -464,6 +463,11 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	/* Node has to be created */
+	if( vs_node_is_created(node) != 1 ) {
+		return 0;
+	}
+
 	/* When parent layer id is not -1, then try to find this parent layer */
 	if(parent_layer_id == RESERVED_LAYER_ID) {
 		parent_layer = NULL;
@@ -476,24 +480,12 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		}
 	}
 
-	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in CREATING or CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
-		return 0;
-	}
-
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+				__FUNCTION__,
+				((struct VSUser *)(vsession->user))->username,
+				node->id);
 		return 0;
 	}
 
@@ -615,7 +607,6 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSLayer *layer;
-	struct VSUser *user;
 
 	uint32 node_id = UINT32(layer_destroy_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_destroy_cmd->data[UINT32_SIZE]);
@@ -628,36 +619,32 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in CREATING or CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
+	if( vs_node_is_created(node) != 1 ) {
 		return 0;
 	}
 
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)(vsession->user))->username,
+				node->id);
 		return 0;
 	}
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
 		return 0;
 	}
 
 	/* Layer has to be created */
 	if(! (layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
 				__FUNCTION__, layer->id, node->id, node->state);
 		return 0;
 	}
@@ -673,7 +660,6 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		struct Generic_Cmd *layer_subscribe_cmd)
 {
 	struct VSNode *node;
-	struct VSUser *user;
 	struct VSLayer *layer;
 	struct VSNodeSubscriber *node_subscriber;
 	struct VSEntitySubscriber *layer_subscriber;
@@ -695,23 +681,17 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in CREATING or CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
+	if( vs_node_is_created(node) != 1 ) {
 		return 0;
 	}
 
 	/* User has to have permission to read the node */
 	if(vs_node_can_read(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't read the node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't read the node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)(vsession->user))->username,
+				node->id);
 		return 0;
 	}
 
@@ -726,21 +706,24 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 
 	/* Client has to be subscribed to the node first */
 	if(node_subscriber == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): client has to be subscribed to the node: %d before subscribing to the layer: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): client has to be subscribed to the node: %d before subscribing to the layer: %d\n",
 				__FUNCTION__, node_id, layer_id);
 		return 0;
 	}
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
 		return 0;
 	}
 
 	/* Layer has to be created */
 	if(! (layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
 				__FUNCTION__, layer->id, node->id, node->state);
 		return 0;
 	}
@@ -749,8 +732,9 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	layer_subscriber = layer->layer_subs.first;
 	while(layer_subscriber != NULL) {
 		if(layer_subscriber->node_sub->session->session_id == vsession->session_id) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client already subscribed to the layer (id: %d) in node (id: %d)\n",
-									__FUNCTION__, layer_id, node_id);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() client already subscribed to the layer (id: %d) in node (id: %d)\n",
+					__FUNCTION__, layer_id, node_id);
 			return 0;
 		}
 		layer_subscriber = layer_subscriber->next;
@@ -799,7 +783,8 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
 		return 0;
 	}
@@ -818,7 +803,6 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	struct VSLayer *layer;
 	struct VSLayerValue *item, _item;
 	struct VBucket *vbucket;
-	struct VSUser *user;
 	struct VSEntitySubscriber *layer_subscriber;
 
 	uint32 node_id = UINT32(layer_set_value_cmd->data[0]);
@@ -832,37 +816,36 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
-		return 0;
-	}
-
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to the node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to the node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)(vsession->user))->username,
+				node->id);
 		return 0;
 	}
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
 		return 0;
 	}
 
 	/* Check type of value */
 	if( data_type != layer->data_type ) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() data type (%d) of layer (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() data type (%d) of layer (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
 				__FUNCTION__, layer->data_type, layer_id, node_id, data_type);
 		return 0;
 	}
 
 	/* Check count of value */
 	if( count != layer->num_vec_comp ) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() count of values (%d) of layer (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() count of values (%d) of layer (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
 				__FUNCTION__, layer->num_vec_comp, layer_id, node_id, count);
 		return 0;
 	}
@@ -1056,7 +1039,6 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSLayer *layer;
-	struct VSUser *user;
 
 	uint32 node_id = UINT32(layer_unset_value_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_unset_value_cmd->data[UINT32_SIZE]);
@@ -1069,23 +1051,20 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
-		return 0;
-	}
-
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to the node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to the node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)(vsession->user))->username,
+				node->id);
 		return 0;
 	}
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
 		return 0;
 	}

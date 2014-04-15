@@ -663,6 +663,14 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+#if 0
+	if(pthread_create(&vs_ctx.save_thread, NULL, vs_mongo_save_loop, (void*)&vs_ctx) != 0) {
+		v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		vs_destroy_ctx(&vs_ctx);
+		exit(EXIT_FAILURE);
+	}
+#endif
+
 	/* Set up pointer to local server CTX -> server server could be terminated
 	 * with signal now. */
 	local_vs_ctx = &vs_ctx;

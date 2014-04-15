@@ -38,7 +38,7 @@ int vs_node_can_write(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct VSNode *node)
 {
-	struct VSUser *user;
+	struct VSUser *user = (struct VSUser*)vsession->user;
 	struct VSNodePermission	*perm;
 	int user_can_write = 0;
 
@@ -47,14 +47,6 @@ int vs_node_can_write(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"node: %d locked by vsession->avatar_id: %d\n",
 				node->id, vsession->avatar_id);
-		return 0;
-	}
-
-	/* Try to find user of this session */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"vsession->user_id: %d not found\n",
-				vsession->user_id);
 		return 0;
 	}
 
@@ -85,17 +77,9 @@ int vs_node_can_read(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct VSNode *node)
 {
-	struct VSUser *user;
+	struct VSUser *user = (struct VSUser*)vsession->user;
 	struct VSNodePermission	*perm;
 	int	user_can_read = 0;
-
-	/* Try to find user of this session */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"vsession->user_id: %d not found\n",
-				vsession->user_id);
-		return 0;
-	}
 
 	if(node->owner == user) {
 		user_can_read = 1;
@@ -384,7 +368,8 @@ int vs_handle_node_owner(struct VS_CTX *vs_ctx,
 		struct Generic_Cmd *node_perm)
 {
 	struct VSNode *node;
-	struct VSUser *user, *new_owner;
+	struct VSUser *user = (struct VSUser*)vsession->user;
+	struct VSUser *new_owner;
 	struct VSEntityFollower *node_follower;
 	uint32 node_id = UINT32(node_perm->data[UINT16_SIZE]);
 	uint16 user_id = UINT16(node_perm->data[0]);
@@ -393,13 +378,6 @@ int vs_handle_node_owner(struct VS_CTX *vs_ctx,
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
-		return 0;
-	}
-
-	/* Try to find user of this session */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"vsession->user_id: %d not found\n", vsession->user_id);
 		return 0;
 	}
 
@@ -446,7 +424,8 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSNodeSubscriber *node_subscriber;
-	struct VSUser *user, *avatar_user;
+	struct VSUser *user;
+	struct VSUser *avatar_user = (struct VSUser *)vsession->user;
 	uint32 node_id = UINT32(node_perm->data[UINT16_SIZE+UINT8_SIZE]);
 	uint16 user_id = UINT16(node_perm->data[0]);
 	uint8 permissions = UINT8(node_perm->data[UINT16_SIZE]);
@@ -455,13 +434,6 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
-		return 0;
-	}
-
-	/* Try to find user of current avatar */
-	if((avatar_user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"vsession->user_id: %d not found\n", vsession->user_id);
 		return 0;
 	}
 

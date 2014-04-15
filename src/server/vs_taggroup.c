@@ -524,9 +524,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
+	if( vs_node_is_created(node) != 1 ) {
 		return 0;
 	}
 
@@ -612,9 +610,7 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
+	if( vs_node_is_created(node) != 1 ) {
 		return 0;
 	}
 
@@ -663,9 +659,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
+	if( vs_node_is_created(node) != 1 ) {
 		return 0;
 	}
 
@@ -761,6 +755,11 @@ int vs_handle_taggroup_unsubscribe(struct VS_CTX *vs_ctx,
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
+		return 0;
+	}
+
+	/* Node has to be created */
+	if( vs_node_is_created(node) != 1 ) {
 		return 0;
 	}
 
