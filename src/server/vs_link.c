@@ -145,7 +145,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct Generic_Cmd *node_link)
 {
-	struct VSUser			*user;
+	struct VSUser			*user = (struct VSUser*)vsession->user;
 	struct VSNode			*old_parent_node, *parent_node, *child_node;
 	struct VSLink			*link;
 	struct VSNodeSubscriber	*node_subscriber;
@@ -163,21 +163,18 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 
 	/* Child node has to be created */
 	if(! (child_node->state == ENTITY_CREATED || child_node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d node id: %d is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d node id: %d is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, __LINE__, child_node->id, child_node->state);
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "vsession->user_id: %d not found\n", vsession->user_id);
 		return 0;
 	}
 
 	/* Is user owner of child node or can user write to child node? */
 	if(vs_node_can_write(vs_ctx, vsession, child_node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d user: %s can't write to child node: %d\n",
-				__FUNCTION__, __LINE__, user->username, child_node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d user: %s can't write to child node: %d (owner: %s)\n",
+				__FUNCTION__, __LINE__, user->username, child_node->id,
+				child_node->owner->username);
 		return 0;
 	}
 
@@ -189,8 +186,10 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 
 	/* Is user owner of old parent node or can user write to old parent node? */
 	if(vs_node_can_write(vs_ctx, vsession, old_parent_node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d user: %s can't write to old parent node: %d\n",
-				__FUNCTION__, __LINE__, user->username, old_parent_node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s():%d user: %s can't write to old parent node: %d (owner: %s)\n",
+				__FUNCTION__, __LINE__, user->username, old_parent_node->id,
+				old_parent_node->owner->username);
 		return 0;
 	}
 
@@ -220,8 +219,9 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	/* Is user owner of parent node or can user write to parent node? */
 	if(vs_node_can_write(vs_ctx, vsession, parent_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s():%d user: %s can't write to parent node: %d\n",
-				__FUNCTION__, __LINE__, user->username, parent_node->id);
+				"%s():%d user: %s can't write to parent node: %d (owner: %s)\n",
+				__FUNCTION__, __LINE__, user->username, parent_node->id,
+				parent_node->owner->username);
 		return 0;
 	}
 

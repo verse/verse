@@ -675,28 +675,17 @@ static struct VSNode *vs_node_new(struct VS_CTX *vs_ctx,
 		const uint16 type)
 {
 	struct VSNode *node = NULL;
-	struct VSNode find_node, *avatar_node;
-	struct VSUser *owner;
-	struct VBucket *bucket;
+	struct VSNode *avatar_node;
+	struct VSUser *owner = (struct VSUser*)vsession->user;
 	struct VSNodePermission *perm;
 	struct VSNodeSubscriber *node_subscriber;
 
 	/* Try to find avatar node to be able to create initial link to
 	 * avatar node (initial parent of new created node) */
-	find_node.id = vsession->avatar_id;
-	bucket = v_hash_array_find_item(&vs_ctx->data.nodes, &find_node);
-	if(bucket != NULL) {
-		avatar_node = (struct VSNode*)bucket->data;
-	} else {
+	avatar_node = vs_node_find(vs_ctx, vsession->avatar_id);
+	if(avatar_node == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"vsession->avatar_id: %d not found\n", vsession->avatar_id);
-		goto end;
-	}
-
-	/* Try to find owner of the new node */
-	if((owner = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"vsession->user_id: %d not found\n", vsession->user_id);
 		goto end;
 	}
 
@@ -934,7 +923,7 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct Generic_Cmd *node_destroy)
 {
-	struct VSUser *user;
+	struct VSUser *user = (struct VSUser*)vsession->user;
 	struct VSNode *node;
 	uint32 node_id = UINT32(node_destroy->data[0]);
 
@@ -947,14 +936,6 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(vs_node_is_created(node) == 1) {
-
-		/* Try to find user */
-		if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG,
-					"vsession->user_id: %d not found\n", vsession->user_id);
-			return 0;
-		}
-
 		/* Is this user owner of this node? */
 		if(user != node->owner) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,

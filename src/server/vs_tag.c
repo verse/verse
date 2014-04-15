@@ -435,7 +435,6 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	struct VSNode			*node;
 	struct VSTagGroup		*tg;
 	struct VSTag			*tag;
-	struct VSUser			*user;
 	struct VBucket			*vbucket;
 	struct VSEntitySubscriber	*tg_subscriber;
 	uint32 					node_id = UINT32(tag_create->data[0]);
@@ -459,17 +458,13 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
-		return 0;
-	}
-
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)vsession->user)->username,
+				node->id);
 		return 0;
 	}
 
@@ -607,7 +602,6 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	struct VSNode			*node;
 	struct VSTagGroup		*tg;
 	struct VSTag			*tag;
-	struct VSUser			*user;
 	uint32 					node_id = UINT32(tag_destroy->data[0]);
 	uint16 					taggroup_id = UINT16(tag_destroy->data[UINT32_SIZE]);
 	uint16					tag_id = UINT16(tag_destroy->data[UINT32_SIZE + UINT16_SIZE]);
@@ -621,35 +615,34 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
 		return 0;
 	}
 
 	/* Is user owner of this node or can user write to this node? */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)vsession->user)->username,
+				node->id);
 		return 0;
 	}
 
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
 		return 0;
 	}
 
 	/* Try to find Tag */
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
 				__FUNCTION__, tag_id, taggroup_id, node_id);
 		return 0;
 	}
@@ -670,7 +663,6 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	struct VSNode				*node;
 	struct VSTagGroup			*tg;
 	struct VSTag				*tag;
-	struct VSUser				*user;
 	struct VSEntitySubscriber	*tg_subscriber;
 	uint32 						node_id;
 	uint16 						taggroup_id;
@@ -689,50 +681,52 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in NODE_CREATED state: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
 				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
 		return 0;
 	}
 
 	/* Is user owner of this node or can user write to this node? */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)vsession->user)->username,
+				node->id);
 		return 0;
 	}
 
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
 		return 0;
 	}
 
 	/* Try to find Tag */
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
 				__FUNCTION__, tag_id, taggroup_id, node_id);
 		return 0;
 	}
 
 	/* Data type has to match */
 	if(data_type != tag->data_type) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() data type (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
-						__FUNCTION__, tag->data_type, tag_id, taggroup_id, node_id, data_type);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() data type (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
+				__FUNCTION__, tag->data_type, tag_id,
+				taggroup_id, node_id, data_type);
 		return 0;
 	}
 
 	/* Count of values has to match */
 	if(count != tag->count) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() count of values (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
-						__FUNCTION__, tag->count, tag_id, taggroup_id, node_id, count);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() count of values (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
+				__FUNCTION__, tag->count, tag_id, taggroup_id, node_id, count);
 		return 0;
 	}
 

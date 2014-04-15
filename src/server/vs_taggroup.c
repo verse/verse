@@ -85,7 +85,8 @@ int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 	taggroup_follower = tg->tg_folls.first;
 	while(taggroup_follower!=NULL) {
 		if(taggroup_follower->node_sub->session->session_id == vsession->session_id ) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Client already knows about this TagGroup: %d\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Client already knows about this TagGroup: %d\n",
 					tg->id);
 			return 0;
 		}
@@ -139,11 +140,13 @@ int vs_taggroup_send_destroy(struct VSNode *node,
 				tg_follower->state = ENTITY_DELETING;
 				ret = 1;
 			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "TagGroup_Destroy (node_id: %d, taggroup_id: %d) wasn't added to the queue\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"TagGroup_Destroy (node_id: %d, taggroup_id: %d) wasn't added to the queue\n",
 						node->id, tg->id);
 			}
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "node_id: %d, taggroup_id: %d, tag_group is not in CREATED state (current state: %d)\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"node_id: %d, taggroup_id: %d, tag_group is not in CREATED state (current state: %d)\n",
 					node->id, tg->id, tg_follower->state);
 		}
 		tg_follower = tg_follower->next;
@@ -411,8 +414,11 @@ int vs_handle_taggroup_destroy_ack(struct VS_CTX *vs_ctx,
 	}
 
 	if( (tg = vs_taggroup_find(node, cmd_tg_destroy_ack->taggroup_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, cmd_tg_destroy_ack->taggroup_id, cmd_tg_destroy_ack->node_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag_group (id: %d) in node (id: %d) not found\n",
+				__FUNCTION__,
+				cmd_tg_destroy_ack->taggroup_id,
+				cmd_tg_destroy_ack->node_id);
 		return 0;
 	}
 
@@ -454,8 +460,11 @@ int vs_handle_taggroup_create_ack(struct VS_CTX *vs_ctx,
 	}
 
 	if( (tg = vs_taggroup_find(node, cmd_tg_create_ack->taggroup_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, cmd_tg_create_ack->taggroup_id, cmd_tg_create_ack->node_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag_group (id: %d) in node (id: %d) not found\n",
+				__FUNCTION__,
+				cmd_tg_create_ack->taggroup_id,
+				cmd_tg_create_ack->node_id);
 		return 0;
 	}
 
@@ -483,7 +492,8 @@ int vs_handle_taggroup_create_ack(struct VS_CTX *vs_ctx,
 								taggroup_destroy_cmd) == 1) {
 					tg_foll->state = ENTITY_DELETING;
 				} else {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "taggroup_destroy (node_id: %d, tg_id: %d) wasn't added to the queue\n",
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"taggroup_destroy (node_id: %d, tg_id: %d) wasn't added to the queue\n",
 							node->id, tg->id);
 				}
 			}
@@ -510,7 +520,6 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 {
 	struct VSNode			*node;
 	struct VSTagGroup		*tg;
-	struct VSUser			*user;
 	struct VBucket			*vbucket;
 	uint32 					node_id = UINT32(taggroup_create_cmd->data[0]);
 	uint16 					taggroup_id = UINT16(taggroup_create_cmd->data[UINT32_SIZE]);
@@ -541,24 +550,21 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	while(vbucket != NULL) {
 		tg = vbucket->data;
 		if(tg->type == type) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() taggroup type: %d is already used in node: %d\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() taggroup type: %d is already used in node: %d\n",
 					__FUNCTION__, type, node->id);
 			return 0;
 		}
 		vbucket = vbucket->next;
 	}
 
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
-		return 0;
-	}
-
 	/* Is user owner of this node or can user write to this node? */
 	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)vsession->user)->username,
+				node->id);
 		return 0;
 	}
 
@@ -598,7 +604,6 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 {
 	struct VSNode			*node;
 	struct VSTagGroup		*tg;
-	struct VSUser			*user;
 	uint32 					node_id = UINT32(taggroup_destroy_cmd->data[0]);
 	uint16 					taggroup_id = UINT16(taggroup_destroy_cmd->data[UINT32_SIZE]);
 
@@ -614,26 +619,23 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
-		return 0;
-	}
-
 	/* Is user owner of this node? */
 	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
 		/* Try to find TagGroup */
 		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() tag_group (id: %d) in node (id: %d) not found\n",
 					__FUNCTION__, taggroup_id, node_id);
 			return 0;
 		}
 
 		return vs_taggroup_send_destroy(node, tg);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__, user->username, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)vsession->user)->username,
+				node->id);
 	}
 
 	return 0;
@@ -647,7 +649,6 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		struct Generic_Cmd *taggroup_subscribe)
 {
 	struct VSNode				*node;
-	struct VSUser				*user;
 	uint32						node_id = UINT32(taggroup_subscribe->data[0]);
 	uint16						taggroup_id = UINT16(taggroup_subscribe->data[UINT32_SIZE]);
 
@@ -660,13 +661,6 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 
 	/* Node has to be created */
 	if( vs_node_is_created(node) != 1 ) {
-		return 0;
-	}
-
-	/* Try to find user */
-	if((user = vs_user_find(vs_ctx, vsession->user_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() vsession->user_id: %d not found\n",
-				__FUNCTION__, vsession->user_id);
 		return 0;
 	}
 
@@ -689,14 +683,16 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 
 		/* Client has to be subscribed to the node first */
 		if(node_subscriber == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): client has to be subscribed to the node: %d before subscribing to the tag_group: %d\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s(): client has to be subscribed to the node: %d before subscribing to the tag_group: %d\n",
 					__FUNCTION__, node_id, taggroup_id);
 			return 0;
 		}
 
 		/* Try to find TagGroup */
 		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() tag_group (id: %d) in node (id: %d) not found\n",
 					__FUNCTION__, taggroup_id, node_id);
 			return 0;
 		}
@@ -705,7 +701,8 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		tg_subscriber = tg->tg_subs.first;
 		while(tg_subscriber != NULL) {
 			if(tg_subscriber->node_sub->session->session_id == vsession->session_id) {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client already subscribed to the tag_group (id: %d) in node (id: %d)\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"%s() client already subscribed to the tag_group (id: %d) in node (id: %d)\n",
 						__FUNCTION__, taggroup_id, node_id);
 				return 0;
 			}
@@ -731,8 +728,11 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 
 		return 1;
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s doesn't have permissions to subscribe to taggroup: %d in node: %d\n",
-				__FUNCTION__, user->username, taggroup_id, node->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s doesn't have permissions to subscribe to taggroup: %d in node: %d\n",
+				__FUNCTION__,
+				((struct VSUser *)vsession->user)->username,
+				taggroup_id, node->id);
 		return 0;
 	}
 
