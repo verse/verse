@@ -35,14 +35,13 @@
 
 #include "v_common.h"
 
-
 /**
  * \brief This function tries to save current version of layer to the database
  *
  * TODO: use GridFS for storing large layers
  */
-static void vs_mongo_layer_save_version(bson *bson_layer,
-		struct VSLayer *layer,
+static void vs_mongo_layer_save_version(struct VSLayer *layer,
+		bson *bson_layer,
 		uint32 version)
 {
 	bson bson_version;
@@ -166,7 +165,7 @@ int vs_mongo_layer_update(struct VS_CTX *vs_ctx,
 		{
 			bson_init(&bson_version);
 			{
-				vs_mongo_layer_save_version(&bson_version, layer, UINT32_MAX);
+				vs_mongo_layer_save_version(layer, &bson_version, UINT32_MAX);
 			}
 			bson_finish(&bson_version);
 			bson_append_bson(&op, "versions", &bson_version);
@@ -215,7 +214,7 @@ int vs_mongo_layer_add_new(struct VS_CTX *vs_ctx,
 	bson_append_int(&bson_layer, "current_version", layer->version);
 
 	bson_append_start_object(&bson_layer, "versions");
-	vs_mongo_layer_save_version(&bson_layer, layer, UINT32_MAX);
+	vs_mongo_layer_save_version(layer, &bson_layer, UINT32_MAX);
 	bson_append_finish_object(&bson_layer);
 
 	bson_finish(&bson_layer);

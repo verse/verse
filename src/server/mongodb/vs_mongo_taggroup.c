@@ -39,8 +39,8 @@
 /**
  * \brief This function save current version o tag group to MongoDB
  */
-static void vs_mongo_taggroup_save_version(bson *bson_tg,
-		struct VSTagGroup *tg,
+static void vs_mongo_taggroup_save_version(struct VSTagGroup *tg,
+		bson *bson_tg,
 		uint32 version)
 {
 	bson bson_version;
@@ -167,7 +167,7 @@ int vs_mongo_taggroup_update(struct VS_CTX *vs_ctx,
 		{
 			bson_init(&bson_version);
 			{
-				vs_mongo_taggroup_save_version(&bson_version, tg, UINT32_MAX);
+				vs_mongo_taggroup_save_version(tg, &bson_version, UINT32_MAX);
 			}
 			bson_finish(&bson_version);
 			bson_append_bson(&op, "versions", &bson_version);
@@ -213,7 +213,7 @@ int vs_mongo_taggroup_add_new(struct VS_CTX *vs_ctx,
 	bson_append_int(&bson_tg, "current_version", tg->version);
 
 	bson_append_start_object(&bson_tg, "versions");
-	vs_mongo_taggroup_save_version(&bson_tg, tg, UINT32_MAX);
+	vs_mongo_taggroup_save_version(tg, &bson_tg, UINT32_MAX);
 	bson_append_finish_object(&bson_tg);
 
 	bson_finish(&bson_tg);

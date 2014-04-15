@@ -43,8 +43,8 @@
  * \brief This function writes new version of node to MongoDB
  */
 static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
-		bson *bson_node,
 		struct VSNode *node,
+		bson *bson_node,
 		uint32 version)
 {
 	VSNode *child_node;
@@ -146,7 +146,7 @@ int vs_mongo_node_add_new(struct VS_CTX *vs_ctx, struct VSNode *node)
 
 	/* Create object of versions and save first version */
 	bson_append_start_object(&bson_node, "versions");
-	vs_mongo_node_save_version(vs_ctx, &bson_node, node, UINT32_MAX);
+	vs_mongo_node_save_version(vs_ctx, node, &bson_node, UINT32_MAX);
 	bson_append_finish_object(&bson_node);
 
 	bson_finish(&bson_node);
@@ -228,7 +228,7 @@ int vs_mongo_node_update(struct VS_CTX *vs_ctx, struct VSNode *node)
 		{
 			bson_init(&bson_version);
 			{
-				vs_mongo_node_save_version(vs_ctx, &bson_version, node, UINT32_MAX);
+				vs_mongo_node_save_version(vs_ctx, node, &bson_version, UINT32_MAX);
 			}
 			bson_finish(&bson_version);
 			bson_append_bson(&op, "versions", &bson_version);
