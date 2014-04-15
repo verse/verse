@@ -3,8 +3,8 @@ Verse 2.0
 [![Travis CI Build Status](https://travis-ci.org/verse/verse.png?branch=master)](https://travis-ci.org/verse/verse)
 [![Coverage Status](https://coveralls.io/repos/verse/verse/badge.png?branch=master)](https://coveralls.io/r/verse/verse?branch=master)
 
-Verse 2.0 is network protocol for real-time sharing of 3D data. It is successor of old Verse protocol developed at KTH.
-Verse 2.0 is still in alpha version.
+Verse 2.0 is network protocol for real-time sharing of 3D data. It is successor
+of old Verse protocol developed at KTH. Verse 2.0 is still in alpha version.
 
 License
 -------
@@ -82,7 +82,8 @@ Folders
   * ./api		source code of API
   * ./client	source code specific for Verse clients
   * ./common	source code shared with Verse server and Verse client
-  * ./server	source code specified for Verse server 
+  * ./server	source code specified for Verse server
+   * ./mongodb  source code used for saving and loading data from MongoDB 
  * ./unittests	contains source code of unit tests
 
 Installation
@@ -121,6 +122,16 @@ module "verse.so" :
 Then it is possible to run this client:
 
     $ python3 verse_client.py
+
+MongoDB
+-------
+
+It is possible to use Verse server without support of MongoDB, but all data
+are stored only in memory and when server is stopped, then all data are lost.
+For production purpose it is recommended to configure using MongoDB in
+server.ini file. Implementation of MongoDB is currently limited, because Verse
+server load all data to memory during start and saves all data to MongoDB, when
+server is stopped.
 
 Firewalls
 ---------
@@ -164,7 +175,8 @@ very similar:
 Verification
 ------------
 
-For more details go to the directory ./promela.
+Main parts of Verse protocol were verified using Promela programming language
+and tool called Spin. For more details go to the directory ./promela.
 
 Testing
 -------
