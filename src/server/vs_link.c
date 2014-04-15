@@ -70,6 +70,28 @@ int vs_link_test_nodes(struct VSNode *parent, struct VSNode *child)
 }
 
 /**
+ * \brief This function recursively updates properties in all child node
+ */
+static void vs_link_update_child(struct VSNode *parent_node,
+		struct VSNode *child_node)
+{
+	struct VSNode *node;
+	struct VSLink *link;
+
+	/* Update properties of child node */
+	child_node->level = parent_node->level + 1;
+	child_node->flags = parent_node->flags;
+
+	link = parent_node->children_links.first;
+
+	while(link != NULL) {
+		node = link->child;
+		vs_link_update_child(child_node, node);
+		link = link->next;
+	}
+}
+
+/**
  * \brief This function tries to create link between parent and child. This
  * function does not check, if child had permission to be linked with parent
  * node. It has to be checked before this link. If link is successfully created,
@@ -90,6 +112,8 @@ struct VSLink *vs_link_create(struct VSNode *parent, struct VSNode *child)
 		v_list_add_tail(&parent->children_links, link);
 		child->parent_link = link;
 		child->level = parent->level + 1;
+		vs_node_inc_version(parent);
+		vs_node_inc_version(child);
 	} else {
 		v_print_log(VRS_PRINT_WARNING,
 				"Could not create link between %d and %d, not enough memory\n",
@@ -215,6 +239,14 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	/* Add link to new parent node */
 	v_list_add_tail(&parent_node->children_links, link);
 	link->parent = parent_node;
+
+	/* Update child node internal properties according new parent node */
+	vs_link_update_child(parent_node, child_node);
+
+	/* Update version in child node, parent node and old parent node */
+	vs_node_inc_version(parent_node);
+	vs_node_inc_version(child_node);
+	vs_node_inc_version(old_parent_node);
 
 	/* Subscribers of old and new parent node will receive information about
 	 * changing link between nodes. Prevent double sending command Node_Link,

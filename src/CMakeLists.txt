@@ -66,7 +66,8 @@ set (libverse_src
 		client/vc_tcp_connect.c
 		client/vc_main.c)
 
-# Source code for verse server		
+# Basic source code for verse server (other files with source code can be
+# enabled, when verse server is compiled with support of additional libraries)		
 set (server_src
 		server/vs_user.c
 		server/vs_udp_connect.c
@@ -119,7 +120,7 @@ endif (OPENSSL_FOUND)
 if (CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_C_FLAGS "-D_REETRANT -Wall -Wextra -pedantic -Wno-long-long")
 	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0 --coverage")
+   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
 	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
 	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3 -fno-strict-aliasing")
 	endif ()
@@ -153,6 +154,18 @@ if (INIPARSER_FOUND)
     include_directories (${INIPARSER_INCLUDE_DIRS})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INIPARSER")
 endif (INIPARSER_FOUND)
+
+
+# When MongoDB is enabled
+if (MongoDB_FOUND)
+    set (verse_server_libs ${verse_server_libs} ${MongoDB_LIBRARIES})
+    set (server_src ${server_src} server/mongodb/vs_mongo_main.c
+            server/mongodb/vs_mongo_node.c
+            server/mongodb/vs_mongo_taggroup.c
+            server/mongodb/vs_mongo_layer.c)
+    include_directories (${MongoDB_INCLUDE_DIR})
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_MONGODB")
+endif (MongoDB_FOUND)
 
 
 # Set up verse server executable

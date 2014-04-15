@@ -36,7 +36,7 @@
 
 #define RESERVED_LAYER_ID			0xFFFF	/* This ID sends client in LayerCreate command */
 
-#define MAX_LAYERS_COUNT			65534	/* Max number of layer that could be stored insided one node */
+#define MAX_LAYERS_COUNT			65534	/* Max number of layer that could be stored inside one node */
 
 /**
  * \brief The structure storing own value(s)
@@ -63,7 +63,16 @@ typedef struct VSLayer {
 	struct VListBase		layer_folls;	/**< The list of clients that know about this layer */
 	struct VListBase		layer_subs;		/**< The list of clients that are subscribed to this layer */
 	uint8					state;			/**< The layer state */
+	/* Versing */
+	uint32					version;		/**< Current version of layer */
+	uint32					saved_version;	/**< last saved version of layer */
+	uint32					crc32;			/**< CRC32 of current layer version */
+#ifdef WITH_MONGODB
+	bson_oid_t				oid;
+#endif
 } VSLayer;
+
+void vs_layer_inc_version(struct VSLayer *layer);
 
 int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node,

@@ -32,6 +32,11 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#ifdef WITH_MONGODB
+#define MONGO_HAVE_STDINT 1
+#include <mongo.h>
+#endif
+
 #include "verse_types.h"
 
 #include "vs_user.h"
@@ -155,6 +160,17 @@ typedef struct VS_CTX {
 	/* WebSocket thread */
 	pthread_t			websocket_thread;			/* WebSocket thread */
 	pthread_attr_t		websocket_thread_attr;		/* The attribute of WebSocket thread*/
+#ifdef WITH_MONGODB
+	mongo				*mongo_conn;				/* Connection to MongoDB server */
+	char				*mongodb_server;			/* Hostname of MongoDB server */
+	unsigned short		mongodb_port;				/* Port of MongoDB server is listening on */
+	char				*mongodb_db_name;			/* Name of MongoDB database */
+	char				*mongodb_user;				/* Username used for authentication to mongodb */
+	char				*mongodb_pass;				/* Password used for authentication to mongodb */
+	char				*mongo_node_ns;				/* Namespace used for saving nodes */
+	char				*mongo_tg_ns;				/* Namespace used for saving tag groups */
+	char				*mongo_layer_ns;			/* Namesapce used for saving layers */
+#endif
 } VS_CTX;
 
 #endif

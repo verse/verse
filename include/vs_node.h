@@ -33,6 +33,8 @@
 #include "vs_user.h"
 #include "vs_entity.h"
 
+#define VS_NODE_SAVEABLE	1	/* This flag specify that node should be saved */
+
 typedef struct VSNodeLock {
 	struct VSession			*session;
 	struct timeval			tv;
@@ -77,9 +79,14 @@ typedef struct VSNode {
 	/* Internal staff */
 	uint32					level;			/* Level in the node tree */
 	uint8					state;			/* Node state */
+	uint8					flags;
+	/* Versing */
+	uint32					version;		/* Current version of node */
+	uint32					saved_version;	/* Last saved version of node */
+	uint32					crc32;			/* CRC32 of node (not supported yet) */
 } VSNode;
 
-struct VSNode *vs_node_create(struct VS_CTX *vs_ctx,
+struct VSNode *vs_node_create_linked(struct VS_CTX *vs_ctx,
 		struct VSNode *parent_node,
 		struct VSUser *owner,
 		uint32 node_id,
@@ -96,6 +103,8 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct Generic_Cmd *node_prio);
+
+void vs_node_inc_version(struct VSNode *node);
 
 int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,

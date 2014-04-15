@@ -33,8 +33,6 @@
 #define FIRST_TAGGROUP_ID		0
 #define LAST_TAGGROUP_ID		65534	/* 2^16 - 2 */
 
-#define VRS_RESERVED_TAGGROUP_ID	0xFFFF	/* This ID sends client in TagGroupCreate command */
-
 #define MAX_TAGGROUPS_COUNT		65534	/* Maximal number of tag groups in one node */
 
 /**
@@ -47,12 +45,20 @@ typedef struct VSTagGroup {
 	struct VHashArrayBase	tags;
 	uint16					last_tag_id;	/* Last used tag id */
 	/* Subscribing */
-	struct VListBase		tg_folls;		/* List of clients that know about this taggroup */
-	struct VListBase		tg_subs;		/* List of clients that are subscribed to this taggroup */
+	struct VListBase		tg_folls;		/* List of clients that know about this tag group */
+	struct VListBase		tg_subs;		/* List of clients that are subscribed to this tag group */
 	/* Internal stuff */
 	uint8					state;
+	/* Versing */
+	uint32					version;
+	uint32					saved_version;
+	uint32					crc32;
+#ifdef WITH_MONGODB
+	bson_oid_t				oid;
+#endif
 } VSTagGroup;
 
+void vs_taggroup_inc_version(struct VSTagGroup *tg);
 
 struct VSTagGroup *vs_taggroup_find(struct VSNode *node,
 		uint16 taggroup_id);
@@ -64,6 +70,7 @@ int vs_taggroup_send_destroy(struct VSNode *node,
 		struct VSTagGroup *tg);
 
 struct VSTagGroup *vs_taggroup_create(struct VSNode *node,
+		uint16 tg_id,
 		uint16 custom_type);
 int vs_taggroup_destroy(struct VSNode *node,
 		struct VSTagGroup *tg);

@@ -22,24 +22,20 @@
  *
  */
 
-#ifndef VS_SYS_NODES_H_
-#define VS_SYS_NODES_H_
+#ifndef VS_MONGO_LAYER_H_
+#define VS_MONGO_LAYER_H_
 
-struct VSNode *vs_node_create_scene_parent(struct VS_CTX *vs_ctx);
+struct VS_CTX;
+struct VSNode;
+struct VSLayer;
 
-int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
-		struct VSession *session);
+int vs_mongo_layer_save(struct VS_CTX *vs_ctx,
+		struct VSNode *node,
+		struct VSLayer *layer);
 
-int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
-		struct VSession *session);
+struct VSLayer *vs_mongo_layer_load(struct VS_CTX *vs_ctx,
+		struct VSNode *node,
+		uint16 layer_id,
+		uint32 version);
 
-long int vs_create_avatar_node(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
-		uint16 user_id);
-
-struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
-		struct VSUser *user);
-
-int vs_nodes_init(struct VS_CTX *vs_ctx);
-
-#endif /* VS_SYS_NODES_H_ */
+#endif /* VS_MONGO_LAYER_H_ */

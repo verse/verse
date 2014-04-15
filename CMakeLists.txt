@@ -32,6 +32,7 @@ option(VERSE_CHECK "Check Unit Tests" ON)
 option(VERSE_DOXYGEN "Doxygen Documentation" ON)
 option(VERSE_WEBSOCKET "Support for WebSocket" ON)
 option(VERSE_INIPARSER "Iniparser library" ON)
+option(VERSE_MONGODB "MongoDB" ON)
 
 # Clang compiler
 if (VERSE_CLANG)
@@ -156,6 +157,15 @@ if(VERSE_WEBSOCKET)
 endif(VERSE_WEBSOCKET)
 
 
+# Support for MongoDB
+if(VERSE_MONGODB)
+
+    # Try to fing optional package
+    find_package(MongoDB)
+    
+endif(VERSE_MONGODB)
+
+
 # Doxygen
 if (VERSE_DOXYGEN)
 
@@ -276,6 +286,12 @@ if (WSLAY_FOUND AND OPENSSL_FOUND)
 else ()
 	message (" * WebSocket:     OFF")
 endif ()
+
+if (MongoDB_FOUND)
+    message (" * MongoDB:       ON")
+else()
+    message (" * MongoDB:       OFF")
+endif()
 
 if (DOXYGEN_FOUND)
 	message (" * Doxygen:       ON")

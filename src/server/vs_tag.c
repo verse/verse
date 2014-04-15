@@ -163,11 +163,60 @@ static void vs_tag_init(struct VSTag *tag)
 	tag->state = ENTITY_RESERVED;
 }
 
+/**
+ * \brief This function tries to set data in tag
+ */
+void vs_tag_set_values(struct VSTag *tag, uint8 count, uint8 index, void *data)
+{
+	/* Set value in tag */
+	switch(tag->data_type) {
+	case VRS_VALUE_TYPE_UINT8:
+		memcpy(&((uint8*)tag->value)[index], data, UINT8_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_UINT16:
+		memcpy(&((uint16*)tag->value)[index], data, UINT16_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_UINT32:
+		memcpy(&((uint32*)tag->value)[index], data, UINT32_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_UINT64:
+		memcpy(&((uint64*)tag->value)[index], data, UINT64_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_REAL16:
+		memcpy(&((real16*)tag->value)[index], data, REAL16_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_REAL32:
+		memcpy(&((real32*)tag->value)[index], data, REAL32_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_REAL64:
+		memcpy(&((real64*)tag->value)[index], data, REAL64_SIZE*count);
+		break;
+	case VRS_VALUE_TYPE_STRING8:
+		if(tag->value == NULL) {
+			tag->value = strdup((char*)data);
+		} else {
+			size_t new_str_len = strlen((char*)data);
+			size_t old_str_len = strlen((char*)tag->value);
+			/* Rewrite old string */
+			if(new_str_len == old_str_len) {
+				strcpy((char*)tag->value, (char*)data);
+			} else {
+				tag->value = (char*)realloc(tag->value, new_str_len*sizeof(char));
+				strcpy((char*)tag->value, (char*)data);
+			}
+		}
+		break;
+	default:
+		assert(0);
+		break;
+	}
+}
 
 /**
  * \brief This function creates new Verse Tag
  */
 struct VSTag *vs_tag_create(struct VSTagGroup *tg,
+		uint16 tag_id,
 		uint8 data_type,
 		uint8 count,
 		uint16 custom_type)
@@ -184,16 +233,20 @@ struct VSTag *vs_tag_create(struct VSTagGroup *tg,
 	/* Initialize new tag */
 	vs_tag_init(tag);
 
-	/* Try to find first free id for tag */
-	tag->id = tg->last_tag_id;
-	while( v_hash_array_find_item(&tg->tags, tag) != NULL ) {
-		tag->id++;
+	if(tag_id == RESERVED_TAG_ID) {
+		/* Try to find first free id for tag */
+		tag->id = tg->last_tag_id;
+		while( v_hash_array_find_item(&tg->tags, tag) != NULL ) {
+			tag->id++;
 
-		if(tag->id > LAST_TAG_ID) {
-			tag->id = FIRST_TAG_ID;
+			if(tag->id > LAST_TAG_ID) {
+				tag->id = FIRST_TAG_ID;
+			}
+
+			/* TODO: previous code could be more effective */
 		}
-
-		/* TODO: this could be more effective */
+	} else {
+		tag->id = tag_id;
 	}
 	tg->last_tag_id = tag->id;
 
@@ -244,6 +297,8 @@ struct VSTag *vs_tag_create(struct VSTagGroup *tg,
 			break;
 	}
 
+	vs_taggroup_inc_version(tg);
+
 	return tag;
 }
 
@@ -267,6 +322,8 @@ int vs_tag_destroy(struct VSTagGroup *tg, struct VSTag *tag)
 		v_hash_array_remove_item(&tg->tags, tag);
 
 		free(tag);
+
+		vs_taggroup_inc_version(tg);
 
 		return 1;
 	} else {
@@ -464,7 +521,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Try to create new tag */
-	tag = vs_tag_create(tg, data_type, count, type);
+	tag = vs_tag_create(tg, RESERVED_TAG_ID, data_type, count, type);
 	if(tag == NULL) {
 		return 0;
 	}
@@ -724,6 +781,8 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 
 	/* Set this tag as initialized, because value of this tag was set. */
 	tag->flag = TAG_INITIALIZED;
+
+	vs_taggroup_inc_version(tg);
 
 	/* Send this tag to all client subscribed to the TagGroup */
 	tg_subscriber = tg->tg_subs.first;

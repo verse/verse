@@ -22,24 +22,17 @@
  *
  */
 
-#ifndef VS_SYS_NODES_H_
-#define VS_SYS_NODES_H_
+#ifndef VS_MONGO_H_
+#define VS_MONGO_H_
 
-struct VSNode *vs_node_create_scene_parent(struct VS_CTX *vs_ctx);
+#define MONGO_HAVE_STDINT 1
 
-int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
-		struct VSession *session);
+struct VS_CTX;
 
-int vs_node_free_avatar_reference(struct VS_CTX *vs_ctx,
-		struct VSession *session);
+int vs_mongo_context_save(struct VS_CTX *vs_ctx);
+int vs_mongo_context_load(struct VS_CTX *vs_ctx);
 
-long int vs_create_avatar_node(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
-		uint16 user_id);
+int vs_mongo_conn_init(struct VS_CTX *vs_ctx);
+void vs_mongo_conn_destroy(struct VS_CTX *vs_ctx);
 
-struct VSNode *vs_create_user_node(struct VS_CTX *vs_ctx,
-		struct VSUser *user);
-
-int vs_nodes_init(struct VS_CTX *vs_ctx);
-
-#endif /* VS_SYS_NODES_H_ */
+#endif /* VS_MONGO_H_ */

@@ -41,7 +41,11 @@
 #include "vs_sys_nodes.h"
 #include "vs_user.h"
 
-#if WITH_INIPARSER
+#ifdef WITH_MONGODB
+#include "vs_mongo_main.h"
+#endif
+
+#ifdef WITH_INIPARSER
 #include "vs_config.h"
 #endif
 
@@ -139,6 +143,8 @@ static void *vs_server_cli(void *arg)
 static void vs_init(struct VS_CTX *vs_ctx)
 {
 	int i;
+	char *hostname;
+
 	vs_ctx->max_connection_attempts = 10;
 	vs_ctx->vsessions = NULL;
 	vs_ctx->max_sessions = 10;
@@ -181,7 +187,17 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->ca_cert_file = NULL;
 	vs_ctx->public_cert_file = strdup("./pki/certificate.pem");
 
-	vs_ctx->hostname = strdup("localhost");
+	hostname = getenv("HOSTNAME");
+	if(hostname != NULL) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Server using hostname: %s\n", hostname);
+		vs_ctx->hostname = strdup(hostname);
+	} else {
+		v_print_log(VRS_PRINT_WARNING,
+				"Server does not have set hostname, using: localhost\n");
+		vs_ctx->hostname = strdup("localhost");
+	}
+
 	vs_ctx->ded = strdup("http://uni-verse.org/verse.ded");
 
 	vs_ctx->auth_type = AUTH_METHOD_CSV_FILE;
@@ -215,6 +231,18 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->data.avatar_node = NULL;
 
 	vs_ctx->data.sem = NULL;
+
+#if WITH_MONGODB
+	vs_ctx->mongo_conn = NULL;
+	vs_ctx->mongodb_server = NULL;
+	vs_ctx->mongodb_port = 0;
+	vs_ctx->mongodb_db_name = NULL;
+	vs_ctx->mongodb_user = NULL;
+	vs_ctx->mongodb_pass = NULL;
+	vs_ctx->mongo_node_ns = NULL;
+	vs_ctx->mongo_tg_ns = NULL;
+	vs_ctx->mongo_layer_ns = NULL;
+#endif
 }
 
 /**
@@ -349,6 +377,43 @@ static void vs_destroy_ctx(struct VS_CTX *vs_ctx)
 
 #ifdef WITH_OPENSSL
 	vs_destroy_stream_ctx(vs_ctx);
+#endif
+
+#ifdef WITH_MONGODB
+	if(vs_ctx->mongodb_server != NULL) {
+		free(vs_ctx->mongodb_server);
+		vs_ctx->mongodb_server = NULL;
+	}
+
+	if(vs_ctx->mongodb_db_name != NULL) {
+		free(vs_ctx->mongodb_db_name);
+		vs_ctx->mongodb_db_name = NULL;
+	}
+
+	if(vs_ctx->mongodb_user != NULL) {
+		free(vs_ctx->mongodb_user);
+		vs_ctx->mongodb_user = NULL;
+	}
+
+	if(vs_ctx->mongodb_pass != NULL) {
+		free(vs_ctx->mongodb_pass);
+		vs_ctx->mongodb_pass = NULL;
+	}
+
+	if(vs_ctx->mongo_node_ns != NULL) {
+		free(vs_ctx->mongo_node_ns);
+		vs_ctx->mongo_node_ns = NULL;
+	}
+
+	if(vs_ctx->mongo_tg_ns != NULL) {
+		free(vs_ctx->mongo_tg_ns);
+		vs_ctx->mongo_tg_ns = NULL;
+	}
+
+	if(vs_ctx->mongo_layer_ns != NULL) {
+		free(vs_ctx->mongo_layer_ns);
+		vs_ctx->mongo_layer_ns = NULL;
+	}
 #endif
 }
 
@@ -523,6 +588,18 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+#ifdef WITH_MONGODB
+	/* Try to connect to MongoDB server */
+	if(vs_ctx.mongodb_server != NULL) {
+		vs_mongo_conn_init(&vs_ctx);
+		/* When connection to MongoDB server was successful, then try to load
+		 * nodes, tag groups and layers from database */
+		if(vs_ctx.mongo_conn != NULL) {
+			vs_mongo_context_load(&vs_ctx);
+		}
+	}
+#endif
+
 	if(vs_ctx.stream_protocol == TCP) {
 		/* Initialize Verse server context */
 		if(vs_init_stream_ctx(&vs_ctx) == -1) {
@@ -603,6 +680,14 @@ int main(int argc, char *argv[])
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
 	}
+
+#ifdef WITH_MONGODB
+	/* Try to save data and disconnect from MongoDB server */
+	if(vs_ctx.mongo_conn != NULL) {
+		vs_mongo_context_save(&vs_ctx);
+		vs_mongo_conn_destroy(&vs_ctx);
+	}
+#endif
 
 	/* Free Verse server context */
 	vs_destroy_ctx(&vs_ctx);
