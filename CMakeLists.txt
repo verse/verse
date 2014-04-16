@@ -186,7 +186,8 @@ endif (VERSE_DOXYGEN)
 
 
 # Set up required subdirectories
-add_subdirectory (src)
+add_subdirectory (src/lib)
+add_subdirectory (src/server)
 add_subdirectory (example)
 
 

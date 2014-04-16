@@ -66,26 +66,7 @@ set (libverse_src
 		client/vc_tcp_connect.c
 		client/vc_main.c)
 
-# Basic source code for verse server (other files with source code can be
-# enabled, when verse server is compiled with support of additional libraries)		
-set (server_src
-		server/vs_user.c
-		server/vs_udp_connect.c
-		server/vs_tcp_connect.c
-		server/vs_taggroup.c
-		server/vs_tag.c
-		server/vs_node.c
-		server/vs_node_access.c
-		server/vs_sys_nodes.c
-		server/vs_main.c
-		server/vs_link.c
-		server/vs_layer.c
-		server/vs_data.c
-		server/vs_auth_csv.c
-		server/vs_handshake.c)
-
-
-include_directories (../include)
+include_directories (../../include)
 
 
 # Make build flags compiler specific for libverse.so
@@ -115,71 +96,6 @@ if (OPENSSL_FOUND)
 	target_link_libraries (verse_shared_lib ${OPENSSL_LIBRARIES} )
 endif (OPENSSL_FOUND)
 
-
-# Make build flags compiler specific for verse_server
-if (CMAKE_COMPILER_IS_GNUCC)
-    set (CMAKE_C_FLAGS "-D_REETRANT -Wall -Wextra -pedantic -Wno-long-long")
-	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-   	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ggdb -O0")
-	elseif( CMAKE_BUILD_TYPE STREQUAL "Release" )
-	    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG -O3 -fno-strict-aliasing")
-	endif ()
-endif (CMAKE_COMPILER_IS_GNUCC)
-
-
-# Basic libraries used by verse_server
-set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
-
-
-# When OpenSSL is enabled
-if (OPENSSL_FOUND)
-    set (verse_server_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
-endif (OPENSSL_FOUND)
-
-
-# When WSLay library is enabled
-if (WSLAY_FOUND AND OPENSSL_FOUND)
-    set (verse_server_libs ${verse_server_libs} ${WSLAY_LIBRARIES})
-    set (server_src ${server_src} server/vs_websocket.c)
-    include_directories (${WSLAY_INCLUDE_DIR})
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWSLAY")
-endif ()
-
-
-# When iniparser is used
-if (INIPARSER_FOUND)
-    set (verse_server_libs ${verse_server_libs} ${INIPARSER_LIBRARIES})
-    set (server_src ${server_src}  server/vs_config.c)
-    include_directories (${INIPARSER_INCLUDE_DIRS})
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_INIPARSER")
-endif (INIPARSER_FOUND)
-
-
-# When MongoDB is enabled
-if (MongoDB_FOUND)
-    set (verse_server_libs ${verse_server_libs} ${MongoDB_LIBRARIES})
-    set (server_src ${server_src} server/mongodb/vs_mongo_main.c
-            server/mongodb/vs_mongo_node.c
-            server/mongodb/vs_mongo_taggroup.c
-            server/mongodb/vs_mongo_layer.c)
-    include_directories (${MongoDB_INCLUDE_DIR})
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_MONGODB")
-endif (MongoDB_FOUND)
-
-
-# Set up verse server executable
-add_executable (verse_server ${server_src})
-add_dependencies (verse_server verse_shared_lib)
-target_link_libraries (verse_server
-	verse_shared_lib
-	${verse_server_libs} )
-
-
-# The rule to install Verse server
-install (TARGETS verse_server
-	RUNTIME
-	DESTINATION bin)
 
 # The rule to install shared library used by Verse server and Verse clients
 install (TARGETS verse_shared_lib
