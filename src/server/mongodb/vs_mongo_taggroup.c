@@ -284,7 +284,7 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 	struct VSTagGroup *tg = NULL;
 	bson query;
 	mongo_cursor cursor;
-	uint32 node_id, tg_id, found = 0, current_version, custom_type;
+	uint32 node_id = 0, tg_id = 0, found = 0, current_version = 0, custom_type = 0;
 	bson_iterator tg_data_iter;
 	const bson *bson_tg;
 
@@ -366,7 +366,7 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 						bson bson_tag;
 						bson_iterator tags_iter, tag_iter;
 						const char *key, *str_value;
-						int tag_id, data_type, count, tag_custom_type;
+						int tag_id, data_type = 0, count = 0, tag_custom_type = 0;
 
 						bson_iterator_subiterator(&version_data_iter, &tags_iter);
 
