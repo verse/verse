@@ -262,6 +262,131 @@ int vs_mongo_taggroup_save(struct VS_CTX *vs_ctx,
 }
 
 /**
+ * \brief This function tries to load tag from MongoDB
+ */
+static void vs_mongo_tag_load_data(struct VSTag *tag,
+		bson *bson_tag)
+{
+	bson_iterator tag_iter;
+
+	if( bson_find(&tag_iter, bson_tag, "data") == BSON_ARRAY) {
+		bson_iterator data_iter;
+		uint8 val_uint8;
+		uint16 val_uint16;
+		uint32 val_uint32;
+		uint64 val_uint64;
+		real32 val_real32;
+		real64 val_real64;
+		const char *str_value;
+		int value_index = 0;
+
+		bson_iterator_subiterator(&tag_iter, &data_iter);
+
+		/* Go through all values */
+		switch(tag->data_type) {
+		case VRS_VALUE_TYPE_UINT8:
+			while( bson_iterator_next(&data_iter) == BSON_INT ) {
+				val_uint8 = (uint8)bson_iterator_int(&data_iter);
+				vs_tag_set_values(tag, 1, value_index, &val_uint8);
+				value_index++;
+			}
+			break;
+		case VRS_VALUE_TYPE_UINT16:
+			while( bson_iterator_next(&data_iter) == BSON_INT ) {
+				val_uint16 = (uint16)bson_iterator_int(&data_iter);
+				vs_tag_set_values(tag, 1, value_index, &val_uint16);
+				value_index++;
+			}
+			break;
+		case VRS_VALUE_TYPE_UINT32:
+			while( bson_iterator_next(&data_iter) == BSON_INT ) {
+				val_uint32 = (uint32)bson_iterator_int(&data_iter);
+				vs_tag_set_values(tag, 1, value_index, &val_uint32);
+				value_index++;
+			}
+			break;
+		case VRS_VALUE_TYPE_UINT64:
+			while( bson_iterator_next(&data_iter) == BSON_LONG ) {
+				val_uint64 = (uint64)bson_iterator_long(&data_iter);
+				vs_tag_set_values(tag, 1, value_index, &val_uint64);
+				value_index++;
+			}
+			break;
+		case VRS_VALUE_TYPE_REAL16:
+			/* TODO: add support for float16 */
+			break;
+		case VRS_VALUE_TYPE_REAL32:
+			while( bson_iterator_next(&data_iter) == BSON_DOUBLE ) {
+				val_real32 = (real32)bson_iterator_double(&data_iter);
+				vs_tag_set_values(tag, 1, value_index, &val_real32);
+				value_index++;
+			}
+			break;
+		case VRS_VALUE_TYPE_REAL64:
+			while( bson_iterator_next(&data_iter) == BSON_DOUBLE ) {
+				val_real64 = (real64)bson_iterator_double(&data_iter);
+				vs_tag_set_values(tag, 1, value_index, &val_real64);
+				value_index++;
+			}
+			break;
+		case VRS_VALUE_TYPE_STRING8:
+			str_value = bson_iterator_string(&data_iter);
+			strcpy(tag->value, str_value);
+			break;
+		}
+	}
+}
+
+/**
+ * \brief This function tries to load tag group data from MongoDB
+ */
+static void vs_mongo_taggroup_load_data(struct VSTagGroup *tg,
+		bson *bson_version)
+{
+	bson_iterator version_data_iter;
+
+	/* Try to get tags of tag group */
+	if( bson_find(&version_data_iter, bson_version, "tags") == BSON_OBJECT ) {
+		struct VSTag *tag;
+		bson bson_tag;
+		bson_iterator tags_iter, tag_iter;
+		const char *key;
+		int tag_id, data_type = -1, count = -1, tag_custom_type = -1;
+
+		bson_iterator_subiterator(&version_data_iter, &tags_iter);
+
+		while( bson_iterator_next(&tags_iter) == BSON_OBJECT ) {
+			key = bson_iterator_key(&tags_iter);
+			bson_iterator_subobject_init(&tags_iter, &bson_tag, 0);
+
+			sscanf(key, "%d", &tag_id);
+
+			if( bson_find(&tag_iter, &bson_tag, "data_type") == BSON_INT) {
+				data_type = bson_iterator_int(&tag_iter);
+			}
+
+			if( bson_find(&tag_iter, &bson_tag, "count") == BSON_INT) {
+				count = bson_iterator_int(&tag_iter);
+			}
+
+			if( bson_find(&tag_iter, &bson_tag, "custom_type") == BSON_INT) {
+				tag_custom_type = bson_iterator_int(&tag_iter);
+			}
+
+			if(data_type != -1 && count != -1 && tag_custom_type != -1) {
+				/* Create tag with specific ID */
+				tag = vs_tag_create(tg, tag_id, data_type, count, tag_custom_type);
+				tag->state = ENTITY_CREATED;
+
+				vs_mongo_tag_load_data(tag, &bson_tag);
+
+				tag->flag = TAG_INITIALIZED;
+			}
+		}
+	}
+}
+
+/**
  * \brief This function tries to load tag group from MongoDB
  *
  * \param[in] *vs_ctx		The verse server context
@@ -284,7 +409,8 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 	struct VSTagGroup *tg = NULL;
 	bson query;
 	mongo_cursor cursor;
-	uint32 node_id = 0, tg_id = 0, found = 0, current_version = 0, custom_type = 0;
+	uint32 node_id = -1, tg_id = -1, current_version = -1, custom_type = -1;
+	int found = 0;
 	bson_iterator tg_data_iter;
 	const bson *bson_tg;
 
@@ -331,135 +457,37 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 		}
 
 		/* Create tag group with specific ID */
-		tg = vs_taggroup_create(node, taggroup_id, custom_type);
+		if((int)current_version != -1 && (int)custom_type != -1) {
+			tg = vs_taggroup_create(node, taggroup_id, custom_type);
 
-		tg->state = ENTITY_CREATED;
+			tg->state = ENTITY_CREATED;
 
-		/* Save ObjectID to tag group */
-		memcpy(&tg->oid, oid, sizeof(bson_oid_t));
+			/* Save ObjectID to tag group */
+			memcpy(&tg->oid, oid, sizeof(bson_oid_t));
 
-		if(tg != NULL) {
-			/* Try to get versions of tag group */
-			if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
-				bson bson_versions;
-				bson_iterator version_iter;
-				char str_num[15];
+			if(tg != NULL) {
+				/* Try to get versions of tag group */
+				if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
+					bson bson_versions;
+					bson_iterator version_iter;
+					char str_num[15];
 
-				/* Initialize sub-object of versions */
-				bson_iterator_subobject_init(&tg_data_iter, &bson_versions, 0);
+					/* Initialize sub-object of versions */
+					bson_iterator_subobject_init(&tg_data_iter, &bson_versions, 0);
 
-				sprintf(str_num, "%u", req_version);
+					sprintf(str_num, "%u", req_version);
 
-				/* Try to find required version of tag group */
-				if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
-					bson bson_version;
-					bson_iterator version_data_iter;
+					/* Try to find required version of tag group */
+					if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
+						bson bson_version;
 
-					/* Set version of tag group */
-					tg->version = tg->saved_version = current_version;
+						/* Set version of tag group */
+						tg->version = tg->saved_version = current_version;
 
-					bson_iterator_subobject_init(&version_iter, &bson_version, 0);
+						bson_iterator_subobject_init(&version_iter, &bson_version, 0);
 
-					/* Try to get tags of tag group */
-					if( bson_find(&version_data_iter, &bson_version, "tags") == BSON_OBJECT ) {
-						struct VSTag *tag;
-						bson bson_tag;
-						bson_iterator tags_iter, tag_iter;
-						const char *key, *str_value;
-						int tag_id, data_type = 0, count = 0, tag_custom_type = 0;
-
-						bson_iterator_subiterator(&version_data_iter, &tags_iter);
-
-						while( bson_iterator_next(&tags_iter) == BSON_OBJECT ) {
-							key = bson_iterator_key(&tags_iter);
-							bson_iterator_subobject_init(&tags_iter, &bson_tag, 0);
-
-							sscanf(key, "%d", &tag_id);
-
-							if( bson_find(&tag_iter, &bson_tag, "data_type") == BSON_INT) {
-								data_type = bson_iterator_int(&tag_iter);
-							}
-
-							if( bson_find(&tag_iter, &bson_tag, "count") == BSON_INT) {
-								count = bson_iterator_int(&tag_iter);
-							}
-
-							if( bson_find(&tag_iter, &bson_tag, "custom_type") == BSON_INT) {
-								tag_custom_type = bson_iterator_int(&tag_iter);
-							}
-
-							/* Create tag with specific ID */
-							tag = vs_tag_create(tg, tag_id, data_type, count, tag_custom_type);
-							tag->state = ENTITY_CREATED;
-
-							if( bson_find(&tag_iter, &bson_tag, "data") == BSON_ARRAY) {
-								bson_iterator data_iter;
-								uint8 val_uint8;
-								uint16 val_uint16;
-								uint32 val_uint32;
-								uint64 val_uint64;
-								real32 val_real32;
-								real64 val_real64;
-								int value_index = 0;
-
-								bson_iterator_subiterator(&tag_iter, &data_iter);
-
-								/* Go through all values */
-								switch(data_type) {
-								case VRS_VALUE_TYPE_UINT8:
-									while( bson_iterator_next(&data_iter) == BSON_INT ) {
-										val_uint8 = (uint8)bson_iterator_int(&data_iter);
-										vs_tag_set_values(tag, 1, value_index, &val_uint8);
-										value_index++;
-									}
-									break;
-								case VRS_VALUE_TYPE_UINT16:
-									while( bson_iterator_next(&data_iter) == BSON_INT ) {
-										val_uint16 = (uint16)bson_iterator_int(&data_iter);
-										vs_tag_set_values(tag, 1, value_index, &val_uint16);
-										value_index++;
-									}
-									break;
-								case VRS_VALUE_TYPE_UINT32:
-									while( bson_iterator_next(&data_iter) == BSON_INT ) {
-										val_uint32 = (uint32)bson_iterator_int(&data_iter);
-										vs_tag_set_values(tag, 1, value_index, &val_uint32);
-										value_index++;
-									}
-									break;
-								case VRS_VALUE_TYPE_UINT64:
-									while( bson_iterator_next(&data_iter) == BSON_LONG ) {
-										val_uint64 = (uint64)bson_iterator_long(&data_iter);
-										vs_tag_set_values(tag, 1, value_index, &val_uint64);
-										value_index++;
-									}
-									break;
-								case VRS_VALUE_TYPE_REAL16:
-									/* TODO: add support for float16 */
-									break;
-								case VRS_VALUE_TYPE_REAL32:
-									while( bson_iterator_next(&data_iter) == BSON_DOUBLE ) {
-										val_real32 = (real32)bson_iterator_double(&data_iter);
-										vs_tag_set_values(tag, 1, value_index, &val_real32);
-										value_index++;
-									}
-									break;
-								case VRS_VALUE_TYPE_REAL64:
-									while( bson_iterator_next(&data_iter) == BSON_DOUBLE ) {
-										val_real64 = (real64)bson_iterator_double(&data_iter);
-										vs_tag_set_values(tag, 1, value_index, &val_real64);
-										value_index++;
-									}
-									break;
-								case VRS_VALUE_TYPE_STRING8:
-									str_value = bson_iterator_string(&data_iter);
-									strcpy(tag->value, str_value);
-									break;
-								}
-
-								tag->flag = TAG_INITIALIZED;
-							}
-						}
+						/* Try to load tags */
+						vs_mongo_taggroup_load_data(tg, &bson_version);
 					}
 				}
 			}
