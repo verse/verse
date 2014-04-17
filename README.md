@@ -70,22 +70,22 @@ If you want to build Verse with Clang, then you have to do more
 Folders
 -------
 
- * `./build`		is target directory for compiled binaries
- * `./config`		is directory with example of users.csv file
- * `./doc`			contains doxyfile for generated doxygen documentation
- * `./example`		contains source code of example Verse clients
- * `./include`		contains all .h files
- * `./pki`			contains example of certificate and private key
- * `./python`		contains source code for Python module implemented in C
- * `./promela`		contains Promela source code used for protocol verification
- * `./src`			contains source code
-  * `./lib`			source code for library (used by client as well by server)
-  * `./lib/api`		source code of API
-  * `./lib/client`	source code specific for Verse clients
-  * `./lib/common`	source code shared with Verse server and Verse client
-  * `./server`		source code specified for Verse server
-  * `./server/mongodb`	source code used for saving and loading data from MongoDB 
- * `./unittests`	contains source code of unit tests
+ * _./build_		is target directory for compiled binaries
+ * _./config_		is directory with example of users.csv file
+ * _./doc_			contains doxyfile for generated doxygen documentation
+ * _./example_		contains source code of example Verse clients
+ * _./include_		contains all .h files
+ * _./pki_			contains example of certificate and private key
+ * _./python_		contains source code for Python module implemented in C
+ * _./promela_		contains Promela source code used for protocol verification
+ * _./src_			contains source code
+  * _./lib_			source code for library (used by client as well by server)
+  * _./lib/api_		source code of API
+  * _./lib/client_	source code specific for Verse clients
+  * _./lib/common_	source code shared with Verse server and Verse client
+  * _./server_		source code specified for Verse server
+  * _./server/mongodb_	source code used for saving and loading data from MongoDB 
+ * _./unittests_	contains source code of unit tests
 
 Installation
 ------------
