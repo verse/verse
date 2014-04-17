@@ -79,11 +79,12 @@ Folders
  * ./python		contains source code for Python module implemented in C
  * ./promela	contains Promela source code used for protocol verification
  * ./src		contains source code
-  * ./api		source code of API
-  * ./client	source code specific for Verse clients
-  * ./common	source code shared with Verse server and Verse client
+  * ./lib		source code for library (used by client as well by server)
+   - ./api		source code of API
+   - ./client	source code specific for Verse clients
+   - ./common	source code shared with Verse server and Verse client
   * ./server	source code specified for Verse server
-   * ./mongodb  source code used for saving and loading data from MongoDB 
+   - ./mongodb  source code used for saving and loading data from MongoDB 
  * ./unittests	contains source code of unit tests
 
 Installation
