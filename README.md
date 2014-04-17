@@ -70,22 +70,22 @@ If you want to build Verse with Clang, then you have to do more
 Folders
 -------
 
- * ./build		is target directory for compiled binaries
- * ./config		is directory with example of users.csv file
- * ./doc		contains doxyfile for generated doxygen documentation
- * ./example	contains source code of example Verse clients
- * ./include	contains all .h files
- * ./pki		contains example of certificate and private key
- * ./python		contains source code for Python module implemented in C
- * ./promela	contains Promela source code used for protocol verification
- * ./src		contains source code
-  * ./lib		source code for library (used by client as well by server)
-   - ./api		source code of API
-   - ./client	source code specific for Verse clients
-   - ./common	source code shared with Verse server and Verse client
-  * ./server	source code specified for Verse server
-   - ./mongodb  source code used for saving and loading data from MongoDB 
- * ./unittests	contains source code of unit tests
+ * `./build`		is target directory for compiled binaries
+ * `./config`		is directory with example of users.csv file
+ * `./doc`			contains doxyfile for generated doxygen documentation
+ * `./example`		contains source code of example Verse clients
+ * `./include`		contains all .h files
+ * `./pki`			contains example of certificate and private key
+ * `./python`		contains source code for Python module implemented in C
+ * `./promela`		contains Promela source code used for protocol verification
+ * `./src`			contains source code
+  * `./lib`			source code for library (used by client as well by server)
+  * `./lib/api`		source code of API
+  * `./lib/client`	source code specific for Verse clients
+  * `./lib/common`	source code shared with Verse server and Verse client
+  * `./server`		source code specified for Verse server
+  * `./server/mongodb`	source code used for saving and loading data from MongoDB 
+ * `./unittests`	contains source code of unit tests
 
 Installation
 ------------
