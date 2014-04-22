@@ -757,29 +757,31 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
-		ret = 0;
+		return 0;
 	}
 
-	if(node != NULL) {
-		/* Node has to be created */
-		if(vs_node_is_created(node) == 1) {
+	pthread_mutex_lock(&node->mutex);
+	
+	/* Node has to be created */
+	if(vs_node_is_created(node) == 1) {
 
-			/* Is client subscribed to this node? */
-			node_subscriber = vs_node_get_subscriber(node, vsession);
+		/* Is client subscribed to this node? */
+		node_subscriber = vs_node_get_subscriber(node, vsession);
 
-			/* When client is subscribed to this node, then change node priority */
-			if(node_subscriber != NULL) {
-				node_subscriber->prio = prio;
-				/* Change priority for this node and all child nodes */
-				vs_node_prio(vsession, node, prio);
-			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG,
-						"%s() client not subscribed to this node (id: %d)\n",
-						__FUNCTION__, node_id);
-				ret = 0;
-			}
+		/* When client is subscribed to this node, then change node priority */
+		if(node_subscriber != NULL) {
+			node_subscriber->prio = prio;
+			/* Change priority for this node and all child nodes */
+			ret = vs_node_prio(vsession, node, prio);
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() client not subscribed to this node (id: %d)\n",
+					__FUNCTION__, node_id);
+			ret = 0;
 		}
 	}
+	
+	pthread_mutex_unlock(&node->mutex);
 
 	return ret;
 }
@@ -796,6 +798,7 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 	uint32 node_id = UINT32(node_unsubscribe->data[0]);
 	uint32 version = UINT32(node_unsubscribe->data[UINT32_SIZE]);
 	/*uint32 crc32 = UINT32(node_unsubscribe->data[UINT32_SIZE + UINT32_SIZE]);*/
+	int ret = 1;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -811,22 +814,26 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_WARNING,
 				"Version: %d != 0, versing is not supported yet\n", version);
 	}
+	
+	pthread_mutex_lock(&node->mutex);
 
 	/* Node has to be created */
 	if(vs_node_is_created(node) == 1) {
 		/* Is client subscribed to this node? */
 		node_subscriber = vs_node_get_subscriber(node, vsession);
 		if(node_subscriber != NULL) {
-			return vs_node_unsubscribe(node, node_subscriber, 0);
+			ret = vs_node_unsubscribe(node, node_subscriber, 0);
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() client not subscribed to this node (id: %d)\n",
 					__FUNCTION__, node_id);
-			return 0;
+			ret = 0;
 		}
 	} else {
-		return 0;
+		ret = 0;
 	}
+	
+	pthread_mutex_unlock(&node->mutex);
 
 	return 1;
 }
@@ -844,6 +851,7 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 	uint32 node_id = UINT32(node_subscribe->data[0]);
 	uint32 version = UINT32(node_subscribe->data[UINT32_SIZE]);
 	/*uint32 crc32 = UINT32(node_subscribe->data[UINT32_SIZE + UINT32_SIZE]);*/
+	int ret = 1;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -852,8 +860,10 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+	
 	/* Node has to be created */
-	if( vs_node_is_created(node) == 1) {
+	if(vs_node_is_created(node) == 1) {
 
 		/* Isn't client already subscribed to this node? */
 		node_subscriber = vs_node_get_subscriber(node, vsession);
@@ -863,13 +873,15 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 					"%s() client %d is already subscribed to the node (id: %d)\n",
 					__FUNCTION__, vsession->session_id, node->id);
 		} else {
-			return vs_node_subscribe(vs_ctx, vsession, node, version);
+			ret = vs_node_subscribe(vs_ctx, vsession, node, version);
 		}
 	} else {
-		return 0;
+		ret = 0;
 	}
+	
+	pthread_mutex_unlock(&node->mutex);
 
-	return 1;
+	return ret;
 }
 
 /**
@@ -894,6 +906,8 @@ int vs_handle_node_destroy_ack(struct VS_CTX *vs_ctx,
 				__FUNCTION__, node_destroy_ack->node_id);
 		return 0;
 	}
+	
+	pthread_mutex_lock(&node->mutex);
 
 	/* Remove corresponding follower from the list of followers */
 	node_follower = node->node_folls.first;
@@ -906,8 +920,11 @@ int vs_handle_node_destroy_ack(struct VS_CTX *vs_ctx,
 		}
 		node_follower = next_node_follower;
 	}
+	
+	pthread_mutex_unlock(&node->mutex);
 
-	/* When node doesn't have any follower, then it is possible to destroy this node*/
+	/* When node doesn't have any follower, then it is possible to destroy
+	 * this node */
 	if(node->node_folls.first == NULL) {
 		node->state = ENTITY_DELETED;
 		vs_node_destroy(vs_ctx, node);
@@ -926,6 +943,7 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 	struct VSUser *user = (struct VSUser*)vsession->user;
 	struct VSNode *node;
 	uint32 node_id = UINT32(node_destroy->data[0]);
+	int ret = 1;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -934,6 +952,8 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+	
 	/* Node has to be created */
 	if(vs_node_is_created(node) == 1) {
 		/* Is this user owner of this node? */
@@ -941,13 +961,17 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"user_id: %d is not owner of the node (id: %d) and can't delete this node.\n",
 					vsession->user_id, node->id);
-			return 0;
+			ret = 0;
+		} else {
+			ret = vs_node_send_destroy(node);
 		}
 	} else {
-		return 0;
+		ret = 0;
 	}
+	
+	pthread_mutex_unlock(&node->mutex);
 
-	return vs_node_send_destroy(node);
+	return ret;
 }
 
 /**
@@ -974,6 +998,8 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+	
 	node_follower = node->node_folls.first;
 	while(node_follower != NULL) {
 		if(node_follower->node_sub->session->session_id == vsession->session_id) {
@@ -1017,6 +1043,8 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 	if(all_created == 1) {
 		node->state = ENTITY_CREATED;
 	}
+	
+	pthread_mutex_unlock(&node->mutex);
 
 	return 1;
 }
