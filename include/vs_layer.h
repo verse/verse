@@ -54,7 +54,7 @@ typedef struct VSLayer {
 	uint16					id;				/**< The ID of this layer */
 	uint8					data_type;		/**< The type of values stored in this layer */
 	uint8					num_vec_comp;	/**< The number of vector components (1, 2, 3, 4) */
-	uint16					type;			/**< The type of layer defined by client */
+	uint16					custom_type;	/**< The type of layer defined by client */
 	struct VHashArrayBase	values;			/**< The hashed linked list of values */
 	/* Parent-Child */
 	struct VSLayer			*parent;		/**< The parent layer */

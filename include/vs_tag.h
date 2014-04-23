@@ -46,16 +46,16 @@
  */
 typedef struct VSTag {
 	uint16				id;
-	uint8				data_type;	/* (u)int(8/16/32/64), real(16/32/64), string8 */
-	uint8				count;		/* The count of values */
-	uint8				flag;		/* Initialized/unitialized */
-	uint16				type;		/* Client specified type */
-	void				*value;		/* Pointer at own value */
+	uint8				data_type;		/* (u)int(8/16/32/64), real(16/32/64), string8 */
+	uint8				count;			/* The count of values */
+	uint8				flag;			/* Initialized/unitialized */
+	uint16				custom_type;	/* Client specified type */
+	void				*value;			/* Pointer at own value */
 	/* Subscribing */
-	struct VListBase	tag_folls;	/* List of clients that knows about
-								   	   this node and are auto-subscribed
-									   to this tag */
-	uint8				state;
+	struct VListBase	tag_folls;		/* List of clients that knows about
+											this node and are auto-subscribed
+											to this tag */
+	uint8				state;			/* Internal state */
 } VSTag;
 
 void vs_tag_send_set(struct VSession *vsession,

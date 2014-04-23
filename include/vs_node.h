@@ -58,7 +58,7 @@ typedef struct VSNodeSubscriber {
 
 typedef struct VSNode {
 	uint32					id;				/* Unique identifier */
-	uint16					type;			/* Client defined type */
+	uint16					custom_type;	/* Client defined type */
 	/* Access control */
 	struct VSUser			*owner;			/* Owner of this object */
 	struct VListBase		permissions;	/* List of access permission */

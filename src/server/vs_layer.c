@@ -75,7 +75,7 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 	layer->id = node->last_layer_id;
 	node->last_layer_id++;
 	layer->data_type = data_type;
-	layer->type = type;
+	layer->custom_type = type;
 	layer->parent = parent;
 	layer->num_vec_comp = count;
 
@@ -247,10 +247,10 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 
 	if(layer->parent != NULL) {
 		layer_create_cmd = v_layer_create_create(node->id, layer->parent->id,
-				layer->id, layer->data_type, layer->num_vec_comp, layer->type);
+				layer->id, layer->data_type, layer->num_vec_comp, layer->custom_type);
 	} else {
 		layer_create_cmd = v_layer_create_create(node->id, RESERVED_LAYER_ID,
-				layer->id, layer->data_type, layer->num_vec_comp, layer->type);
+				layer->id, layer->data_type, layer->num_vec_comp, layer->custom_type);
 	}
 
 	if(layer_create_cmd != NULL &&
@@ -508,7 +508,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	/* Check, if there isn't tag with the same type */
 	while(vbucket != NULL) {
 		layer = vbucket->data;
-		if(layer->type == type) {
+		if(layer->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer type: %d is already used in layer: %d\n",
 					__FUNCTION__, type, layer->id);
 			return 0;

@@ -63,7 +63,7 @@ static void vs_mongo_taggroup_save_version(struct VSTagGroup *tg,
 		bson_init(&bson_tag);
 		bson_append_int(&bson_tag, "data_type", tag->data_type);
 		bson_append_int(&bson_tag, "count", tag->count);
-		bson_append_int(&bson_tag, "custom_type", tag->type);
+		bson_append_int(&bson_tag, "custom_type", tag->custom_type);
 
 		bson_append_start_array(&bson_tag, "data");
 		switch(tag->data_type) {
@@ -209,7 +209,7 @@ int vs_mongo_taggroup_add_new(struct VS_CTX *vs_ctx,
 	bson_append_oid(&bson_tg, "_id", &tg->oid);
 	bson_append_int(&bson_tg, "node_id", node->id);
 	bson_append_int(&bson_tg, "taggroup_id", tg->id);
-	bson_append_int(&bson_tg, "custom_type", tg->type);
+	bson_append_int(&bson_tg, "custom_type", tg->custom_type);
 	bson_append_int(&bson_tg, "current_version", tg->version);
 
 	bson_append_start_object(&bson_tg, "versions");

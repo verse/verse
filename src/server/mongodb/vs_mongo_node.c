@@ -141,7 +141,7 @@ int vs_mongo_node_add_new(struct VS_CTX *vs_ctx, struct VSNode *node)
 	bson_append_new_oid(&bson_node, "_id");
 	/* Save Node ID, Custom Type of node and current version */
 	bson_append_int(&bson_node, "node_id", node->id);
-	bson_append_int(&bson_node, "custom_type", node->type);
+	bson_append_int(&bson_node, "custom_type", node->custom_type);
 	bson_append_int(&bson_node, "current_version", node->version);
 
 	/* Create object of versions and save first version */

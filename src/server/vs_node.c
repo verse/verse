@@ -341,9 +341,9 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 	}
 
 	if(avatar_node != NULL){
-		node_create_cmd = v_node_create_create(node->id, avatar_node->id, node->owner->user_id, node->type);
+		node_create_cmd = v_node_create_create(node->id, avatar_node->id, node->owner->user_id, node->custom_type);
 	} else {
-		node_create_cmd = v_node_create_create(node->id, node->parent_link->parent->id, node->owner->user_id, node->type);
+		node_create_cmd = v_node_create_create(node->id, node->parent_link->parent->id, node->owner->user_id, node->custom_type);
 	}
 
 	if ( node_create_cmd != NULL &&
@@ -396,7 +396,7 @@ void vs_node_init(struct VSNode *node)
 	int res;
 
 	node->id = 0xFFFFFFFF;
-	node->type = 0;
+	node->custom_type = 0;
 
 	node->owner = NULL;
 	node->permissions.first = NULL;
@@ -522,7 +522,7 @@ struct VSNode *vs_node_create_linked(struct VS_CTX *vs_ctx,
 	}
 
 	node->owner = owner;
-	node->type = custom_type;
+	node->custom_type = custom_type;
 
 	return node;
 }

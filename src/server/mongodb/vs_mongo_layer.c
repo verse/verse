@@ -208,7 +208,7 @@ int vs_mongo_layer_add_new(struct VS_CTX *vs_ctx,
 	bson_append_oid(&bson_layer, "_id", &layer->oid);
 	bson_append_int(&bson_layer, "node_id", node->id);
 	bson_append_int(&bson_layer, "layer_id", layer->id);
-	bson_append_int(&bson_layer, "custom_type", layer->type);
+	bson_append_int(&bson_layer, "custom_type", layer->custom_type);
 	bson_append_int(&bson_layer, "data_type", layer->data_type);
 	bson_append_int(&bson_layer, "vec_size", layer->num_vec_comp);
 	bson_append_int(&bson_layer, "current_version", layer->version);

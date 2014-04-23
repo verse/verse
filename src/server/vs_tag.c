@@ -91,7 +91,7 @@ int vs_tag_send_create(struct VSEntitySubscriber *tg_subscriber,
 	}
 
 	/* Create new Tag_Create command */
-	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->type);
+	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->custom_type);
 
 	/* Put command to the outgoing queue */
 	if(tag_create != NULL &&
@@ -153,7 +153,7 @@ int vs_tag_send_destroy(struct VSNode *node,
 static void vs_tag_init(struct VSTag *tag)
 {
 	tag->id = 0;
-	tag->type = 0;
+	tag->custom_type = 0;
 	tag->tag_folls.first = NULL;
 	tag->tag_folls.last = NULL;
 	tag->data_type = VRS_VALUE_TYPE_RESERVED;
@@ -263,7 +263,7 @@ struct VSTag *vs_tag_create(struct VSTagGroup *tg,
 
 	tag->data_type = data_type;
 	tag->count = count;
-	tag->type = custom_type;
+	tag->custom_type = custom_type;
 
 	/* Allocate memory for value (not for type string8) */
 	switch(data_type) {
@@ -501,7 +501,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	/* Check, if there isn't tag with the same type */
 	while(vbucket != NULL) {
 		tag = vbucket->data;
-		if(tag->type == type) {
+		if(tag->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag type: %d is already used in taggroup: %d\n",
 					__FUNCTION__, type, tg->id);
 			return 0;

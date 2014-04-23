@@ -94,7 +94,7 @@ int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 	}
 
 	/* Create TagGroup create command */
-	taggroup_create_cmd = v_taggroup_create_create(node->id, tg->id, tg->type);
+	taggroup_create_cmd = v_taggroup_create_create(node->id, tg->id, tg->custom_type);
 
 	/* Put this command to the outgoing queue */
 	if(taggroup_create_cmd != NULL &&
@@ -168,7 +168,7 @@ static void vs_taggroup_init(struct VSTagGroup *tg)
 #endif
 
 	tg->id = 0;
-	tg->type = 0;
+	tg->custom_type = 0;
 
 	v_hash_array_init(&tg->tags,
 				HASH_MOD_256,
@@ -230,10 +230,9 @@ struct VSTagGroup *vs_taggroup_create(struct VSNode *node,
 			tg->id++;
 
 			/* Skip IDs with special purpose */
-			if(tg->id > LAST_TAGGROUP_ID)
+			if(tg->id > LAST_TAGGROUP_ID) {
 				tg->id = FIRST_TAGGROUP_ID;
-
-			/* TODO: make this faster */
+			}
 		}
 	} else {
 		tg->id = tg_id;
@@ -252,7 +251,7 @@ struct VSTagGroup *vs_taggroup_create(struct VSNode *node,
 	}
 
 	/* Copy type */
-	tg->type = custom_type;
+	tg->custom_type = custom_type;
 
 	vs_node_inc_version(node);
 
@@ -549,7 +548,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	/* Check, if there isn't tag group with the same type */
 	while(vbucket != NULL) {
 		tg = vbucket->data;
-		if(tg->type == type) {
+		if(tg->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() taggroup type: %d is already used in node: %d\n",
 					__FUNCTION__, type, node->id);

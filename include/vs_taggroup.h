@@ -40,7 +40,7 @@
  */
 typedef struct VSTagGroup {
 	uint16					id;
-	uint16					type;
+	uint16					custom_type;
 	/* Tags */
 	struct VHashArrayBase	tags;
 	uint16					last_tag_id;	/* Last used tag id */
