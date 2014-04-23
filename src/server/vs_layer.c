@@ -481,7 +481,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* User has to have permission to write to the node */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
@@ -624,7 +624,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 	}
 
 	/* User has to have permission to write to the node */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,
@@ -686,7 +686,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* User has to have permission to read the node */
-	if(vs_node_can_read(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_read(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't read the node: %d\n",
 				__FUNCTION__,
@@ -817,7 +817,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	}
 
 	/* User has to have permission to write to the node */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to the node: %d\n",
 				__FUNCTION__,
@@ -1052,7 +1052,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 	}
 
 	/* User has to have permission to write to the node */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to the node: %d\n",
 				__FUNCTION__,

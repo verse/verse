@@ -244,8 +244,7 @@ int vs_node_send_data(struct VSNode *node,
  * \brief This function add session (client) to the list of clients that are
  * subscribed this node.
  */
-static int vs_node_subscribe(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
+static int vs_node_subscribe(struct VSession *vsession,
 		struct VSNode *node,
 		uint32 version)
 {
@@ -254,7 +253,7 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	int							user_can_read = 0;
 
 	/* Can user subscribe to this node? */
-	user_can_read = vs_node_can_read(vs_ctx, vsession, node);
+	user_can_read = vs_node_can_read(vsession, node);
 
 	/* Add current session to the list of node subscribers */
 	node_subscriber = (struct VSNodeSubscriber*)calloc(1, sizeof(struct VSNodeSubscriber));
@@ -886,7 +885,7 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 					"%s() client %d is already subscribed to the node (id: %d)\n",
 					__FUNCTION__, vsession->session_id, node->id);
 		} else {
-			ret = vs_node_subscribe(vs_ctx, vsession, node, version);
+			ret = vs_node_subscribe(vsession, node, version);
 		}
 	} else {
 		ret = 0;
@@ -937,7 +936,8 @@ int vs_handle_node_destroy_ack(struct VS_CTX *vs_ctx,
 	pthread_mutex_unlock(&node->mutex);
 
 	/* When node doesn't have any follower, then it is possible to destroy
-	 * this node */
+	 * this node. It is not necessary to lock this node, because other threads
+	 * will not work with this node anymore. */
 	if(node->node_folls.first == NULL) {
 		node->state = ENTITY_DELETED;
 		vs_node_destroy(vs_ctx, node);

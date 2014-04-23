@@ -29,11 +29,9 @@ int vs_node_set_perm(struct VSNode *node,
 		VSUser *user,
 		uint8 permission);
 
-int vs_node_can_write(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
+int vs_node_can_write(struct VSession *vsession,
 		struct VSNode *node);
-int vs_node_can_read(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
+int vs_node_can_read(struct VSession *vsession,
 		struct VSNode *node);
 
 /* Senders of commands */

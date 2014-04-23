@@ -559,7 +559,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of this node or can user write to this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,
@@ -584,7 +584,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 				node_subscriber != NULL;
 				node_subscriber = node_subscriber->next)
 		{
-			if( vs_node_can_read(vs_ctx, node_subscriber->session, node) == 1) {
+			if( vs_node_can_read(node_subscriber->session, node) == 1) {
 				vs_taggroup_send_create(node_subscriber, node, tg);
 			}
 		}
@@ -620,7 +620,7 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
+	if(vs_node_can_write(vsession, node) == 1) {
 		/* Try to find TagGroup */
 		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
@@ -665,7 +665,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of the node or can user read the node? */
-	if(vs_node_can_read(vs_ctx, vsession, node) == 1) {
+	if(vs_node_can_read(vsession, node) == 1) {
 		struct VSNodeSubscriber		*node_subscriber;
 		struct VSTagGroup			*tg;
 		struct VSTag				*tag;
@@ -750,6 +750,7 @@ int vs_handle_taggroup_unsubscribe(struct VS_CTX *vs_ctx,
 	struct VSTagGroup			*tg;
 	uint32						node_id = UINT32(taggroup_unsubscribe->data[0]);
 	uint16						taggroup_id = UINT16(taggroup_unsubscribe->data[UINT32_SIZE]);
+	int							ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -758,17 +759,23 @@ int vs_handle_taggroup_unsubscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Node has to be created */
 	if( vs_node_is_created(node) != 1 ) {
-		return 0;
+		ret = 0;
+	} else {
+		/* Try to find TagGroup */
+		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
+					__FUNCTION__, taggroup_id, node_id);
+			ret = 0;
+		}
+
+		ret = vs_taggroup_unsubscribe(tg, vsession);
 	}
 
-	/* Try to find TagGroup */
-	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, taggroup_id, node_id);
-		return 0;
-	}
+	pthread_mutex_unlock(&node->mutex);
 
-	return vs_taggroup_unsubscribe(tg, vsession);
+	return ret;
 }

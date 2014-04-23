@@ -459,7 +459,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* User has to have permission to write to the node */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,
@@ -622,7 +622,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of this node or can user write to this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,
@@ -688,7 +688,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of this node or can user write to this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) != 1) {
+	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,

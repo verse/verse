@@ -34,8 +34,7 @@
 /**
  * \brief This function checks if client can write to the node
  */
-int vs_node_can_write(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
+int vs_node_can_write(struct VSession *vsession,
 		struct VSNode *node)
 {
 	struct VSUser *user = (struct VSUser*)vsession->user;
@@ -57,7 +56,9 @@ int vs_node_can_write(struct VS_CTX *vs_ctx,
 		perm = node->permissions.first;
 		while(perm != NULL) {
 			/* Can this user or other users write to this node? */
-			if(perm->user == user || perm->user == vs_ctx->other_users) {
+			if(perm->user == user ||
+					perm->user->user_id == VRS_OTHER_USERS_UID)
+			{
 				if(perm->permissions & VRS_PERM_NODE_WRITE) {
 					user_can_write = 1;
 				}
@@ -73,8 +74,7 @@ int vs_node_can_write(struct VS_CTX *vs_ctx,
 /**
  * \brief This function checks if client can read the node
  */
-int vs_node_can_read(struct VS_CTX *vs_ctx,
-		struct VSession *vsession,
+int vs_node_can_read(struct VSession *vsession,
 		struct VSNode *node)
 {
 	struct VSUser *user = (struct VSUser*)vsession->user;
@@ -85,19 +85,16 @@ int vs_node_can_read(struct VS_CTX *vs_ctx,
 		user_can_read = 1;
 	} else {
 		perm = node->permissions.first;
-		while(perm!=NULL) {
-			/* Can the user read this node? */
-			if(perm->user == user) {
+		while(perm != NULL) {
+			/* Can this user or other users read this node? */
+			if(perm->user == user ||
+					perm->user->user_id == VRS_OTHER_USERS_UID)
+			{
 				if(perm->permissions & VRS_PERM_NODE_READ) {
 					user_can_read = 1;
 					break;
 				}
 			/* Can all other users read this node? */
-			} else if(perm->user == vs_ctx->other_users) {
-				if(perm->permissions & VRS_PERM_NODE_READ) {
-					user_can_read = 1;
-				}
-				break;
 			}
 			perm = perm->next;
 		}
@@ -294,7 +291,7 @@ int vs_handle_node_unlock(struct VS_CTX *vs_ctx,
 	pthread_mutex_lock(&node->mutex);
 
 	/* Can this avatar/user write to this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
+	if(vs_node_can_write(vsession, node) == 1) {
 		/* Only client that locked this node can unlock this node */
 		if(node->lock.session == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
@@ -364,7 +361,7 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 	pthread_mutex_lock(&node->mutex);
 
 	/* Can this avatar/user write to this node? */
-	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
+	if(vs_node_can_write(vsession, node) == 1) {
 		struct timeval tv;
 
 		/* Is this new lock */
@@ -538,7 +535,7 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 				/* Unlock locked node, when locker of the node lost permission
 				 * to lock this node (it can not no longer write to node) */
 				if(node->lock.session != NULL &&
-						vs_node_can_write(vs_ctx, node->lock.session, node) != 1)
+						vs_node_can_write(node->lock.session, node) != 1)
 				{
 					lost_locker_session = node->lock.session;
 					node->lock.session = NULL;

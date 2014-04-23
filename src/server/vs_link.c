@@ -170,7 +170,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of child node or can user write to child node? */
-	if(vs_node_can_write(vs_ctx, vsession, child_node) != 1) {
+	if(vs_node_can_write(vsession, child_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d user: %s can't write to child node: %d (owner: %s)\n",
 				__FUNCTION__, __LINE__, user->username, child_node->id,
@@ -185,7 +185,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	old_parent_node = link->parent;
 
 	/* Is user owner of old parent node or can user write to old parent node? */
-	if(vs_node_can_write(vs_ctx, vsession, old_parent_node) != 1) {
+	if(vs_node_can_write(vsession, old_parent_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d user: %s can't write to old parent node: %d (owner: %s)\n",
 				__FUNCTION__, __LINE__, user->username, old_parent_node->id,
@@ -217,7 +217,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	}
 
 	/* Is user owner of parent node or can user write to parent node? */
-	if(vs_node_can_write(vs_ctx, vsession, parent_node) != 1) {
+	if(vs_node_can_write(vsession, parent_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d user: %s can't write to parent node: %d (owner: %s)\n",
 				__FUNCTION__, __LINE__, user->username, parent_node->id,
@@ -261,7 +261,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	 * session temporary value */
 	node_subscriber = old_parent_node->node_subs.first;
 	while(node_subscriber != NULL) {
-		if(vs_node_can_read(vs_ctx, node_subscriber->session, old_parent_node) == 1) {
+		if(vs_node_can_read(node_subscriber->session, old_parent_node) == 1) {
 			node_subscriber->session->tmp = 1;
 			vs_link_change_send(node_subscriber, link);
 		}
@@ -284,7 +284,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	node_subscriber = parent_node->node_subs.first;
 	while(node_subscriber != NULL) {
 		if(node_subscriber->session->tmp != 1) {
-			if(vs_node_can_read(vs_ctx, node_subscriber->session, parent_node) == 1) {
+			if(vs_node_can_read(node_subscriber->session, parent_node) == 1) {
 				vs_node_send_create(node_subscriber, child_node, NULL);
 			}
 		}
