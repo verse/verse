@@ -195,6 +195,52 @@ static int vs_node_unsubscribe(struct VSNode *node,
 }
 
 /**
+ * \brief This function sends data (child nodes, tag groups and layers) stored
+ * in the node to the subscriber.
+ */
+int vs_node_send_data(struct VSNode *node,
+		struct VSNodeSubscriber *node_subscriber)
+{
+	struct VSNode				*child_node;
+	struct VSLink				*link;
+	struct VBucket				*bucket;
+	struct VSTagGroup			*tg;
+	struct VSLayer				*layer;
+
+	/* Send node_create of all child nodes of this node and corresponding
+	 * links */
+	link = node->children_links.first;
+	while(link != NULL) {
+		child_node = link->child;
+		vs_node_send_create(node_subscriber, child_node, NULL);
+		link = link->next;
+	}
+
+	/* Send taggroup_create of all tag_groups in this node */
+	bucket = node->tag_groups.lb.first;
+	while(bucket != NULL) {
+		tg = (struct VSTagGroup*)bucket->data;
+		if(tg->state == ENTITY_CREATING || tg->state == ENTITY_CREATED) {
+			vs_taggroup_send_create(node_subscriber, node, tg);
+		}
+		bucket = bucket->next;
+	}
+
+	/* Send layer_create for all layers in this node */
+	bucket = node->layers.lb.first;
+	while(bucket != NULL) {
+		layer = (struct VSLayer*)bucket->data;
+		if(layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED) {
+			vs_layer_send_create(node_subscriber, node, layer);
+		}
+		bucket = bucket->next;
+	}
+
+	return 1;
+}
+
+
+/**
  * \brief This function add session (client) to the list of clients that are
  * subscribed this node.
  */
@@ -203,13 +249,8 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 		struct VSNode *node,
 		uint32 version)
 {
-	struct VSNode				*child_node;
 	struct VSNodePermission		*perm;
 	struct VSNodeSubscriber		*node_subscriber;
-	struct VSLink				*link;
-	struct VBucket				*bucket;
-	struct VSTagGroup			*tg;
-	struct VSLayer				*layer;
 	int							user_can_read = 0;
 
 	/* Can user subscribe to this node? */
@@ -241,8 +282,7 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 	}
 
 	/* If user doesn't have permission to subscribe to this node, then send
-	 * only node_perm command explaining, why user can't rest of this
-	 * node */
+	 * only node_perm command explaining, why user can't read this node */
 	if(user_can_read == 0) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"Insufficient permission to read content of the node: %d\n",
@@ -250,34 +290,7 @@ static int vs_node_subscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Send node_create of all child nodes of this node and corresponding
-	 * links */
-	link = node->children_links.first;
-	while(link != NULL) {
-		child_node = link->child;
-		vs_node_send_create(node_subscriber, child_node, NULL);
-		link = link->next;
-	}
-
-	/* Send taggroup_create of all tag_groups in this node */
-	bucket = node->tag_groups.lb.first;
-	while(bucket != NULL) {
-		tg = (struct VSTagGroup*)bucket->data;
-		if(tg->state == ENTITY_CREATING || tg->state == ENTITY_CREATED) {
-			vs_taggroup_send_create(node_subscriber, node, tg);
-		}
-		bucket = bucket->next;
-	}
-
-	/* Send layer_create for all layers in this node */
-	bucket = node->layers.lb.first;
-	while(bucket != NULL) {
-		layer = (struct VSLayer*)bucket->data;
-		if(layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED) {
-			vs_layer_send_create(node_subscriber, node, layer);
-		}
-		bucket = bucket->next;
-	}
+	vs_node_send_data(node, node_subscriber);
 
 	return 1;
 }

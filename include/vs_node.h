@@ -97,6 +97,9 @@ void vs_node_init(struct VSNode *node);
 
 struct VSNode *vs_node_find(struct VS_CTX *vs_ctx, uint32 node_id);
 
+int vs_node_send_data(struct VSNode *node,
+		struct VSNodeSubscriber *node_subscriber);
+
 int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node,
 		struct VSNode *avatar_node);

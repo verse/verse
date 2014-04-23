@@ -43,8 +43,6 @@ int vs_node_send_unlock(struct VSNodeSubscriber *node_subscriber,
 int vs_node_send_lock(struct VSNodeSubscriber *node_subscriber,
 		struct VSession *vsession,
 		struct VSNode *node);
-int vs_node_send_owner(struct VSNodeSubscriber *node_subscriber,
-		struct VSNode *node);
 int vs_node_send_perm(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node,
 		struct VSUser *user,

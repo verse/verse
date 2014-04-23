@@ -109,7 +109,7 @@ int vs_node_can_read(struct VS_CTX *vs_ctx,
 /**
  * \brief This function send node_owner to the client
  */
-int vs_node_send_owner(struct VSNodeSubscriber *node_subscriber,
+static int vs_node_send_owner(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node)
 {
 	struct Generic_Cmd *node_owner = NULL;
@@ -117,7 +117,7 @@ int vs_node_send_owner(struct VSNodeSubscriber *node_subscriber,
 	node_owner = v_node_owner_create(node->id, node->owner->user_id);
 
 	if(node_owner != NULL) {
-		v_out_queue_push_tail(node_subscriber->session->out_queue,
+		return v_out_queue_push_tail(node_subscriber->session->out_queue,
 							node_subscriber->prio,
 							node_owner);
 	} else {
@@ -125,6 +125,27 @@ int vs_node_send_owner(struct VSNodeSubscriber *node_subscriber,
 	}
 
 	return 1;
+}
+
+/**
+ * \brief This function tries to get permission of node for the user
+ */
+static uint8 vs_node_get_perm(struct VSNode *node, VSUser *user)
+{
+	struct VSNodePermission	*perm;
+
+	perm = node->permissions.first;
+	while(perm != NULL) {
+		/* Try to in user in list of permissions */
+		if(perm->user == user) {
+			return perm->permissions;
+		} else if(perm->user->user_id == VRS_OTHER_USERS_UID) {
+			return perm->permissions;
+		}
+		perm = perm->next;
+	}
+
+	return 0;
 }
 
 /*
@@ -189,7 +210,7 @@ int vs_node_send_perm(struct VSNodeSubscriber *node_subscriber,
 	}
 
 	if(node_perm != NULL) {
-		v_out_queue_push_tail(node_subscriber->session->out_queue,
+		return v_out_queue_push_tail(node_subscriber->session->out_queue,
 							node_subscriber->prio,
 							node_perm);
 	} else {
@@ -211,12 +232,36 @@ int vs_node_send_unlock(struct VSNodeSubscriber *node_subscriber,
 	cmd_node_unlock = v_node_unlock_create(node->id, vsession->avatar_id);
 
 	if(cmd_node_unlock != NULL) {
-		v_out_queue_push_tail(node_subscriber->session->out_queue,
+		return v_out_queue_push_tail(node_subscriber->session->out_queue,
 				node_subscriber->prio,
 				cmd_node_unlock);
+	} else {
+		return 0;
 	}
 
-	return 0;
+	return 1;
+}
+
+/**
+ * \brief This function sends node_lock to the subscriber of the node
+ */
+int vs_node_send_lock(struct VSNodeSubscriber *node_subscriber,
+		struct VSession *vsession,
+		struct VSNode *node)
+{
+	struct Generic_Cmd *cmd_node_lock;
+
+	cmd_node_lock = v_node_lock_create(node->id, vsession->avatar_id);
+
+	if(cmd_node_lock != NULL) {
+		return v_out_queue_push_tail(node_subscriber->session->out_queue,
+				node_subscriber->prio,
+				cmd_node_lock);
+	} else {
+		return 0;
+	}
+
+	return 1;
 }
 
 /**
@@ -229,6 +274,7 @@ int vs_handle_node_unlock(struct VS_CTX *vs_ctx,
 	struct VSNode *node;
 	uint32 avatar_id = UINT32(node_unlock->data[0]);
 	uint32 node_id = UINT32(node_unlock->data[UINT32_SIZE]);
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -244,6 +290,8 @@ int vs_handle_node_unlock(struct VS_CTX *vs_ctx,
 				avatar_id, vsession->avatar_id);
 		return 0;
 	}
+
+	pthread_mutex_lock(&node->mutex);
 
 	/* Can this avatar/user write to this node? */
 	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
@@ -259,42 +307,31 @@ int vs_handle_node_unlock(struct VS_CTX *vs_ctx,
 			/* TODO: send node_unlock only in situation, when client received
 			 * node_lock command */
 
+			ret = 1;
+
 			/* Send node_unlock to all node subscribers */
 			for(node_subscriber = node->node_subs.first;
 					node_subscriber != NULL;
 					node_subscriber = node_subscriber->next)
 			{
-				vs_node_send_unlock(node_subscriber, vsession, node);
+				if(vs_node_send_unlock(node_subscriber, vsession, node) != 1) {
+					ret = 0;
+				}
 			}
 
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Node: %d is not locked by avatar: %d\n",
 					node->id, vsession->avatar_id);
+			ret = 0;
 		}
+	} else {
+		ret = 0;
 	}
 
-	return 0;
-}
+	pthread_mutex_unlock(&node->mutex);
 
-/**
- * \brief This function sends node_lock to the subscriber of the node
- */
-int vs_node_send_lock(struct VSNodeSubscriber *node_subscriber,
-		struct VSession *vsession,
-		struct VSNode *node)
-{
-	struct Generic_Cmd *cmd_node_lock;
-
-	cmd_node_lock = v_node_lock_create(node->id, vsession->avatar_id);
-
-	if(cmd_node_lock != NULL) {
-		v_out_queue_push_tail(node_subscriber->session->out_queue,
-				node_subscriber->prio,
-				cmd_node_lock);
-	}
-
-	return 0;
+	return ret;
 }
 
 /**
@@ -307,6 +344,7 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 	struct VSNode *node;
 	uint32 avatar_id = UINT32(node_lock->data[0]);
 	uint32 node_id = UINT32(node_lock->data[UINT32_SIZE]);
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -323,6 +361,8 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Can this avatar/user write to this node? */
 	if(vs_node_can_write(vs_ctx, vsession, node) == 1) {
 		struct timeval tv;
@@ -336,12 +376,16 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 			node->lock.tv.tv_sec = tv.tv_sec;
 			node->lock.tv.tv_usec = tv.tv_usec;
 
+			ret = 1;
+
 			/* Send node_lock to all node subscribers */
 			for(node_subscriber = node->node_subs.first;
 					node_subscriber != NULL;
 					node_subscriber = node_subscriber->next)
 			{
-				vs_node_send_lock(node_subscriber, vsession, node);
+				if(vs_node_send_lock(node_subscriber, vsession, node) != 1) {
+					ret = 0;
+				}
 			}
 
 		/* Is this keep alive lock */
@@ -354,10 +398,15 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Node: %d is already locked by avatar: %d\n",
 					node->id, vsession->avatar_id);
+			ret = 0;
 		}
+	} else {
+		ret = 0;
 	}
 
-	return 0;
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 /**
@@ -373,6 +422,7 @@ int vs_handle_node_owner(struct VS_CTX *vs_ctx,
 	struct VSEntityFollower *node_follower;
 	uint32 node_id = UINT32(node_perm->data[UINT16_SIZE]);
 	uint16 user_id = UINT16(node_perm->data[0]);
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -396,23 +446,33 @@ int vs_handle_node_owner(struct VS_CTX *vs_ctx,
 	}
 
 	/* New Owner can't be fake user */
-	if(new_owner->fake_user != 1) {
+	if(new_owner->fake_user == 1) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"new owner: %d can not be fake user\n", user_id);
+		return 0;
+	}
 
-		/* Change owner of the node */
-		node->owner = new_owner;
+	pthread_mutex_lock(&node->mutex);
 
-		vs_node_inc_version(node);
+	/* Change owner of the node */
+	node->owner = new_owner;
 
-		/* Send node_owner to all node followers */
-		for(node_follower = node->node_folls.first;
-				node_follower != NULL;
-				node_follower = node_follower->next)
-		{
-			vs_node_send_owner(node_follower->node_sub, node);
+	vs_node_inc_version(node);
+
+	ret = 1;
+	/* Send node_owner to all node followers */
+	for(node_follower = node->node_folls.first;
+			node_follower != NULL;
+			node_follower = node_follower->next)
+	{
+		if(vs_node_send_owner(node_follower->node_sub, node) != 1) {
+			ret = 0;
 		}
 	}
 
-	return 0;
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 /**
@@ -429,6 +489,8 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 	uint32 node_id = UINT32(node_perm->data[UINT16_SIZE+UINT8_SIZE]);
 	uint16 user_id = UINT16(node_perm->data[0]);
 	uint8 permissions = UINT8(node_perm->data[UINT16_SIZE]);
+	uint8 old_permssions;
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -444,14 +506,6 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
-	}
-
 	/* Check if permission contains valid permission flags */
 	if( ! ((permissions & VRS_PERM_NODE_READ) ||
 			(permissions & VRS_PERM_NODE_WRITE) ||
@@ -462,31 +516,76 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
-	/* User has to be owner of the node, to be able to change permission of
-	 * this node */
-	if(node->owner == avatar_user) {
-		/* Set permission for this node */
-		vs_node_set_perm(node, user, permissions);
+	pthread_mutex_lock(&node->mutex);
 
-		/* Set this command to all subscribers */
-		node_subscriber = node->node_subs.first;
-		while(node_subscriber != NULL) {
-			vs_node_send_perm(node_subscriber, node, user, permissions);
+	/* Node has to be created */
+	if(vs_node_is_created(node) == 1) {
 
-			/* TODO: send create commands to the client, when at least read
-			 * access was granted for the user */
+		old_permssions = vs_node_get_perm(node, user);
 
-			/* TODO: unlock locked node, when locker of the node lost permission
-			 * to lock this node */
+		/* User has to be owner of the node, to be able to change permission of
+		 * this node */
+		if(node->owner == avatar_user) {
 
-			node_subscriber = node_subscriber->next;
+			/* Set permission for this node */
+			ret = vs_node_set_perm(node, user, permissions);
+
+			/* When it was possible to create new permissions, then send
+			 * updated permissions to client */
+			if(ret == 1) {
+				struct VSession *lost_locker_session = NULL;
+
+				/* Unlock locked node, when locker of the node lost permission
+				 * to lock this node (it can not no longer write to node) */
+				if(node->lock.session != NULL &&
+						vs_node_can_write(vs_ctx, node->lock.session, node) != 1)
+				{
+					lost_locker_session = node->lock.session;
+					node->lock.session = NULL;
+				}
+
+				node_subscriber = node->node_subs.first;
+				while(node_subscriber != NULL) {
+
+					/* Set node_perm command to all subscribers */
+					if(vs_node_send_perm(node_subscriber, node, user, permissions) != 1) {
+						ret = 0;
+					}
+
+					/* Send unlock command, when node was unlocked */
+					if(lost_locker_session != NULL) {
+						if(vs_node_send_unlock(node_subscriber, lost_locker_session, node) != 1) {
+							ret = 0;
+						}
+					}
+
+					/* Send create commands to the client, when at least read
+					 * access was granted for the user */
+					if((struct VSUser*)node_subscriber->session->user == user ||
+							user->user_id == VRS_OTHER_USERS_UID)
+					{
+						/* Subscriber wasn't able to read content of data and
+						 * it is able to read data ... */
+						if(!(old_permssions & VRS_PERM_NODE_READ) &&
+								(permissions & VRS_PERM_NODE_READ))
+						{
+							/* Send child node, tag groups and layers */
+							vs_node_send_data(node, node_subscriber);
+						}
+					}
+
+					node_subscriber = node_subscriber->next;
+				}
+			}
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s(): user: %s can't change permissions of node: %d\n",
+					__FUNCTION__, user->username, node->id);
+			ret = 0;
 		}
-	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s(): user: %s can't change permissions of node: %d\n",
-				__FUNCTION__, user->username, node->id);
-		return 0;
 	}
 
-	return 0;
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
