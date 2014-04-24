@@ -2,6 +2,7 @@ Verse 2.0
 =========
 [![Travis CI Build Status](https://travis-ci.org/verse/verse.png?branch=master)](https://travis-ci.org/verse/verse)
 [![Coverage Status](https://coveralls.io/repos/verse/verse/badge.png?branch=master)](https://coveralls.io/r/verse/verse?branch=master)
+[![Coverity Scan Build Status](https://scan.coverity.com/projects/1994/badge.svg)](https://scan.coverity.com/projects/1994)
 
 Verse 2.0 is network protocol for real-time sharing of 3D data. It is successor
 of old Verse protocol developed at KTH. Verse 2.0 is still in alpha version.
