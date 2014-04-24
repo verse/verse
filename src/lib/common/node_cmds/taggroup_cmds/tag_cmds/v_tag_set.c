@@ -65,6 +65,10 @@ struct Generic_Cmd *v_tag_set_create(const uint32 node_id,
 	tag_set = (struct Generic_Cmd *)malloc(UINT8_SIZE +
 			cmd_struct[cmd_id].size);
 
+	if(tag_set == NULL) {
+		return NULL;
+	}
+
 	tag_set->id = cmd_id;
 	UINT32(tag_set->data[0]) = node_id;
 	UINT16(tag_set->data[UINT32_SIZE]) = taggroup_id;

@@ -58,7 +58,7 @@ typedef struct VSTag {
 	uint8				state;			/* Internal state */
 } VSTag;
 
-void vs_tag_send_set(struct VSession *vsession,
+int vs_tag_send_set(struct VSession *vsession,
 		uint8 prio,
 		struct VSNode *node,
 		struct VSTagGroup *tg,

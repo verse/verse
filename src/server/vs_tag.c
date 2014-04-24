@@ -38,7 +38,7 @@
 /**
  * \brief This function add any TagSet command to the queue of outgoing commands
  */
-void vs_tag_send_set(struct VSession *vsession,
+int vs_tag_send_set(struct VSession *vsession,
 		uint8 prio,
 		struct VSNode *node,
 		struct VSTagGroup *tg,
@@ -48,7 +48,11 @@ void vs_tag_send_set(struct VSession *vsession,
 
 	tag_set_cmd = v_tag_set_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->value);
 
-	v_out_queue_push_tail(vsession->out_queue, prio, tag_set_cmd);
+	if(tag_set_cmd != NULL) {
+		return v_out_queue_push_tail(vsession->out_queue, prio, tag_set_cmd);
+	}
+
+	return 0;
 }
 
 /**
@@ -242,8 +246,6 @@ struct VSTag *vs_tag_create(struct VSTagGroup *tg,
 			if(tag->id > LAST_TAG_ID) {
 				tag->id = FIRST_TAG_ID;
 			}
-
-			/* TODO: previous code could be more effective */
 		}
 	} else {
 		tag->id = tag_id;
@@ -354,7 +356,7 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 	uint32						node_id = tag_create_ack->node_id;
 	uint16						taggroup_id = tag_create_ack->taggroup_id;
 	uint16						tag_id = tag_create_ack->tag_id;
-	int							all_created = 1, tag_found = 0;
+	int							all_created = 1, tag_found = 0, ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -363,18 +365,20 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find Tag */
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
 				__FUNCTION__, tag_id, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find tag follower that generated this fake command */
@@ -384,7 +388,7 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 			tag_found = 1;
 			/* When tag contain value, then send this value to the client */
 			if( (tag->flag & TAG_INITIALIZED) && (tag_follower->state != ENTITY_CREATED)) {
-				vs_tag_send_set(tag_follower->node_sub->session, tag_follower->node_sub->prio, node, tg, tag);
+				ret = vs_tag_send_set(tag_follower->node_sub->session, tag_follower->node_sub->prio, node, tg, tag);
 			}
 			tag_follower->state = ENTITY_CREATED;
 
@@ -396,11 +400,14 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 				if( tag_destroy_cmd != NULL &&
 						(v_out_queue_push_tail(tag_follower->node_sub->session->out_queue,
 								tag_follower->node_sub->prio,
-								tag_destroy_cmd) == 1)) {
+								tag_destroy_cmd) == 1))
+				{
 					tag_follower->state = ENTITY_DELETING;
 				} else {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "Tag_Destroy (node_id: %d, taggroup_id: %d, tag_id: %d) wasn't added to the queue\n",
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"Tag_Destroy (node_id: %d, taggroup_id: %d, tag_id: %d) wasn't added to the queue\n",
 							node->id, tg->id, tag->id);
+					ret = 0;
 				}
 			}
 		} else if(tag_follower->state != ENTITY_CREATED) {
@@ -415,14 +422,18 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 	}
 
 	if(tag_found == 0) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_follower of tag (id: %d) in tag_group (id: %d) in node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() tag_follower of tag (id: %d) in tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, tag_id, tg->id, node->id);
-		return 0;
 	} else {
-		return 1;
+		ret = 1;
 	}
 
-	return 0;
+end:
+
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 /**
@@ -443,6 +454,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	uint8					data_type = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE]);
 	uint8					count = UINT8(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE]);
 	uint16 					type = UINT16(tag_create->data[UINT32_SIZE + UINT16_SIZE + UINT16_SIZE + UINT8_SIZE + UINT8_SIZE]);
+	int						ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -451,11 +463,11 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) is not in CREATING or CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
+	if(vs_node_is_created(node) != 1) {
+		goto end;
 	}
 
 	/* User has to have permission to write to the node */
@@ -465,21 +477,21 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Tag Group has to be created too (it can't be in DELETING or DELETED state ) */
 	if(!(tg->state == ENTITY_CREATED || tg->state == ENTITY_CREATING)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag group (id: %d) from node (id: %d) is not in CREATING or CREATED state: %d\n",
 				__FUNCTION__, tg->id, node->id, tg->state);
-		return 0;
+		goto end;
 	}
 
 	/* Client has to send tag_create command with tag_id equal to
@@ -487,14 +499,14 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	if(tag_id != RESERVED_TAG_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_id: %d is not 0xFFFF\n",
 				__FUNCTION__, tag_id);
-		return 0;
+		goto end;
 	}
 
 	/* Is type of Tag supported? */
 	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_STRING8)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_type: %d is not supported\n",
 				__FUNCTION__, data_type);
-		return 0;
+		goto end;
 	}
 
 	vbucket = tg->tags.lb.first;
@@ -504,7 +516,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		if(tag->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag type: %d is already used in taggroup: %d\n",
 					__FUNCTION__, type, tg->id);
-			return 0;
+			goto end;
 		}
 		vbucket = vbucket->next;
 	}
@@ -512,25 +524,32 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	if (v_hash_array_count_items(&tg->tags) > MAX_TAGS_COUNT) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() max number of tags in node: %d tag_group: %d was reached\n",
 				tg->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to create new tag */
 	tag = vs_tag_create(tg, RESERVED_TAG_ID, data_type, count, type);
 	if(tag == NULL) {
-		return 0;
+		goto end;
 	}
+
+	ret = 1;
 
 	tag->state = ENTITY_CREATING;
 
 	/* Send TagCreate to all subscribers of tag group */
 	tg_subscriber = tg->tg_subs.first;
 	while(tg_subscriber != NULL) {
-		vs_tag_send_create(tg_subscriber, node, tg, tag);
+		if(vs_tag_send_create(tg_subscriber, node, tg, tag) != 1) {
+			ret = 0;
+		}
 		tg_subscriber = tg_subscriber->next;
 	}
 
-	return 1;
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 /**
@@ -549,6 +568,7 @@ int vs_handle_tag_destroy_ack(struct VS_CTX *vs_ctx,
 	uint32						node_id = tag_destroy_ack->node_id;
 	uint16						taggroup_id = tag_destroy_ack->taggroup_id;
 	uint16						tag_id = tag_destroy_ack->tag_id;
+	int							ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -557,18 +577,20 @@ int vs_handle_tag_destroy_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find Tag */
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
 				__FUNCTION__, tag_id, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find tag follower that generated this fake command */
@@ -589,6 +611,11 @@ int vs_handle_tag_destroy_ack(struct VS_CTX *vs_ctx,
 		vs_tag_destroy(tg, tag);
 	}
 
+	ret = 1;
+
+end:
+	pthread_mutex_unlock(&node->mutex);
+
 	return 1;
 }
 
@@ -605,6 +632,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	uint32 					node_id = UINT32(tag_destroy->data[0]);
 	uint16 					taggroup_id = UINT16(tag_destroy->data[UINT32_SIZE]);
 	uint16					tag_id = UINT16(tag_destroy->data[UINT32_SIZE + UINT16_SIZE]);
+	int						ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -613,12 +641,11 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
+	if(vs_node_is_created(node) != 1) {
+		goto end;
 	}
 
 	/* Is user owner of this node or can user write to this node? */
@@ -628,7 +655,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find TagGroup */
@@ -636,7 +663,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find Tag */
@@ -644,10 +671,15 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
 				__FUNCTION__, tag_id, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
-	return vs_tag_send_destroy(node, tg, tag);
+	ret = vs_tag_send_destroy(node, tg, tag);
+
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 
@@ -667,6 +699,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	uint32 						node_id;
 	uint16 						taggroup_id;
 	uint16						tag_id;
+	int							ret = 0;
 
 	node_id = UINT32(tag_set->data[0]);
 	taggroup_id = UINT16(tag_set->data[UINT32_SIZE]);
@@ -679,12 +712,11 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Node has to be created */
-	if(!(node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"%s() node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, node->id, node->state);
-		return 0;
+	if(vs_node_is_created(node) != 1) {
+		goto end;
 	}
 
 	/* Is user owner of this node or can user write to this node? */
@@ -694,7 +726,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find TagGroup */
@@ -702,7 +734,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_group (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find Tag */
@@ -710,7 +742,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
 				__FUNCTION__, tag_id, taggroup_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Data type has to match */
@@ -719,7 +751,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 				"%s() data type (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
 				__FUNCTION__, tag->data_type, tag_id,
 				taggroup_id, node_id, data_type);
-		return 0;
+		goto end;
 	}
 
 	/* Count of values has to match */
@@ -727,7 +759,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() count of values (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
 				__FUNCTION__, tag->count, tag_id, taggroup_id, node_id, count);
-		return 0;
+		goto end;
 	}
 
 	/* Set value in tag */
@@ -773,6 +805,8 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 		break;
 	}
 
+	ret = 1;
+
 	/* Set this tag as initialized, because value of this tag was set. */
 	tag->flag = TAG_INITIALIZED;
 
@@ -781,10 +815,15 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	/* Send this tag to all client subscribed to the TagGroup */
 	tg_subscriber = tg->tg_subs.first;
 	while(tg_subscriber != NULL) {
-		vs_tag_send_set(tg_subscriber->node_sub->session, tg_subscriber->node_sub->prio, node, tg, tag);
+		if(vs_tag_send_set(tg_subscriber->node_sub->session, tg_subscriber->node_sub->prio, node, tg, tag) != 1) {
+			ret = 0;
+		}
 		tg_subscriber = tg_subscriber->next;
 	}
 
-	return 0;
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
