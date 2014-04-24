@@ -525,7 +525,6 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	layer = vs_layer_create(node, parent_layer, data_type, count, type);
 
 	/* Try to find first free id for layer */
-	/* TODO: this could be more effective */
 	layer->id = node->last_layer_id;
 	while( v_hash_array_find_item(&node->layers, layer) != NULL ) {
 		layer->id++;
