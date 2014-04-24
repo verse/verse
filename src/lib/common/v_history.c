@@ -273,7 +273,7 @@ int v_packet_history_add_cmd(struct VPacket_History *history,
 			 * linked list */
 			v_print_log(VRS_PRINT_ERROR, "Unable allocate enough memory for sent command\n");
 			ret = v_hash_array_remove_item(&history->cmd_hist[cmd_id]->cmds, _cmd);
-			if(ret==1) {
+			if(ret == 1) {
 				v_cmd_destroy(_cmd);
 			}
 			ret = 0;

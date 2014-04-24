@@ -1189,7 +1189,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	}
 
 	if( (dgram_conn = (struct VDgramConn*)calloc(1, sizeof(struct VDgramConn))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
 		goto end;
 	}
@@ -1205,6 +1205,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	if( (fcntl(dgram_conn->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		free(dgram_conn);
+		dgram_conn = NULL;
 		freeaddrinfo(result);
 		goto end;
 	}
@@ -1214,6 +1215,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	if( setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 		free(dgram_conn);
+		dgram_conn = NULL;
 		goto end;
 	}
 

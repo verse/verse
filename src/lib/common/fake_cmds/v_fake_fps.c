@@ -71,10 +71,10 @@ struct Generic_Cmd *v_Fps_create(real32 fps,
 		uint32 seconds,
 		uint32 useconds)
 {
-	struct Generic_Cmd *fps_cmd = NULL;
-	fps_cmd = (struct Generic_Cmd*)calloc(1, sizeof(struct Fps_Cmd));
-	v_Fps_init((struct Fps_Cmd *)fps_cmd, fps, seconds, useconds);
-	return fps_cmd;
+	struct Fps_Cmd *fps_cmd = NULL;
+	fps_cmd = (struct Fps_Cmd*)calloc(1, sizeof(struct Fps_Cmd));
+	v_Fps_init(fps_cmd, fps, seconds, useconds);
+	return (struct Generic_Cmd *)fps_cmd;
 }
 
 /**
