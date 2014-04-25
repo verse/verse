@@ -166,7 +166,7 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					for(col=0; col < LINE_LEN && line[col] != ','; col++) {}
 					next_comma = col;
 					new_user->username = strndup(&line[prev_comma], next_comma-prev_comma);
-					prev_comma = next_comma+1;
+					prev_comma = ((next_comma + 1) < LINE_LEN) ? next_comma + 1 : LINE_LEN;
 
 					/* password */
 					for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
@@ -178,7 +178,7 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 						new_user->password = NULL;
 						new_user->password_hash = strndup(&line[prev_comma], next_comma-prev_comma);
 					}
-					prev_comma = next_comma+1;
+					prev_comma = ((next_comma + 1) < LINE_LEN) ? next_comma + 1 : LINE_LEN;
 					
 					/* user id */
 					for(col=prev_comma; col < LINE_LEN && line[col] != ','; col++) {}
@@ -186,7 +186,7 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					tmp = strndup(&line[prev_comma], next_comma-prev_comma);
 					sscanf(tmp, "%d", (int*)&new_user->user_id);
 					free(tmp);
-					prev_comma = next_comma+1;
+					prev_comma = ((next_comma + 1) < LINE_LEN) ? next_comma + 1 : LINE_LEN;
 
 					/* real name */
 					for(col=prev_comma; col < LINE_LEN && line[col] != '\n'; col++) {}

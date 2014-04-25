@@ -1136,7 +1136,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	srand(tv.tv_sec - tv.tv_usec);
 #endif
 
-	if (v_parse_url(vsession->host_url, &url) != 1) {
+	if (v_url_parse(vsession->host_url, &url) != 1) {
 		goto end;
 	} else {
 		/* v_print_url(VRS_PRINT_DEBUG_MSG, &url); */
@@ -1191,6 +1191,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	if( (dgram_conn = (struct VDgramConn*)calloc(1, sizeof(struct VDgramConn))) == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
+		close(sockfd);
 		goto end;
 	}
 
@@ -1295,7 +1296,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	dgram_conn->host_id = (unsigned int)rand();
 
 end:
-	v_clear_url(&url);
+	v_url_clear(&url);
 	return dgram_conn;
 }
 

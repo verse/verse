@@ -1028,7 +1028,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 {
 	struct VStreamConn *stream_conn = NULL;
 	struct addrinfo hints, *result, *rp;
-	int sockfd, ret, flag;
+	int sockfd = -1, ret, flag;
 	unsigned int int_size;
 #ifndef __APPLE__
 	struct timeval tv;
@@ -1052,10 +1052,10 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	hints.ai_flags = 0;					/* No flags required */
 	hints.ai_protocol = IPPROTO_TCP;	/* Allow TCP protocol only */
 
-	if(is_log_level(VRS_PRINT_DEBUG_MSG)) v_print_log(VRS_PRINT_DEBUG_MSG, "Try to connect to: %s:%s\n", node, service);
+	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to connect to: %s:%s\n", node, service);
 
 	if( (ret = getaddrinfo(node, service, &hints, &result)) !=0 ) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "getaddrinfo(): %s\n", gai_strerror(ret));
+		v_print_log(VRS_PRINT_ERROR, "getaddrinfo(): %s\n", gai_strerror(ret));
 		*error = VRS_CONN_TERM_HOST_UNKNOWN;
 		return NULL;
 	}
@@ -1063,7 +1063,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	/* Try to use addrinfo from getaddrinfo() */
 	for(rp=result; rp!=NULL; rp=rp->ai_next) {
 		if( (sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			continue;
 		}
 		else {
@@ -1072,18 +1072,24 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			if(connect(sockfd, rp->ai_addr, rp->ai_addrlen) != -1)
 				break;
 			close(sockfd);
+			sockfd = -1;
 		}
 	}
 
 	if(rp == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Could not connect to the [%s]:%s\n", node, service);
+		v_print_log(VRS_PRINT_ERROR,
+				"Could not connect to the [%s]:%s\n", node, service);
 		freeaddrinfo(result);
 		*error = VRS_CONN_TERM_SERVER_DOWN;
+		if(sockfd != -1) {
+			close(sockfd);
+		}
 		return NULL;
 	}
 
 	if ( (stream_conn = (struct VStreamConn*)malloc(sizeof(struct VStreamConn))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "malloc(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR,
+				"malloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1135,7 +1141,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	/* Make sure socket is blocking */
 	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
 	if( (fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;

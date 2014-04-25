@@ -1723,12 +1723,13 @@ uint16 v_cmd_unpack_len(const char *buffer,
 	if(length8 == 0xFF) {
 		buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &length16);
 		*length = length16;
-		*cmd_addr_len = 1 + 1 + 2; /* Size of: CmdOpCode + 0xFF + Length16 */
+		/* Size of: CmdOpCode + 0xFF + Length16 */
+		*cmd_addr_len = 1 + 1 + 2;
 	} else {
 		*length = length8;
-		*cmd_addr_len = 1 + 1; /* Size of: CmdOpCode + Length8 */
+		/* Size of: CmdOpCode + Length8 */
+		*cmd_addr_len = 1 + 1;
 	}
-	cmd_addr_len += 1; /* Size of: Share */
 
 	return buffer_pos;
 }

@@ -160,7 +160,7 @@ typedef struct VPacket {
 	/* Flag controlling if this packed has been already acked? */
 	char						acked;
 	/* Array of unions of system commands */
-	VSystemCommands sys_cmd[MAX_SYSTEM_COMMAND_COUNT];
+	VSystemCommands sys_cmd[MAX_SYSTEM_COMMAND_COUNT + 1];
 	/* Number of system commands in packet */
 	unsigned short				sys_cmd_count;
 	/* Pointer to the received buffer, where are stored node commands */
@@ -242,9 +242,10 @@ typedef struct VURL {
 	char		*service;				/* Port number or name of service */
 } VURL;
 
-int v_parse_url(const char *str, struct VURL *url);
-void v_print_url(const int level, struct VURL *url);
-void v_clear_url(struct VURL *url);
+int v_url_parse(const char *str, struct VURL *url);
+void v_url_print(const int level, struct VURL *url);
+void v_url_init(struct VURL *url);
+void v_url_clear(struct VURL *url);
 
 int v_exponential_backoff(const int steps);
 

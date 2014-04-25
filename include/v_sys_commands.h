@@ -105,10 +105,10 @@ typedef struct User_Authentication_Failure {
 
 /* Data structure for USER_AUTH_REQUEST system command */
 typedef struct User_Authentication_Request {
-	uint8			id;						/* ID of command = (7) */
-	char			username[VRS_MAX_USERNAME_LENGTH];		/* User name */
-	uint8			method_type;			/* Type of authentication*/
-	char			data[VRS_MAX_DATA_LENGTH];	/* Data for user authentication method */
+	uint8			id;								/* ID of command = (7) */
+	char			username[VRS_MAX_USERNAME_LENGTH + 1];		/* User name */
+	uint8			method_type;					/* Type of authentication */
+	char			data[VRS_MAX_DATA_LENGTH + 1];	/* Data for user authentication method */
 } User_Authentication_Request;
 
 /* Data structure for CHANGE_L, CHANGE_R, CONFIRM_L and CONFIRM_R commands */

@@ -71,7 +71,7 @@ static int v_compare_ipv6_addr(const struct in6_addr *addr1, const struct in6_ad
  * contained all needed items and it returns 0, when there were some problem
  * during parsing.
  */
-int v_parse_url(const char *str, struct VURL *url)
+int v_url_parse(const char *str, struct VURL *url)
 {
 	int str_pos=0;
 
@@ -183,7 +183,7 @@ int v_parse_url(const char *str, struct VURL *url)
 	return 1;
 }
 
-void v_print_url(const int level, struct VURL *url)
+void v_url_print(const int level, struct VURL *url)
 {
 	v_print_log(level, "URL:\n");
 	v_print_log_simple(level, "\tscheme: %s\n", url->scheme);
@@ -203,7 +203,23 @@ void v_print_url(const int level, struct VURL *url)
 	v_print_log_simple(level, "\tservice: %s\n", url->service);
 }
 
-void v_clear_url(struct VURL *url)
+/**
+ * \brief This function initialize URL structure
+ */
+void v_url_init(struct VURL *url)
+{
+	url->transport_protocol = 0;
+	url->security_protocol = 0;
+	url->ip_ver = 0;
+	url->node = NULL;
+	url->scheme = NULL;
+	url->service = NULL;
+}
+
+/**
+ * \brief This function clear URL structure
+ */
+void v_url_clear(struct VURL *url)
 {
 	url->transport_protocol = 0;
 	url->security_protocol = 0;

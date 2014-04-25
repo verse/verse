@@ -331,9 +331,9 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 
 	/* Check if it is necessary to send payload packet */
 	ret = check_pay_flag(C);
-	if(ret!=0) {
+	if(ret != 0) {
 		s_packet->header.flags |= PAY_FLAG;
-		if(ret==2) {
+		if(ret == 2) {
 			keep_alive_packet = 1;
 		}
 	}
@@ -346,7 +346,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	/* Check if it is necessary to send acknowledgment of received payload
 	 * packet */
 	ret = check_ack_nak_flag(C);
-	if(ret==1) {
+	if(ret == 1) {
 		s_packet->header.flags |= ACK_FLAG;
 
 		/* Update last acknowledged Payload packet */
@@ -502,7 +502,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 	/* Send buffer */
 	ret = v_send_packet(io_ctx, &error_num);
 
-	if(ret==SEND_PACKET_SUCCESS) {
+	if(ret == SEND_PACKET_SUCCESS) {
 		gettimeofday(&tv, NULL);
 
 		/* Update time of sending last payload packet */

@@ -349,6 +349,9 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 	struct timeval tv;
 	struct VURL url;
 
+	/* Initialize URL structure */
+	v_url_init(&url);
+
 	/* Reset content of received message */
 	memset(r_message, 0, sizeof(struct VMessage));
 
@@ -377,7 +380,7 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 					/* Only first proposed URL will be used */
 					vsession->host_url = strdup((char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str);
 					/* Check if proposed URL is correct */
-					ret = v_parse_url(vsession->host_url, &url);
+					ret = v_url_parse(vsession->host_url, &url);
 					if(ret == 1)
 						host_url_proposed = 1;
 					else
@@ -626,7 +629,7 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 	}
 
 end:
-	v_clear_url(&url);
+	v_url_clear(&url);
 
 	return ret;
 }

@@ -276,7 +276,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 	}
 
 	if(current_session != NULL) {
-		struct vContext *new_C;
+		struct vContext *new_C = NULL;
 		int flag;
 
 		/* Try to accept client connection (do TCP handshake) */
@@ -288,7 +288,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Try to do TCP handshake */
 			if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr4, &addr_len)) == -1) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
 				return 0;
 			}
 
@@ -302,7 +302,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Try to do TCP handshake */
 			if( (current_session->stream_conn->io_ctx.sockfd = accept(io_ctx->sockfd, (struct sockaddr*)client_addr6, &addr_len)) == -1) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
 				return 0;
 			}
 
@@ -315,11 +315,9 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 		if(setsockopt(current_session->stream_conn->io_ctx.sockfd,
 				IPPROTO_TCP, TCP_NODELAY, &flag, (socklen_t)sizeof(flag)) == -1)
 		{
-			if(is_log_level(VRS_PRINT_ERROR)) {
-				v_print_log(VRS_PRINT_ERROR,
-						"setsockopt: TCP_NODELAY: %d\n",
-						strerror(errno));
-			}
+			v_print_log(VRS_PRINT_ERROR,
+					"setsockopt: TCP_NODELAY: %d\n",
+					strerror(errno));
 			return -1;;
 		}
 
@@ -333,25 +331,32 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
 		}
 
-		/* Duplicate verse context for new thread */
-		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-		memcpy(new_C, C, sizeof(struct vContext));
-
 		/* Try to initialize thread attributes */
 		if( (ret = pthread_attr_init(&current_session->tcp_thread_attr)) !=0 ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "pthread_attr_init(): %s\n", strerror(errno));
 			return 0;
 		}
 
 		/* Try to set thread attributes as detached */
 		if( (ret = pthread_attr_setdetachstate(&current_session->tcp_thread_attr, PTHREAD_CREATE_DETACHED)) != 0) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "pthread_attr_setdetachstate(): %s\n", strerror(errno));
 			return 0;
 		}
 
-		/* Try to create new thread */
-		if((ret = pthread_create(&current_session->tcp_thread, &current_session->tcp_thread_attr, conn_loop, (void*)new_C)) != 0) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+		/* Duplicate verse context for new thread, because it will set it's
+		 * own properties for context (stream connection, datagram connection,
+		 * in/out messages and packets) */
+		new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
+		if(new_C != NULL) {
+			memcpy(new_C, C, sizeof(struct vContext));
+
+			/* Try to create new thread */
+			if((ret = pthread_create(&current_session->tcp_thread, &current_session->tcp_thread_attr, conn_loop, (void*)new_C)) != 0) {
+				v_print_log(VRS_PRINT_ERROR,
+						"pthread_create(): %s\n", strerror(errno));
+				free(new_C);
+				new_C = NULL;
+			}
 		}
 
 		/* Destroy thread attributes */
@@ -369,7 +374,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Try to do TCP handshake */
 			if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr4, &addr_len)) == -1) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
 				return 0;
 			}
 			/* Close connection (no more free session slots) */
@@ -381,7 +386,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Try to do TCP handshake */
 			if( (tmp_sockfd = accept(io_ctx->sockfd, (struct sockaddr*)&client_addr6, &addr_len)) == -1) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
+				v_print_log(VRS_PRINT_ERROR, "accept(): %s\n", strerror(errno));
 				return 0;
 			}
 			/* Close connection (no more free session slots) */

@@ -341,7 +341,7 @@ int v_array_add_item(struct VArrayBase *arraybase, void *vitem, uint32 *index)
 
 		/* Reallocate access array */
 		new_array = realloc(arraybase->array, sizeof(struct VIndex)*length);
-		if(new_array!=NULL) {
+		if(new_array != NULL) {
 			arraybase->array = new_array;
 			arraybase->length = length;
 		} else {
@@ -356,7 +356,7 @@ int v_array_add_item(struct VArrayBase *arraybase, void *vitem, uint32 *index)
 			arraybase->array[i].item = NULL;
 			arraybase->array[i].next = i+1;
 		}
-		arraybase->array[i].next = 0xFFFFFFFF;
+		arraybase->array[i-1].next = 0xFFFFFFFF;
 
 		arraybase->first_free_index = (length/2);
 		arraybase->last_free_index = length-1;
