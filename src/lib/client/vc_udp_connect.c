@@ -148,7 +148,7 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	int value_rank;
 
 	if(change_r_cmd->feature == FTR_FC_ID) {
-		for(value_rank=0; value_rank<change_r_cmd->count; value_rank++) {
+		for(value_rank = 0; value_rank < change_r_cmd->count; value_rank++) {
 			/* Is value in "list" of supported methods */
 			if(change_r_cmd->value[value_rank].uint8 == FC_NONE ||
 					change_r_cmd->value[value_rank].uint8 == FC_TCP_LIKE)
