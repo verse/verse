@@ -92,15 +92,16 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].real32 = *(real32*)value;
 			break;
 		default:
-			/* When unsuported feature*/
+			/* When unsupported feature*/
 			sys_cmds[cmd_rank].cmd.id = CMD_RESERVED_ID;
+			va_end(args);
 			return 0;
 		}
 		ftr_rank++;
 	}
 	va_end(args);
 
-	/* Add count of values to the command*/
+	/* Add count of values to the command */
 	sys_cmds[cmd_rank].negotiate_cmd.count = ftr_rank;
 
 	/* Add terminating fake command */
