@@ -802,7 +802,7 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 		const uint8_t *methods)
 {
 	static int attempts = 0;	/* Store number of authentication attempt for this session. */
-	char name[64];
+	char name[VRS_MAX_USERNAME_LENGTH + 1];
 	char *password;
 	int i, is_passwd_supported = 0;
 
@@ -829,7 +829,7 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 	} else {
 		if(is_passwd_supported == 1) {
 			attempts++;
-			strcpy(name, username);
+			strncpy(name, username, VRS_MAX_USERNAME_LENGTH);
 			if(my_password != NULL && attempts == 1) {
 				vrs_send_user_authenticate(session_id, name, VRS_UA_METHOD_PASSWORD, my_password);
 			} else {
