@@ -68,7 +68,9 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 	/* Add OpCode of features */
 	sys_cmds[cmd_rank].negotiate_cmd.feature = ftr_op_code;
 
+	/* Start of varargs */
 	va_start(args, ftr_op_code);
+
 	while( (value = va_arg(args, void*)) != NULL) {
 		switch(ftr_op_code) {
 		case FTR_FC_ID:
@@ -99,6 +101,8 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 		}
 		ftr_rank++;
 	}
+
+	/* End of varargs */
 	va_end(args);
 
 	/* Add count of values to the command */
