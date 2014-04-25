@@ -91,36 +91,36 @@ void v_print_log(const uint8 level, const char *format, ...)
 
 	if(log_file==NULL) return;
 
+	va_start(ap, format);
+
 	switch(level) {
 		case VRS_PRINT_ERROR:
 			if( log_print_level>=VRS_PRINT_ERROR ) {
 				fprintf(log_file, "ERROR: ");
-				va_start(ap, format);
 				vfprintf(log_file, format, ap);
 			}
 			break;
 		case VRS_PRINT_INFO:
 			if( log_print_level>=VRS_PRINT_INFO ) {
 				fprintf(log_file, "INFO: ");
-				va_start(ap, format);
 				vfprintf(log_file, format, ap);
 			}
 			break;
 		case VRS_PRINT_WARNING:
 			if( log_print_level>=VRS_PRINT_WARNING ) {
 				fprintf(log_file, "WARNING: ");
-				va_start(ap, format);
 				vfprintf(log_file, format, ap);
 			}
 			break;
 		case VRS_PRINT_DEBUG_MSG:
 			if( log_print_level>=VRS_PRINT_DEBUG_MSG ) {
 				fprintf(log_file, "DEBUG: ");
-				va_start(ap, format);
 				vfprintf(log_file, format, ap);
 			}
 			break;
 	}
+
+	va_end(ap);
 }
 
 /**
