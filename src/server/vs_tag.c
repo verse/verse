@@ -616,7 +616,7 @@ int vs_handle_tag_destroy_ack(struct VS_CTX *vs_ctx,
 end:
 	pthread_mutex_unlock(&node->mutex);
 
-	return 1;
+	return ret;
 }
 
 /**

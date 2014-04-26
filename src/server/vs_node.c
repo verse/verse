@@ -847,7 +847,7 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 	
 	pthread_mutex_unlock(&node->mutex);
 
-	return 1;
+	return ret;
 }
 
 
