@@ -340,6 +340,10 @@ static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 
 	/* Generate random string */
 	vsession->peer_token.str = (char*)malloc((TOKEN_SIZE+1)*sizeof(char));
+	if (vsession->peer_token.str == NULL) {
+		return 0;
+	}
+	
 	for(i=0; i<TOKEN_SIZE; i++) {
 		/* Generate only printable characters (debug prints) */
 		vsession->peer_token.str[i] = 32 + (char)((float)rand()*94.0/RAND_MAX);
@@ -417,8 +421,8 @@ static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 					}
 				} else if(r_message->sys_cmd[i].negotiate_cmd.feature==FTR_TOKEN) {
 					if(r_message->sys_cmd[i].negotiate_cmd.count>0) {
-						if(vsession->peer_token.str != NULL &&
-								strcmp(vsession->peer_token.str, (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
+						if(strcmp(vsession->peer_token.str,
+								  (char*)r_message->sys_cmd[i].negotiate_cmd.value[0].string8.str) == 0)
 						{
 							gettimeofday(&tv, NULL);
 							vsession->peer_token.tv.tv_sec = tv.tv_sec;
