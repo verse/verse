@@ -460,12 +460,13 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 		if((int)current_version != -1 && (int)custom_type != -1) {
 			tg = vs_taggroup_create(node, taggroup_id, custom_type);
 
-			tg->state = ENTITY_CREATED;
-
-			/* Save ObjectID to tag group */
-			memcpy(&tg->oid, oid, sizeof(bson_oid_t));
-
 			if(tg != NULL) {
+
+				tg->state = ENTITY_CREATED;
+
+				/* Save ObjectID to tag group */
+				memcpy(&tg->oid, oid, sizeof(bson_oid_t));
+
 				/* Try to get versions of tag group */
 				if( bson_find(&tg_data_iter, bson_tg, "versions") == BSON_OBJECT ) {
 					bson bson_versions;
