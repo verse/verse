@@ -1121,7 +1121,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	struct VSession *vsession = CTX_current_session(C);
 	struct VDgramConn *dgram_conn = NULL;
 	struct addrinfo hints, *result, *rp;
-	int sockfd;
+	int sockfd = -1;
 	int flag, ret;
 	struct VURL url;
 
@@ -1150,21 +1150,26 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		if(url.ip_ver==IPV6) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Try to connect to: [%s]:%s\n", url.node, url.service);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Try to connect to: [%s]:%s\n",
+						url.node, url.service);
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Try to connect to: %s:%s\n", url.node, url.service);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Try to connect to: %s:%s\n",
+						url.node, url.service);
 		}
 	}
 
 	if( (ret = getaddrinfo(url.node, url.service, &hints, &result)) !=0 ) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "getaddrinfo(): %s\n", gai_strerror(ret));
+		v_print_log(VRS_PRINT_ERROR,
+					"getaddrinfo(): %s\n", gai_strerror(ret));
 		goto end;
 	}
 
 	/* Try to use addrinfo from getaddrinfo() */
 	for(rp=result; rp!=NULL; rp=rp->ai_next) {
 		if( (sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			continue;
 		}
 		else {
@@ -1173,25 +1178,35 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 			if(connect(sockfd, rp->ai_addr, rp->ai_addrlen) != -1)
 				break;
 			close(sockfd);
+			sockfd = -1;
 		}
 	}
 
-	if(rp==NULL) {
+	if(rp == NULL) {
 		if(is_log_level(VRS_PRINT_ERROR)) {
 			if(url.ip_ver==IPV6) {
-				v_print_log(VRS_PRINT_ERROR, "Could not connect to the [%s]:%s\n", url.node, url.service);
+				v_print_log(VRS_PRINT_ERROR,
+							"Could not connect to the [%s]:%s\n",
+							url.node, url.service);
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Could not connect to the %s:%s\n", url.node, url.service);
+				v_print_log(VRS_PRINT_ERROR,
+							"Could not connect to the %s:%s\n",
+							url.node, url.service);
 			}
 		}
 		freeaddrinfo(result);
+		if(sockfd != -1) {
+			close(sockfd);
+		}
 		goto end;
 	}
 
 	if( (dgram_conn = (struct VDgramConn*)calloc(1, sizeof(struct VDgramConn))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
-		close(sockfd);
+		if(sockfd != -1) {
+			close(sockfd);
+		}
 		goto end;
 	}
 
@@ -1204,9 +1219,12 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	/* Set socket non-blocking */
 	flag = fcntl(dgram_conn->io_ctx.sockfd, F_GETFL, 0);
 	if( (fcntl(dgram_conn->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		free(dgram_conn);
 		dgram_conn = NULL;
+		if(sockfd != -1) {
+			close(sockfd);
+		}
 		freeaddrinfo(result);
 		goto end;
 	}
@@ -1214,8 +1232,11 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	/* Set socket to reuse address */
 	flag = 1;
 	if( setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == -1) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
 		free(dgram_conn);
+		if(sockfd != -1) {
+			close(sockfd);
+		}
 		dgram_conn = NULL;
 		goto end;
 	}
@@ -1259,7 +1280,8 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 #if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
 		dgram_conn->io_ctx.flags |= SOCKET_SECURED;
 #else
-		v_print_log(VRS_PRINT_ERROR, "Server tries to force client to use secured connection, but it is not supported\n");
+		v_print_log(VRS_PRINT_ERROR,
+					"Server tries to force client to use secured connection, but it is not supported\n");
 		goto end;
 #endif
 	}
@@ -1297,6 +1319,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 
 end:
 	v_url_clear(&url);
+	
 	return dgram_conn;
 }
 
