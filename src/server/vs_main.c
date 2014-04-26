@@ -635,17 +635,21 @@ int main(int argc, char *argv[])
 	 * but other OS can use in theory e.g.: unsigned long int for this purpose */
 	semaphore_name_len = strlen(DATA_SEMAPHORE_NAME) + 1 + 10 + 1;
 	vs_ctx.data.sem_name = (char*)malloc(semaphore_name_len * sizeof(char));
-	sprintf(vs_ctx.data.sem_name, "%s-%d", DATA_SEMAPHORE_NAME, effective_user_id);
-	vs_ctx.data.sem_name[semaphore_name_len - 1] = '\0';
+	if(vs_ctx.data.sem_name != NULL) {
+		sprintf(vs_ctx.data.sem_name, "%s-%d", DATA_SEMAPHORE_NAME, effective_user_id);
+		vs_ctx.data.sem_name[semaphore_name_len - 1] = '\0';
 
-	/* Initialize data semaphore. The semaphore has to be named, because
-	 * Mac OS X (and probably other BSD like UNIXes) doesn't support unnamed
-	 * semaphores */
-	if( (vs_ctx.data.sem = sem_open(vs_ctx.data.sem_name, O_CREAT, 0644, 1)) == SEM_FAILED) {
-		v_print_log(VRS_PRINT_ERROR, "sem_open(%s): %s\n",
-				vs_ctx.data.sem_name, strerror(errno));
-		if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
-		vs_destroy_ctx(&vs_ctx);
+		/* Initialize data semaphore. The semaphore has to be named, because
+		 * Mac OS X (and probably other BSD like UNIXes) doesn't support unnamed
+		 * semaphores */
+		if( (vs_ctx.data.sem = sem_open(vs_ctx.data.sem_name, O_CREAT, 0644, 1)) == SEM_FAILED) {
+			v_print_log(VRS_PRINT_ERROR, "sem_open(%s): %s\n",
+					vs_ctx.data.sem_name, strerror(errno));
+			free(vs_ctx.data.sem_name);
+			vs_destroy_ctx(&vs_ctx);
+			exit(EXIT_FAILURE);
+		}
+	} else {
 		exit(EXIT_FAILURE);
 	}
 
