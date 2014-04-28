@@ -1261,20 +1261,25 @@ static int vs_init_dgram_ctx(struct vContext *C)
 
 		/* Create socket which server uses for listening for new connections */
 		if ( (dgram_conn->io_ctx.sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1 ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
 
 		/* Set socket non-blocking */
 		flag = fcntl(dgram_conn->io_ctx.sockfd, F_GETFL, 0);
 		if( (fcntl(dgram_conn->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 			return -1;
 		}
 
 		/* Set socket to reuse addresses */
 		flag = 1;
-		setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, (socklen_t) sizeof(flag));
+		if( setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR,
+				(const void*) &flag, (socklen_t) sizeof(flag)) != 0)
+		{
+			v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
+			return -1;
+		}
 
 		/* Set up server address and port */
 		memset(&dgram_conn->io_ctx.host_addr.addr.ipv4, 0, sizeof(struct sockaddr_in));
@@ -1285,7 +1290,10 @@ static int vs_init_dgram_ctx(struct vContext *C)
 		dgram_conn->io_ctx.host_addr.addr.ipv4.sin_port = htons(vsession->dgram_conn->io_ctx.host_addr.port);
 
 		/* Bind address and socket */
-		if( bind(dgram_conn->io_ctx.sockfd, (struct sockaddr*)&(dgram_conn->io_ctx.host_addr.addr.ipv4), sizeof(dgram_conn->io_ctx.host_addr.addr.ipv4)) == -1) {
+		if( bind(dgram_conn->io_ctx.sockfd,
+				(struct sockaddr*)&(dgram_conn->io_ctx.host_addr.addr.ipv4),
+				sizeof(dgram_conn->io_ctx.host_addr.addr.ipv4)) == -1)
+		{
 			v_print_log(VRS_PRINT_ERROR, "bind(): %s\n", strerror(errno));
 			return -1;
 		}
@@ -1297,20 +1305,25 @@ static int vs_init_dgram_ctx(struct vContext *C)
 
 		/* Create socket which server uses for listening for new connections */
 		if ( (dgram_conn->io_ctx.sockfd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1 ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "socket(): %s\n", strerror(errno));
 			return -1;
 		}
 
 		/* Set socket non-blocking */
 		flag = fcntl(dgram_conn->io_ctx.sockfd, F_GETFL, 0);
 		if( (fcntl(dgram_conn->io_ctx.sockfd, F_SETFL, flag | O_NONBLOCK)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 			return -1;
 		}
 
 		/* Set socket to reuse addresses */
 		flag = 1;
-		setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &flag, (socklen_t) sizeof(flag));
+		if(	setsockopt(dgram_conn->io_ctx.sockfd, SOL_SOCKET, SO_REUSEADDR,
+				(const void*) &flag, (socklen_t) sizeof(flag)) != 0)
+		{
+			v_print_log(VRS_PRINT_ERROR, "setsockopt(): %s\n", strerror(errno));
+			return -1;
+		}
 
 		/* Set up server address and port */
 		memset(&dgram_conn->io_ctx.host_addr.addr.ipv6, 0, sizeof(struct sockaddr_in6));
@@ -1321,7 +1334,10 @@ static int vs_init_dgram_ctx(struct vContext *C)
 		dgram_conn->io_ctx.host_addr.addr.ipv6.sin6_port = htons(vsession->dgram_conn->io_ctx.host_addr.port);
 
 		/* Bind address and socket */
-		if( bind(dgram_conn->io_ctx.sockfd, (struct sockaddr*)&(dgram_conn->io_ctx.host_addr.addr.ipv6), sizeof(dgram_conn->io_ctx.host_addr.addr.ipv6)) == -1) {
+		if( bind(dgram_conn->io_ctx.sockfd,
+				(struct sockaddr*)&(dgram_conn->io_ctx.host_addr.addr.ipv6),
+				sizeof(dgram_conn->io_ctx.host_addr.addr.ipv6)) == -1)
+		{
 			v_print_log(VRS_PRINT_ERROR, "bind(): %d\n", strerror(errno));
 			return -1;
 		}
