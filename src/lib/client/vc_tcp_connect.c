@@ -1080,7 +1080,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		}
 	}
 
-	if(rp == NULL) {
+	if(rp == NULL || sockfd == -1) {
 		v_print_log(VRS_PRINT_ERROR,
 				"Could not connect to the [%s]:%s\n", node, service);
 		freeaddrinfo(result);
@@ -1095,6 +1095,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		v_print_log(VRS_PRINT_ERROR,
 				"malloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
+		close(sockfd);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
 	}
@@ -1132,6 +1133,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		stream_conn->peer_address.port = ntohs(((struct sockaddr_in6*)rp->ai_addr)->sin6_port);
 		memcpy(&stream_conn->peer_address.addr.ipv6, rp->ai_addr, rp->ai_addrlen);
 	}
+
 	/* Use first successfully assigned socket */
 	stream_conn->io_ctx.sockfd = sockfd;
 
@@ -1139,13 +1141,21 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 
 	/* Try to get size of TCP buffer */
 	int_size = sizeof(int_size);
-	getsockopt(stream_conn->io_ctx.sockfd, SOL_SOCKET, SO_RCVBUF,
-			(void *)&stream_conn->socket_buffer_size, &int_size);
+	if( getsockopt(stream_conn->io_ctx.sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size) != 0 )
+	{
+		v_print_log(VRS_PRINT_ERROR, "getsockopt(): %s\n", strerror(errno));
+		close(stream_conn->io_ctx.sockfd);
+		free(stream_conn);
+		*error = VRS_CONN_TERM_ERROR;
+		return NULL;
+	}
 
 	/* Make sure socket is blocking */
 	flag = fcntl(stream_conn->io_ctx.sockfd, F_GETFL, 0);
 	if( (fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		close(stream_conn->io_ctx.sockfd);
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1156,6 +1166,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
 		ERR_print_errors_fp(v_log_file());
+		close(stream_conn->io_ctx.sockfd);
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1163,9 +1174,11 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 
 	/* Bind socket and SSL */
 	if (SSL_set_fd(stream_conn->io_ctx.ssl, stream_conn->io_ctx.sockfd) == 0) {
-		v_print_log(VRS_PRINT_ERROR, "Failed binding socket descriptor and SSL.\n");
+		v_print_log(VRS_PRINT_ERROR,
+				"Failed binding socket descriptor and SSL.\n");
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
+		close(stream_conn->io_ctx.sockfd);
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1178,6 +1191,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		v_print_log(VRS_PRINT_ERROR, "SSL connection failed\n");
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
+		close(stream_conn->io_ctx.sockfd);
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1187,7 +1201,9 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 
 	/* Debug print: ciphers, certificates, etc. */
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection uses: %s cipher.\n", SSL_get_cipher(stream_conn->io_ctx.ssl));
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"SSL connection uses: %s cipher.\n",
+				SSL_get_cipher(stream_conn->io_ctx.ssl));
 	}
 #else
 	(void)ctx;
