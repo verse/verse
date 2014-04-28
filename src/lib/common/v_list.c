@@ -965,31 +965,37 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 		uint8 key_size)
 {
 	uint32 i;
-	int res;
+	int res, ret = 0;
 
 	hash_array->lb.first = NULL;
 	hash_array->lb.last = NULL;
 
 	/* Initialize mutex of this array */
-	if((res=pthread_mutex_init(&hash_array->mutex, NULL))!=0) {
+	if((res = pthread_mutex_init(&hash_array->mutex, NULL)) != 0) {
 		/* This function always return 0 on Linux */
 		v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
 		hash_array->length = 0;
 		hash_array->hash_func = NULL;
-		return 0;
+		hash_array->key_offset = 0;
+		hash_array->key_size = 0;
+		hash_array->flags = 0;
+		goto end;
 	}
+
+	pthread_mutex_lock(&hash_array->mutex);
 
 	if(flags & HASH_MOD_256) {
 		hash_array->length = 256;
-		hash_array->buckets = (struct VBucketP*)calloc(hash_array->length,sizeof(struct VBucketP));
-		if(hash_array->buckets==NULL) {
+		hash_array->buckets = (struct VBucketP*)calloc(hash_array->length,
+				sizeof(struct VBucketP));
+		if(hash_array->buckets == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "calloc(): no memory allocated\n");
 			hash_array->length = 0;
 			hash_array->hash_func = NULL;
 			hash_array->key_offset = 0;
 			hash_array->key_size = 0;
 			hash_array->flags = 0;
-			return 0;
+			goto end;
 		}
 		for(i=0; i<hash_array->length; i++) {
 			hash_array->buckets[i].vbucket = NULL;
@@ -998,15 +1004,16 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 		hash_array->hash_func = v_hash_func_uint16;
 	} else if(flags & HASH_MOD_65536) {
 		hash_array->length = 65536;
-		hash_array->buckets = (struct VBucketP*)calloc(hash_array->length,sizeof(struct VBucketP));
-		if(hash_array->buckets==NULL) {
+		hash_array->buckets = (struct VBucketP*)calloc(hash_array->length,
+				sizeof(struct VBucketP));
+		if(hash_array->buckets == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "calloc(): no memory allocated\n");
 			hash_array->length = 0;
 			hash_array->hash_func = NULL;
 			hash_array->key_offset = 0;
 			hash_array->key_size = 0;
 			hash_array->flags = 0;
-			return 0;
+			goto end;
 		}
 		for(i=0; i<hash_array->length; i++) {
 			hash_array->buckets[i].vbucket = NULL;
@@ -1022,13 +1029,17 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 		hash_array->key_size = 0;
 		hash_array->flags = 0;
 		hash_array->hash_func = NULL;
-		return 0;
+		goto end;
 	}
 
+	ret = 1;
 	hash_array->count = 0;
 	hash_array->key_offset = key_offset;
 	hash_array->key_size = key_size;
 	hash_array->flags = flags;
 
-	return 1;
+	pthread_mutex_unlock(&hash_array->mutex);
+
+end:
+	return ret;
 }
