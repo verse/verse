@@ -495,7 +495,10 @@ void *vs_websocket_loop(void *arg)
 
 	/* Set socket blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
-	fcntl(io_ctx->sockfd, F_SETFL, flags & ~O_NONBLOCK);
+	if( fcntl(io_ctx->sockfd, F_SETFL, flags & ~O_NONBLOCK) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		goto end;
+	}
 
 	/* Listen for HTTP request from web client and try to do
 	 * WebSocket handshake */

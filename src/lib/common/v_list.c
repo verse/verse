@@ -973,18 +973,21 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 	uint32 i;
 	int res, ret = 0;
 
+	/* Default initializaton */
 	hash_array->lb.first = NULL;
 	hash_array->lb.last = NULL;
+	hash_array->count = 0;
+	hash_array->length = 0;
+	hash_array->buckets = NULL;
+	hash_array->hash_func = NULL;
+	hash_array->key_offset = 0;
+	hash_array->key_size = 0;
+	hash_array->flags = 0;
 
 	/* Initialize mutex of this array */
 	if((res = pthread_mutex_init(&hash_array->mutex, NULL)) != 0) {
 		/* This function always return 0 on Linux */
 		v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
-		hash_array->length = 0;
-		hash_array->hash_func = NULL;
-		hash_array->key_offset = 0;
-		hash_array->key_size = 0;
-		hash_array->flags = 0;
 		return 0;
 	}
 
@@ -996,11 +999,6 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 				sizeof(struct VBucketP));
 		if(hash_array->buckets == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "calloc(): no memory allocated\n");
-			hash_array->length = 0;
-			hash_array->hash_func = NULL;
-			hash_array->key_offset = 0;
-			hash_array->key_size = 0;
-			hash_array->flags = 0;
 			goto end;
 		}
 		for(i=0; i<hash_array->length; i++) {
@@ -1014,11 +1012,6 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 				sizeof(struct VBucketP));
 		if(hash_array->buckets == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "calloc(): no memory allocated\n");
-			hash_array->length = 0;
-			hash_array->hash_func = NULL;
-			hash_array->key_offset = 0;
-			hash_array->key_size = 0;
-			hash_array->flags = 0;
 			goto end;
 		}
 		for(i=0; i<hash_array->length; i++) {
@@ -1028,18 +1021,10 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 		hash_array->hash_func = v_hash_func_uint32;
 	} else {
 		v_print_log(VRS_PRINT_ERROR, "Unsupported hash function\n");
-		hash_array->length = 0;
-		hash_array->buckets = NULL;
-		hash_array->hash_func = NULL;
-		hash_array->key_offset = 0;
-		hash_array->key_size = 0;
-		hash_array->flags = 0;
-		hash_array->hash_func = NULL;
 		goto end;
 	}
 
 	ret = 1;
-	hash_array->count = 0;
 	hash_array->key_offset = key_offset;
 	hash_array->key_size = key_size;
 	hash_array->flags = flags;
