@@ -505,29 +505,45 @@ void *vs_websocket_loop(void *arg)
 
 	/* Try to get size of TCP buffer */
 	int_size = sizeof(int_size);
-	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
-			(void *)&stream_conn->socket_buffer_size, &int_size);
+	if( getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size) != 0)
+	{
+		v_print_log(VRS_PRINT_ERROR, "Unable to get TCP buffer size\n");
+		goto end;
+	}
 
 	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
+
+	if(r_message == NULL || s_message == NULL) {
+		v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+		goto end;
+	}
+
 	CTX_r_message_set(C, r_message);
 	CTX_s_message_set(C, s_message);
 
+	/* Set socket non-blocking */
+	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
+	if(fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
+		goto end;
+	}
+
+	/* Try to initialize WebSocket server context */
+	if(wslay_event_context_server_init(&wslay_ctx, &callbacks, C) != 0) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to initialize webSocket server context\n");
+		goto end;
+	}
+
+	/* Set initial state */
 	stream_conn->host_state = TCP_SERVER_STATE_RESPOND_METHODS;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
 		printf("%c[%dm", 27, 0);
-	}
-
-	/* Set socket non-blocking */
-	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
-	fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK);
-
-	/* Try to initialize WebSocket server context */
-	if(wslay_event_context_server_init(&wslay_ctx, &callbacks, C) != 0) {
-		goto end;
 	}
 
 	/* "Never ending" loop */
