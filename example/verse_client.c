@@ -507,27 +507,27 @@ static void cb_receive_node_create(const uint8_t session_id,
 			__FUNCTION__, session_id, node_id, parent_id, user_id, custom_type);
 
 	/* Is node special node? */
-	if(node_id==VRS_ROOT_NODE_ID) {
+	if(node_id == VRS_ROOT_NODE_ID) {
 		printf("\tRoot Node\n");
-	} else if(node_id==VRS_AVATAR_PARENT_NODE_ID) {
+	} else if(node_id == VRS_AVATAR_PARENT_NODE_ID) {
 		printf("\tParent of Avatar Nodes\n");
 		/* Try to delete node, that could not be deleted */
 		vrs_send_node_destroy(session_id, VRS_DEFAULT_PRIORITY, node_id);
-	} else if(node_id==VRS_USERS_PARENT_NODE_ID) {
+	} else if(node_id == VRS_USERS_PARENT_NODE_ID) {
 		printf("\tParent of User Nodes\n");
 		/* Example of node subscribe command */
 		vrs_send_node_subscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0, 0);
-	} else if(node_id==VRS_SCENE_PARENT_NODE_ID) {
+	} else if(node_id == VRS_SCENE_PARENT_NODE_ID) {
 		printf("\tParent of Scene Nodes\n");
 		/* Example of node un-subscribe command */
 		vrs_send_node_unsubscribe(session_id, VRS_DEFAULT_PRIORITY, node_id, 0);
-	} else if(node_id==VRS_ROOT_NODE_ID) {
+	} else if(user_id == VRS_ROOT_NODE_ID) {
 		printf("\tUser Node of SuperUser\n");
-	} else if(parent_id==VRS_USERS_PARENT_NODE_ID) {
+	} else if(parent_id == VRS_USERS_PARENT_NODE_ID) {
 		printf("\tUser Node\n");
-	} else if(node_id==VRS_RESERVED_NODE_ID) {
+	} else if(node_id == VRS_RESERVED_NODE_ID) {
 		printf("\tReservered Node ID (should never be received by client from server)\n");
-	} else if(node_id>=VRS_FIRST_COMMON_NODE_ID) {
+	} else if(node_id >= VRS_FIRST_COMMON_NODE_ID) {
 		printf("\tCommon Node\n");
 	}
 
