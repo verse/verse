@@ -818,13 +818,19 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 
 	/* Get username, when it is requested */
 	if(username == NULL) {
+		int ret = 0;
 		attempts = 0;	/* Reset counter of auth. attempt. */
 		if(my_username != NULL) {
 			vrs_send_user_authenticate(session_id, my_username, 0, NULL);
 		} else {
 			printf("Username: ");
-			scanf("%s", name);
-			vrs_send_user_authenticate(session_id, name, 0, NULL);
+			ret = scanf("%s", name);
+			if(ret == 1) {
+				vrs_send_user_authenticate(session_id, name, 0, NULL);
+			} else {
+				printf("ERROR: Reading username.\n");
+				exit(EXIT_FAILURE);
+			}
 		}
 	} else {
 		if(is_passwd_supported == 1) {
