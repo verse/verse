@@ -222,7 +222,6 @@ static int vs_LISTEN_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	if(change_l_cmd->feature == FTR_TOKEN) {
 		if( vsession->peer_token.str != NULL &&
 				change_l_cmd->count > 0 &&
-				change_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)change_l_cmd->value[0].string8.str, vsession->peer_token.str)==0 )
 		{
 			return 1;
