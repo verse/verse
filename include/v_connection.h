@@ -83,7 +83,7 @@
 #define TCP_SERVER_STATE_CLOSED					8
 
 /* Maximal number of client or server state.  */
-#define STATE_COUNT				(((UDP_CLIENT_STATE_CLOSED > UDP_SERVER_STATE_CLOSED) ? UDP_CLIENT_STATE_CLOSED : UDP_SERVER_STATE_CLOSED)+1)
+#define STATE_COUNT				(((UDP_CLIENT_STATE_CLOSED > UDP_SERVER_STATE_CLOSED) ? UDP_CLIENT_STATE_CLOSED : UDP_SERVER_STATE_CLOSED) + 1)
 
 /* Temporary flags that keeps information about receiving system commands
  * in OPEN and CLOSEREQ states */
