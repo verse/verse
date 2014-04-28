@@ -198,7 +198,6 @@ static int vc_REQUEST_CONFIRM_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		/* This block of code checks if the server confirmed send token. */
 		if( vsession->host_token.str != NULL &&
 				confirm_l_cmd->count == 1 &&
-				confirm_l_cmd->value[0].string8.str != NULL &&
 				strcmp((char*)confirm_l_cmd->value[0].string8.str, vsession->host_token.str)==0 )
 		{
 			v_print_log(VRS_PRINT_DEBUG_MSG,
