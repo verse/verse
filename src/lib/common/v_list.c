@@ -979,7 +979,7 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 		hash_array->key_offset = 0;
 		hash_array->key_size = 0;
 		hash_array->flags = 0;
-		goto end;
+		return 0;
 	}
 
 	pthread_mutex_lock(&hash_array->mutex);
@@ -1038,8 +1038,8 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 	hash_array->key_size = key_size;
 	hash_array->flags = flags;
 
+end:
 	pthread_mutex_unlock(&hash_array->mutex);
 
-end:
 	return ret;
 }
