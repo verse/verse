@@ -800,9 +800,9 @@ int vs_handle_taggroup_unsubscribe(struct VS_CTX *vs_ctx,
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
 					__FUNCTION__, taggroup_id, node_id);
 			ret = 0;
+		} else {
+			ret = vs_taggroup_unsubscribe(tg, vsession);
 		}
-
-		ret = vs_taggroup_unsubscribe(tg, vsession);
 	}
 
 	pthread_mutex_unlock(&node->mutex);
