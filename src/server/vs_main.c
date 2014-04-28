@@ -117,11 +117,11 @@ void vs_handle_signal(int sig)
 static void *vs_server_cli(void *arg)
 {
 	struct VS_CTX *vs_ctx = (struct VS_CTX*)arg;
-	char ch;
+	int ret;
 
 	do {
-		ch = getchar();
-		if(ch == 'q') {
+		ret = getchar();
+		if(ret != EOF && (char)ret == 'q') {
 			vs_request_terminate(vs_ctx);
 
 			/* Reset signal handling to default behavior */
