@@ -98,8 +98,12 @@ void *vs_tcp_conn_loop(void *arg)
 
 	/* Try to get size of TCP buffer */
 	int_size = sizeof(int_size);
-	getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
-			(void *)&stream_conn->socket_buffer_size, &int_size);
+	if( getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
+			(void *)&stream_conn->socket_buffer_size, &int_size) != 0 )
+	{
+		v_print_log(VRS_PRINT_ERROR, "getsockopt(): %s\n", strerror(errno));
+		goto end;
+	}
 
 #ifdef WITH_OPENSSL
 	/* Try to do TLS handshake with client */
@@ -110,6 +114,12 @@ void *vs_tcp_conn_loop(void *arg)
 
 	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
+
+	if(r_message == NULL || s_message == NULL) {
+		v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+		goto end;
+	}
+
 	CTX_r_message_set(C, r_message);
 	CTX_s_message_set(C, s_message);
 
