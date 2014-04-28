@@ -667,7 +667,8 @@ struct VBucket *v_hash_array_add_item(struct VHashArrayBase *hash_array,
 	/* Check if it was possible to allocate memory for bucket */
 	if(vbucket == NULL) {
 		v_print_log(VRS_PRINT_ERROR, "Not enough memory for new bucket\n");
-		return NULL;
+		vbucket = NULL;
+		goto end;
 	}
 
 	v_list_add_tail(&hash_array->lb, vbucket);
@@ -677,10 +678,12 @@ struct VBucket *v_hash_array_add_item(struct VHashArrayBase *hash_array,
 		vbucket->data = malloc(item_size);
 		/* Check if it was possible to allocate memory for data */
 		if(vbucket->data == NULL) {
-			v_print_log(VRS_PRINT_ERROR, "Not enough memory for new data of bucket\n");
+			v_print_log(VRS_PRINT_ERROR,
+					"Not enough memory for new data of bucket\n");
 			v_list_rem_item(&hash_array->lb, vbucket);
 			free(vbucket);
-			return NULL;
+			vbucket = NULL;
+			goto end;
 		}
 		/* Copy item to the bucket */
 		memcpy(vbucket->data, item, item_size);
@@ -702,13 +705,15 @@ struct VBucket *v_hash_array_add_item(struct VHashArrayBase *hash_array,
 		/* Check if it was possible to allocate memory for pointer at
 		 * bucket */
 		if(new_vbucket_p == NULL) {
-			v_print_log(VRS_PRINT_ERROR, "Not enough memory for new pointer at bucket\n");
+			v_print_log(VRS_PRINT_ERROR,
+					"Not enough memory for new pointer at bucket\n");
 			v_list_rem_item(&hash_array->lb, vbucket);
 			if(hash_array->flags & HASH_COPY_BUCKET) {
 				free(vbucket->data);
 			}
 			free(vbucket);
-			return NULL;
+			vbucket = NULL;
+			goto end;
 		}
 
 		/* Go to the end of the list */
@@ -725,6 +730,7 @@ struct VBucket *v_hash_array_add_item(struct VHashArrayBase *hash_array,
 
 	hash_array->count++;
 
+end:
 	pthread_mutex_unlock(&hash_array->mutex);
 
 	return vbucket;
