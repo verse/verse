@@ -453,6 +453,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 			{
 				/* TODO: Add better check here */
 				if(prio <= VRS_DEFAULT_PRIORITY && buffer_pos >= vconn->io_ctx.mtu) {
+					full_packet = 1;
 					break;
 				}
 
@@ -528,7 +529,7 @@ int send_packet_in_OPEN_CLOSEREQ_state(struct vContext *C)
 		if(s_packet->header.flags & ACK_FLAG) vconn->count_s_ack++;
 
 		/* If the packet was sent full and there are some pending data to send
-		 * then modify returned value*/
+		 * then modify returned value */
 		if(full_packet == 1) {
 			ret = SEND_PACKET_FULL;
 		}
