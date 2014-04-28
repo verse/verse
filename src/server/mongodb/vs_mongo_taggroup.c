@@ -376,11 +376,14 @@ static void vs_mongo_taggroup_load_data(struct VSTagGroup *tg,
 			if(data_type != -1 && count != -1 && tag_custom_type != -1) {
 				/* Create tag with specific ID */
 				tag = vs_tag_create(tg, tag_id, data_type, count, tag_custom_type);
-				tag->state = ENTITY_CREATED;
 
-				vs_mongo_tag_load_data(tag, &bson_tag);
+				if(tag != NULL) {
+					tag->state = ENTITY_CREATED;
 
-				tag->flag = TAG_INITIALIZED;
+					vs_mongo_tag_load_data(tag, &bson_tag);
+
+					tag->flag = TAG_INITIALIZED;
+				}
 			}
 		}
 	}
