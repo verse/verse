@@ -359,7 +359,7 @@ void vc_REQUEST_init_send_packet(struct vContext *C)
 				CMD_CHANGE_L_ID, FTR_CMD_COMPRESS, &cmpr_none, NULL);
 		/* Client isn't able to receive compressed commands (remote proposal) */
 		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
-				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_addr_share, NULL);
+				CMD_CHANGE_R_ID, FTR_CMD_COMPRESS, &cmpr_none, NULL);
 	} else {
 		/* Client wants to send compressed commands (local proposal) */
 		cmd_rank += v_add_negotiate_cmd(s_packet->sys_cmd, cmd_rank,
