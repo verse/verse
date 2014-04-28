@@ -80,8 +80,7 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		 * negotiated token. When token is not the same, then the client
 		 * will not response to the received packet. */
 		if( vsession->peer_token.str != NULL &&
-				change_l_cmd->count > 0 &&
-				change_l_cmd->value[0].string8.str != NULL )
+				change_l_cmd->count > 0)
 		{
 			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote TOKEN: %s proposed\n", change_l_cmd->value[0].string8.str);
 			return 1;
