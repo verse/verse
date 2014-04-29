@@ -973,7 +973,16 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 	uint32 i;
 	int res, ret = 0;
 
-	/* Default initializaton */
+	/* Initialize mutex of this array */
+	if((res = pthread_mutex_init(&hash_array->mutex, NULL)) != 0) {
+		/* This function always return 0 on Linux */
+		v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
+		return 0;
+	}
+
+	pthread_mutex_lock(&hash_array->mutex);
+
+	/* Default values */
 	hash_array->lb.first = NULL;
 	hash_array->lb.last = NULL;
 	hash_array->count = 0;
@@ -983,15 +992,6 @@ int v_hash_array_init(struct VHashArrayBase *hash_array,
 	hash_array->key_offset = 0;
 	hash_array->key_size = 0;
 	hash_array->flags = 0;
-
-	/* Initialize mutex of this array */
-	if((res = pthread_mutex_init(&hash_array->mutex, NULL)) != 0) {
-		/* This function always return 0 on Linux */
-		v_print_log(VRS_PRINT_ERROR, "pthread_mutex_init(): %d\n", res);
-		return 0;
-	}
-
-	pthread_mutex_lock(&hash_array->mutex);
 
 	if(flags & HASH_MOD_256) {
 		hash_array->length = 256;
