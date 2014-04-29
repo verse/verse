@@ -112,7 +112,7 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 		file = fopen(vs_ctx->csv_user_file, "rt");
 		if(file != NULL) {
 			struct VSUser *new_user, *user;
-			char line[LINE_LEN], *tmp;
+			char line[LINE_LEN + 1], *tmp;
 			char raw_pass = 0, hash_pass = 0;
 
 			raw = 0;
@@ -201,13 +201,17 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 					while(user != NULL) {
 						/* User ID */
 						if(user->user_id == new_user->user_id) {
-							v_print_log(VRS_PRINT_WARNING, "User %s could not be added to list of user, because user %s has same user ID: %d\n",
-									new_user->username, user->username, user->user_id);
+							v_print_log(VRS_PRINT_WARNING,
+									"User %s could not be added to list of user, because user %s has same user ID: %d\n",
+									new_user->username,
+									user->username,
+									user->user_id);
 							break;
 						}
 						/* Username */
 						if( strcmp(user->username, new_user->username) == 0) {
-							v_print_log(VRS_PRINT_WARNING, "User %s could not be added to list of user, because user ID: %d has the same name\n",
+							v_print_log(VRS_PRINT_WARNING,
+									"User %s could not be added to list of user, because user ID: %d has the same name\n",
 									new_user->username, user->user_id);
 							break;
 						}
@@ -216,13 +220,15 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 
 					/* Check correctness of User ID */
 					if(!(new_user->user_id >= MIN_USER_ID && new_user->user_id <= MAX_USER_ID)) {
-						v_print_log(VRS_PRINT_WARNING, "User ID: %d of user: %s not in valid range (%d-%d)\n",
+						v_print_log(VRS_PRINT_WARNING,
+									"User ID: %d of user: %s not in valid range (%d-%d)\n",
 								new_user->user_id, new_user->username, MIN_USER_ID, MAX_USER_ID);
 						free(new_user);
 					} else {
 						if(user == NULL) {
 							v_list_add_tail(&vs_ctx->users, (void*)new_user);
-							v_print_log(VRS_PRINT_DEBUG_MSG, "Added: username: %s, ID: %d, realname: %s\n",
+							v_print_log(VRS_PRINT_DEBUG_MSG,
+										"Added: username: %s, ID: %d, realname: %s\n",
 									new_user->username, new_user->user_id, new_user->realname);
 							usr_count++;
 						} else {
@@ -237,15 +243,18 @@ int vs_load_user_accounts_csv_file(VS_CTX *vs_ctx)
 
 			if(usr_count > 0) {
 				ret = 1;
-				v_print_log(VRS_PRINT_DEBUG_MSG, "%d user account loaded from file: %s\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+							"%d user account loaded from file: %s\n",
 							usr_count, vs_ctx->csv_user_file);
 			} else {
 				ret = 0;
-				v_print_log(VRS_PRINT_ERROR, "No valid user account loaded from file: %s\n",
+				v_print_log(VRS_PRINT_ERROR,
+							"No valid user account loaded from file: %s\n",
 						vs_ctx->csv_user_file);
 			}
 		} else {
-			v_print_log(VRS_PRINT_ERROR, "Could not open file: %s\n",
+			v_print_log(VRS_PRINT_ERROR,
+						"Could not open file: %s\n",
 						vs_ctx->csv_user_file);
 		}
 	}
