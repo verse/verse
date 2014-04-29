@@ -706,7 +706,7 @@ static int vs_init_io_ctx(struct IO_CTX *io_ctx,
 
 	/* Allocate buffer for incoming packets */
 	if ( (io_ctx->buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char))) == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "calloc(): %s\n", strerror(errno));
 		return -1;
 	}
 
