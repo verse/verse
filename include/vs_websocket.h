@@ -38,6 +38,11 @@
 #define WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 /**
+ * The length of client key has to be 24 bytes
+ */
+#define WS_CLIENT_KEY_LEN 24
+
+/**
  * The name of supported WebSocket protocol that is negotiated during
  * WebSocket handshake.
  */

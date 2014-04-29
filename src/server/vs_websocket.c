@@ -49,7 +49,7 @@
  * Calculates SHA-1 hash of *src*. The size of *src* is *src_length* bytes.
  * *dst* must be at least SHA1_DIGEST_SIZE.
  */
-static void sha1(uint8_t *dst, const uint8_t *src, size_t src_length)
+static void sha1(uint8_t *dst, const uint8_t *src, const size_t src_length)
 {
 	SHA1(src, src_length, dst);
 }
@@ -60,7 +60,7 @@ static void sha1(uint8_t *dst, const uint8_t *src, size_t src_length)
  * The size of *src* is *src_length*.
  * *dst* must be at least BASE64_ENCODE_RAW_LENGTH(src_length).
  */
-static void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
+static void base64(uint8_t *dst, const uint8_t *src, const size_t src_length)
 {
 	BIO *bmem, *b64;
 	BUF_MEM *bptr;
@@ -88,8 +88,8 @@ static void base64(uint8_t *dst, const uint8_t *src, size_t src_length)
 static void create_accept_key(char *dst, const char *client_key)
 {
 	uint8_t sha1buf[20], key_src[60];
-	memcpy(key_src, client_key, 24);
-	memcpy(key_src+24, WS_GUID, 36);
+	memcpy(key_src, client_key, WS_CLIENT_KEY_LEN);
+	memcpy(key_src + WS_CLIENT_KEY_LEN, WS_GUID, 36);
 	sha1(sha1buf, key_src, sizeof(key_src));
 	base64((uint8_t*)dst, sha1buf, 20);
 	dst[BASE64_ENCODE_RAW_LENGTH(20)] = '\0';
@@ -102,69 +102,72 @@ static void create_accept_key(char *dst, const char *client_key)
  * If the caller is looking for a specific value, we return a pointer to the
  * start of that value, else we simply return the start of values list.
  */
-static char* http_header_find_field_value(char *header, char *field_name, char *value)
+static char* http_header_find_field_value(char *header,
+		char *field_name,
+		char *value)
 {
-	char *header_end,
-	*field_start,
-	*field_end,
-	*next_crlf,
-	*value_start;
-	int field_name_len;
+	char *header_end = header + strlen(header) - 1,
+	*field_start = header,
+	*field_end = NULL,
+	*next_crlf = NULL,
+	*value_start = NULL;
+	int field_name_len = strlen(field_name);
 
-	/* Pointer to the last character in the header */
-	header_end = header + strlen(header) - 1;
+	do {
+		field_start = strstr(field_start + 1, field_name);
 
-	field_name_len = strlen(field_name);
+		if(field_start != NULL) {
 
-	field_start = header;
+			field_end = field_start + field_name_len - 1;
 
-	do{
-		field_start = strstr(field_start+1, field_name);
-
-		field_end = field_start + field_name_len - 1;
-
-		if(field_start != NULL
-				&& field_start - header >= 2
-				&& field_start[-2] == '\r'
-				&& field_start[-1] == '\n'
-						&& header_end - field_end >= 1
-						&& field_end[1] == ':')
-		{
-			break; /* Found the field */
-		}
-		else
-		{
-			continue; /* This is not the one; keep looking. */
+			if(field_start - header >= 2 &&
+					field_start[-2] == '\r' &&
+					field_start[-1] == '\n' &&
+					header_end - field_end >= 1 &&
+					field_end[1] == ':')
+			{
+				/* Found the field */
+				break;
+			}
 		}
 	} while(field_start != NULL);
 
-	if(field_start == NULL)
+	if(field_start == NULL) {
 		return NULL;
+	}
 
 	/* Find the field terminator */
 	next_crlf = strstr(field_start, "\r\n");
 
 	/* A field is expected to end with \r\n */
-	if(next_crlf == NULL)
-		return NULL; /* Malformed HTTP header! */
+	if(next_crlf == NULL) {
+		/* Malformed HTTP header! */
+		return NULL;
+	}
 
-	/* If not looking for a value, then return a pointer to the start of values string */
-	if(value == NULL)
-		return field_end+2;
+	/* If not looking for a value, then return a pointer to the start
+	 * of values string */
+	if(value == NULL) {
+		return field_end + 2;
+	}
 
 	value_start = strstr(field_start, value);
 
 	/* Value not found */
-	if(value_start == NULL)
+	if(value_start == NULL) {
 		return NULL;
+	}
 
 	/* Found the value we're looking for */
-	if(value_start > next_crlf)
-		return NULL; /* ... but after the CRLF terminator of the field. */
+	if(value_start > next_crlf) {
+		/* ... but after the CRLF terminator of the field. */
+		return NULL;
+	}
 
 	/* The value we found should be properly delineated from the other tokens */
-	if(isalnum(value_start[-1]) || isalnum(value_start[strlen(value)]))
+	if(isalnum(value_start[-1]) || isalnum(value_start[strlen(value)])) {
 		return NULL;
+	}
 
 	return value_start;
 }
@@ -175,55 +178,109 @@ static char* http_header_find_field_value(char *header, char *field_name, char *
  * connection to the client. This function returns 0 if it succeeds,
  * or returns -1.
  */
-static int http_handshake(int fd)
+static int http_handshake(int sockfd)
 {
 	char header[16384], accept_key[29], res_header[256];
 	char *keyhdstart, *keyhdend;
 	size_t header_length = 0, res_header_sent = 0, res_header_length;
 	ssize_t ret;
+	fd_set set;
+	struct timeval timeout_tv, start_tv, current_tv;
 
+	/* Get current time */
+	gettimeofday(&start_tv, NULL);
+
+	/* Set default timeout */
+	timeout_tv.tv_sec = VRS_TIMEOUT;
+	timeout_tv.tv_usec = 0;
+
+	/* Try to read whole header without blocking read, use select and
+	 * timeout */
 	while(1) {
-		while((ret = read(fd, header+header_length,
-				sizeof(header)-header_length)) == -1 && errno == EINTR);
-		if(ret == -1) {
-			perror("read");
+
+		FD_ZERO(&set);
+		FD_SET(sockfd, &set);
+
+		if( (ret = select(sockfd + 1, &set, NULL, NULL, &timeout_tv)) == -1 ) {
+			v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			return -1;
-		} else if(ret == 0) {
-			v_print_log(VRS_PRINT_ERROR,
-					"HTTP Handshake: Got EOF");
-			return -1;
-		} else {
-			header_length += ret;
-			if(header_length >= 4 &&
-					memcmp(header + header_length - 4, "\r\n\r\n", 4) == 0) {
-				break;
-			} else if(header_length == sizeof(header)) {
-				v_print_log(VRS_PRINT_ERROR,
-						"HTTP Handshake: Too large HTTP headers\n");
-				return -1;
+		/* Was event on the listen socket */
+		} else if(ret > 0) {
+			if(FD_ISSET(sockfd, &set)) {
+				ret = read(sockfd,
+						header + header_length,
+						sizeof(header) - header_length);
+
+				if(ret == -1) {
+					v_print_log(VRS_PRINT_ERROR, "read(): %s\n", strerror(errno));
+					return -1;
+				} else if(ret == 0) {
+					v_print_log(VRS_PRINT_ERROR,
+							"HTTP Handshake: Got EOF");
+					return -1;
+				} else {
+					header_length += ret;
+					/* Was end of HTTP header reached? */
+					if(header_length >= 4 &&
+							memcmp(header + header_length - 4, "\r\n\r\n", 4) == 0)
+					{
+						break;
+					} else if(header_length == sizeof(header)) {
+						v_print_log(VRS_PRINT_ERROR,
+								"HTTP Handshake: Too large HTTP headers\n");
+						return -1;
+					}
+				}
 			}
+		}
+
+		gettimeofday(&current_tv, NULL);
+
+		/* Update timeout */
+		timeout_tv.tv_sec = VRS_TIMEOUT - (current_tv.tv_sec - start_tv.tv_sec);
+		timeout_tv.tv_usec = 0;
+
+		/* Where there is no elapsing time, then exit handshake */
+		if(timeout_tv.tv_sec <= 0) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"HTTP Handshake: Timed out\n");
+			return -1;
 		}
 	}
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "HTTP Handshake: received request\n");
+	header[header_length] = '\0';
+
+	v_print_log(VRS_PRINT_DEBUG_MSG,
+			"HTTP Handshake: received request: %s\n",
+			header);
 
 	/* Check if required HTTP headers were received in the request */
+
+	/* Header has to contain field "Upgrade: websocket" */
 	if(http_header_find_field_value(header, "Upgrade", "websocket") == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Missing required header field 'Upgrade: websocket'\n");
 		return -1;
 	}
+	/* Header has to contain field "Connection: Upgrade" */
 	if(http_header_find_field_value(header, "Connection", "Upgrade") == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Missing required header field 'Connection: Upgrade'\n");
 		return -1;
 	}
-	if( (keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key", NULL)) == NULL) {
+	/* Client has to send field Sec-WebSocket-Key in HTTP header */
+	if( (keyhdstart = http_header_find_field_value(header, "Sec-WebSocket-Key",
+			NULL)) == NULL)
+	{
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Missing required header field 'Sec-WebSocket-Key: SOME_SECRET_KEY'\n");
 		return -1;
 	}
-	if( http_header_find_field_value(header, "Sec-WebSocket-Protocol", WEB_SOCKET_PROTO_NAME) == NULL) {
+	/* Requested protocol name has to be equal to "v1.verse.tul.cz" */
+	if( http_header_find_field_value(header, "Sec-WebSocket-Protocol",
+			WEB_SOCKET_PROTO_NAME) == NULL)
+	{
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Missing required header field 'Sec-WebSocket-Protocol: %s'\n",
 				WEB_SOCKET_PROTO_NAME);
@@ -234,7 +291,7 @@ static int http_handshake(int fd)
 	for(; *keyhdstart == ' '; ++keyhdstart);
 	keyhdend = keyhdstart;
 	for(; *keyhdend != '\r' && *keyhdend != ' '; ++keyhdend);
-	if(keyhdend - keyhdstart != 24) {
+	if(keyhdend - keyhdstart != WS_CLIENT_KEY_LEN) {
 		v_print_log(VRS_PRINT_ERROR,
 				"HTTP Handshake: Invalid value in Sec-WebSocket-Key\n");
 		return -1;
@@ -249,17 +306,19 @@ static int http_handshake(int fd)
 			"Upgrade: websocket\r\n"
 			"Connection: Upgrade\r\n"
 			"Sec-WebSocket-Accept: %s\r\n"
-			"Sec-WebSocket-Protocol: v1.verse.tul.cz\r\n"
-			"\r\n", accept_key);
+			"Sec-WebSocket-Protocol: %s\r\n"
+			"\r\n",
+			accept_key,
+			WEB_SOCKET_PROTO_NAME);
 
 	/* Send response to the client */
 	res_header_length = strlen(res_header);
 	while(res_header_sent < res_header_length) {
-		while((ret = write(fd, res_header + res_header_sent,
+		while((ret = write(sockfd, res_header + res_header_sent,
 				res_header_length - res_header_sent)) == -1 &&
 				errno == EINTR);
 		if(ret == -1) {
-			perror("write");
+			v_print_log(VRS_PRINT_ERROR, "write(): %s\n", strerror(errno));
 			return -1;
 		} else {
 			res_header_sent += ret;
@@ -493,9 +552,9 @@ void *vs_websocket_loop(void *arg)
 			vs_ws_recv_msg_callback
 	};
 
-	/* Set socket blocking */
+	/* Set socket non-blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
-	if( fcntl(io_ctx->sockfd, F_SETFL, flags & ~O_NONBLOCK) == -1) {
+	if( fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		goto end;
 	}
@@ -525,13 +584,6 @@ void *vs_websocket_loop(void *arg)
 
 	CTX_r_message_set(C, r_message);
 	CTX_s_message_set(C, s_message);
-
-	/* Set socket non-blocking */
-	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
-	if(fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
-		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
-		goto end;
-	}
 
 	/* Try to initialize WebSocket server context */
 	if(wslay_event_context_server_init(&wslay_ctx, &callbacks, C) != 0) {
@@ -603,7 +655,7 @@ void *vs_websocket_loop(void *arg)
 				&write_set,
 				NULL,			/* Don't care about exception */
 				&tv)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+			v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
