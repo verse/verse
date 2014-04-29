@@ -50,7 +50,8 @@ void v_print_message_sys_cmds(const unsigned char level, const struct VMessage *
 	int i=0;
 
 	while(i < MAX_SYSTEM_COMMAND_COUNT &&
-		  vmessage->sys_cmd[i].cmd.id != CMD_RESERVED_ID) {
+		  vmessage->sys_cmd[i].cmd.id != CMD_RESERVED_ID)
+	{
 		switch(vmessage->sys_cmd[i].cmd.id) {
 		v_print_log_simple(level, "\t");
 		case CMD_USER_AUTH_REQUEST:
@@ -85,7 +86,9 @@ void v_print_packet_sys_cmds(const unsigned char level, const struct VPacket *vp
 {
 	int i=0;
 
-	while(vpacket->sys_cmd[i].cmd.id != CMD_RESERVED_ID && i<MAX_SYSTEM_COMMAND_COUNT) {
+	while(i < MAX_SYSTEM_COMMAND_COUNT &&
+		  vpacket->sys_cmd[i].cmd.id != CMD_RESERVED_ID)
+	{
 		switch(vpacket->sys_cmd[i].cmd.id) {
 			case CMD_ACK_ID:
 				v_print_ack_nak_cmd(level, (struct Ack_Nak_Cmd*)&vpacket->sys_cmd[i].ack_cmd);
@@ -123,15 +126,15 @@ int v_unpack_packet_system_commands(const char *buffer,
 	unsigned char length, cmd_id=CMD_RESERVED_ID;
 	int i=0;
 
-	if(buffer_len<VERSE_PACKET_HEADER_SIZE) {
+	if(buffer_len < VERSE_PACKET_HEADER_SIZE) {
 		vpacket->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
 		return -1;	/* Corrupted data was received ... buffer can not be proceeded further */
-	} else if(buffer_len==VERSE_PACKET_HEADER_SIZE) {
+	} else if(buffer_len == VERSE_PACKET_HEADER_SIZE) {
 		vpacket->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
 		return VERSE_PACKET_HEADER_SIZE;
 	} else {
-		while(buffer_pos<buffer_len &&
-				cmd_id<=MAX_SYS_CMD_ID && /* System command IDs are in range 0-31 */
+		while(buffer_pos < buffer_len &&
+				cmd_id <= MAX_SYS_CMD_ID && /* System command IDs are in range 0-31 */
 				i < MAX_SYSTEM_COMMAND_COUNT-1 )
 		{
 			/* Unpack Command ID */
@@ -201,7 +204,7 @@ int v_unpack_message_system_commands(const char *buffer,
 		vmessage->sys_cmd[0].cmd.id = CMD_RESERVED_ID;
 		return 0;	/* Corrupted data was received ... buffer can not be proceeded further */
 	} else {
-		while(buffer_pos<buffer_len && cmd_id<=MAX_SYS_CMD_ID) {	/* System command IDs are in range 0-31 */
+		while(buffer_pos<buffer_len && cmd_id <= MAX_SYS_CMD_ID) {	/* System command IDs are in range 0-31 */
 			/* Unpack Command ID */
 			not_used += vnp_raw_unpack_uint8(&buffer[buffer_pos], &cmd_id);
 
@@ -264,7 +267,9 @@ int v_pack_dgram_system_commands(const struct VPacket *vpacket, char *buffer)
 	unsigned short buffer_pos=0;
 	int i=0;
 
-	while(vpacket->sys_cmd[i].cmd.id != CMD_RESERVED_ID && i<MAX_SYSTEM_COMMAND_COUNT) {
+	while(i < MAX_SYSTEM_COMMAND_COUNT &&
+		  vpacket->sys_cmd[i].cmd.id != CMD_RESERVED_ID)
+	{
 		switch(vpacket->sys_cmd[i].cmd.id) {
 			case CMD_ACK_ID:
 				buffer_pos += v_raw_pack_ack_nak_cmd(&buffer[buffer_pos],
@@ -299,7 +304,9 @@ int v_pack_stream_system_commands(const struct VMessage *vmessage, char *buffer)
 	unsigned short buffer_pos=0;
 	int i=0;
 
-	while(vmessage->sys_cmd[i].cmd.id != CMD_RESERVED_ID && i<MAX_SYSTEM_COMMAND_COUNT) {
+	while(i < MAX_SYSTEM_COMMAND_COUNT &&
+		  vmessage->sys_cmd[i].cmd.id != CMD_RESERVED_ID)
+	{
 		switch(vmessage->sys_cmd[i].cmd.id) {
 		case CMD_USER_AUTH_REQUEST:
 			buffer_pos += v_raw_pack_user_auth_request(&buffer[buffer_pos],
