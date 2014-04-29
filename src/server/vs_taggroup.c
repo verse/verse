@@ -544,7 +544,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
-		goto end;
+		return 0;
 	}
 
 	pthread_mutex_lock(&node->mutex);
