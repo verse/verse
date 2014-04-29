@@ -49,8 +49,8 @@ void v_print_message_sys_cmds(const unsigned char level, const struct VMessage *
 {
 	int i=0;
 
-	while(vmessage->sys_cmd[i].cmd.id != CMD_RESERVED_ID &&
-			i < MAX_SYSTEM_COMMAND_COUNT) {
+	while(i < MAX_SYSTEM_COMMAND_COUNT &&
+		  vmessage->sys_cmd[i].cmd.id != CMD_RESERVED_ID) {
 		switch(vmessage->sys_cmd[i].cmd.id) {
 		v_print_log_simple(level, "\t");
 		case CMD_USER_AUTH_REQUEST:
