@@ -1193,9 +1193,6 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 			}
 		}
 		freeaddrinfo(result);
-		if(sockfd != -1) {
-			close(sockfd);
-		}
 		goto end;
 	}
 
