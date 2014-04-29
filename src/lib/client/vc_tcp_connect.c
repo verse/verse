@@ -1080,14 +1080,11 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		}
 	}
 
-	if(rp == NULL || sockfd == -1) {
+	if(rp == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
 				"Could not connect to the [%s]:%s\n", node, service);
 		freeaddrinfo(result);
 		*error = VRS_CONN_TERM_SERVER_DOWN;
-		if(sockfd != -1) {
-			close(sockfd);
-		}
 		return NULL;
 	}
 
