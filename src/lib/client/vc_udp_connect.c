@@ -82,7 +82,9 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 		if( vsession->peer_token.str != NULL &&
 				change_l_cmd->count > 0)
 		{
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Remote TOKEN: %s proposed\n", change_l_cmd->value[0].string8.str);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Remote TOKEN: %s proposed\n",
+					change_l_cmd->value[0].string8.str);
 			return 1;
 		} else {
 			v_print_log(VRS_PRINT_WARNING, "Peer proposed wrong TOKEN\n");
@@ -92,6 +94,8 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 
 	/* Server proposes it's own Flow Control */
 	if(change_l_cmd->feature == FTR_FC_ID) {
+		int ret = 0;
+
 		for(value_rank=0; value_rank<change_l_cmd->count; value_rank++) {
 			/* Is value in "list" of supported methods */
 			if(change_l_cmd->value[value_rank].uint8 == FC_NONE ||
@@ -105,29 +109,41 @@ static int vc_REQUEST_CHANGE_L_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					 * and server. Client can't use different method then
 					 * server and vice versa. */
 					if(dgram_conn->fc_meth != change_l_cmd->value[value_rank].uint8) {
-						v_print_log(VRS_PRINT_WARNING, "Proposed FC local :%d is not same as proposed FC remote: %d\n",
-								change_l_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
-						return 0;
+						v_print_log(VRS_PRINT_WARNING,
+								"Skipping proposed local FC :%d; it is not teh same as proposed remote FC: %d\n",
+								change_l_cmd->value[value_rank].uint8,
+								dgram_conn->fc_meth);
+						continue;
 					}
 				}
 				dgram_conn->fc_meth = change_l_cmd->value[value_rank].uint8;
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Local Flow Control ID: %d proposed\n", change_l_cmd->value[0].uint8);
-				return 1;
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Local Flow Control ID: %d proposed\n",
+						change_l_cmd->value[0].uint8);
+				ret = 1;
+				break;
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control method\n");
-				return 0;
+				v_print_log(VRS_PRINT_ERROR,
+						"Skipping unsupported Flow Control method: %d\n",
+						change_l_cmd->value[value_rank].uint8);
+				continue;
 			}
 		}
+
+		return ret;
 	}
 
 	/* Server proposes it's own scale of Flow Control Window */
 	if(change_l_cmd->feature == FTR_RWIN_SCALE) {
 		if(change_l_cmd->count >= 1) {
 			dgram_conn->rwin_peer_scale = change_l_cmd->value[0].uint8;
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Scale of peer RWIN: %d proposed\n", dgram_conn->rwin_peer_scale);
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Scale of peer RWIN: %d proposed\n",
+					dgram_conn->rwin_peer_scale);
 			return 1;
 		} else {
-			v_print_log(VRS_PRINT_ERROR, "At last on value of RWIN scale has to be proposed\n");
+			v_print_log(VRS_PRINT_ERROR,
+					"At last on value of RWIN scale has to be proposed\n");
 			return 0;
 		}
 	}
@@ -147,6 +163,8 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 	int value_rank;
 
 	if(change_r_cmd->feature == FTR_FC_ID) {
+		int ret = 0;
+
 		for(value_rank = 0; value_rank < change_r_cmd->count; value_rank++) {
 			/* Is value in "list" of supported methods */
 			if(change_r_cmd->value[value_rank].uint8 == FC_NONE ||
@@ -161,21 +179,27 @@ static int vc_REQUEST_CHANGE_R_cb(struct vContext *C, struct Generic_Cmd *cmd)
 					 * server and vice versa. */
 					if(dgram_conn->fc_meth != change_r_cmd->value[value_rank].uint8) {
 						v_print_log(VRS_PRINT_WARNING,
-								"Proposed FC remote :%d is not same as proposed FC local: %d\n",
-								change_r_cmd->value[value_rank].uint8, dgram_conn->fc_meth);
-						return 0;
+								"Skipping proposed remote FC :%d is not the same as proposed local FC: %d\n",
+								change_r_cmd->value[value_rank].uint8,
+								dgram_conn->fc_meth);
+						continue;
 					}
 				}
 				dgram_conn->fc_meth = change_r_cmd->value[value_rank].uint8;
 				v_print_log(VRS_PRINT_DEBUG_MSG,
 						"Remote Flow Control ID: %d proposed\n",
 						change_r_cmd->value[0].uint8);
-				return 1;
+				ret = 1;
+				break;
 			} else {
-				v_print_log(VRS_PRINT_ERROR, "Unsupported Flow Control method\n");
-				return 0;
+				v_print_log(VRS_PRINT_ERROR,
+						"Skipping unsupported Flow Control method: %d\n",
+						change_r_cmd->value[value_rank].uint8);
+				continue;
 			}
 		}
+
+		return ret;
 	}
 
 	/* Ignore unknown feature */
