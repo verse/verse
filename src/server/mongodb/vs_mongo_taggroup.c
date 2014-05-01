@@ -357,9 +357,9 @@ static void vs_mongo_taggroup_load_data(struct VSTagGroup *tg,
 
 		while( bson_iterator_next(&tags_iter) == BSON_OBJECT ) {
 			key = bson_iterator_key(&tags_iter);
-			bson_iterator_subobject_init(&tags_iter, &bson_tag, 0);
-
 			sscanf(key, "%d", &tag_id);
+
+			bson_iterator_subobject_init(&tags_iter, &bson_tag, 0);
 
 			if( bson_find(&tag_iter, &bson_tag, "data_type") == BSON_INT) {
 				data_type = bson_iterator_int(&tag_iter);
@@ -412,7 +412,8 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 	struct VSTagGroup *tg = NULL;
 	bson query;
 	mongo_cursor cursor;
-	uint32 node_id = -1, tg_id = -1, current_version = -1, custom_type = -1;
+	uint32 node_id = -1, tmp_taggroup_id = -1,
+			current_version = -1, custom_type = -1;
 	int found = 0;
 	bson_iterator tg_data_iter;
 	const bson *bson_tg;
@@ -435,12 +436,12 @@ struct VSTagGroup *vs_mongo_taggroup_load_linked(struct VS_CTX *vs_ctx,
 
 		/* Try to get tag group id */
 		if( bson_find(&tg_data_iter, bson_tg, "taggroup_id") == BSON_INT ) {
-			tg_id = bson_iterator_int(&tg_data_iter);
+			tmp_taggroup_id = bson_iterator_int(&tg_data_iter);
 		}
 
 		/* ObjectID is ALMOST unique. So it is check, if node id and
 		 * tag group id matches */
-		if(node_id == node->id && tg_id == taggroup_id) {
+		if(node_id == node->id && tmp_taggroup_id == taggroup_id) {
 			found = 1;
 			break;
 		}

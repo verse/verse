@@ -210,7 +210,10 @@ int vs_node_layers_destroy(struct VSNode *node)
 	return 0;
 }
 
-static VSLayer *vs_layer_find(struct VSNode *node, uint16 layer_id)
+/**
+ * \brief Try to find layer within node with specified layer
+ */
+VSLayer *vs_layer_find(struct VSNode *node, uint16 layer_id)
 {
 	struct VSLayer find_layer;
 	struct VBucket *bucket;

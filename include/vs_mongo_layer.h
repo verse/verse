@@ -33,9 +33,11 @@ int vs_mongo_layer_save(struct VS_CTX *vs_ctx,
 		struct VSNode *node,
 		struct VSLayer *layer);
 
-struct VSLayer *vs_mongo_layer_load(struct VS_CTX *vs_ctx,
+struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
+		bson_oid_t *oid,
 		struct VSNode *node,
+		struct VSLayer *parent_layer,
 		uint16 layer_id,
-		uint32 version);
+		uint32 req_version);
 
 #endif /* VS_MONGO_LAYER_H_ */
