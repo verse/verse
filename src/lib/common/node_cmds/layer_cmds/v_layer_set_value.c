@@ -66,6 +66,11 @@ struct Generic_Cmd *v_layer_set_value_create(const uint32 node_id,
 	layer_set = (struct Generic_Cmd *)malloc(UINT8_SIZE +
 			cmd_struct[cmd_id].size);
 
+	if(layer_set == NULL) {
+		v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+		return NULL;
+	}
+
 	layer_set->id = cmd_id;
 	UINT32(layer_set->data[0]) = node_id;
 	UINT16(layer_set->data[UINT32_SIZE]) = layer_id;

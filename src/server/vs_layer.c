@@ -357,9 +357,13 @@ int vs_layer_send_set_value(struct VSEntitySubscriber *layer_subscriber,
 	set_value_cmd = v_layer_set_value_create(node->id, layer->id, value->id,
 			layer->data_type, layer->num_vec_comp, value->value);
 
-	return v_out_queue_push_tail(layer_subscriber->node_sub->session->out_queue,
+	if(set_value_cmd != NULL) {
+		return v_out_queue_push_tail(layer_subscriber->node_sub->session->out_queue,
 			layer_subscriber->node_sub->prio,
 			set_value_cmd);
+	} else {
+		return 0;
+	}
 }
 
 /**
@@ -374,7 +378,7 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 	struct VSLayer *layer;
 	struct VSEntityFollower *layer_foll;
 	struct Layer_Create_Ack_Cmd *layer_create_cmd_ack = (struct Layer_Create_Ack_Cmd*)cmd;
-	int all_created = 1;
+	int all_created = 1, ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, layer_create_cmd_ack->node_id)) == NULL) {
@@ -383,11 +387,13 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_create_cmd_ack->layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_create_cmd_ack->layer_id, layer_create_cmd_ack->node_id);
-		return 0;
+		goto end;
 	}
 
 	for(layer_foll = layer->layer_folls.first;
@@ -395,10 +401,13 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 			layer_foll = layer_foll->next)
 	{
 		if(layer_foll->node_sub->session->session_id == vsession->session_id) {
+
 			/* Switch from state CREATING to state CREATED */
 			if(layer_foll->state == ENTITY_CREATING) {
 				layer_foll->state = ENTITY_CREATED;
 			}
+
+			ret = 1;
 
 			/* If the layer is in the state DELETING, then it is possible
 			 * now to sent layer_destroy command to the client, because
@@ -407,14 +416,17 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 				struct Generic_Cmd *layer_destroy_cmd = v_layer_destroy_create(node->id, layer->id);
 
 				/* Push this command to the outgoing queue */
-				if ( layer_destroy_cmd!= NULL &&
+				if ( layer_destroy_cmd != NULL &&
 						v_out_queue_push_tail(layer_foll->node_sub->session->out_queue,
 								layer_foll->node_sub->prio,
-								layer_destroy_cmd) == 1) {
+								layer_destroy_cmd) == 1)
+				{
 					layer_foll->state = ENTITY_DELETING;
 				} else {
-					v_print_log(VRS_PRINT_DEBUG_MSG, "layer_destroy (node_id: %d, layer_id: %d) wasn't added to the queue\n",
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"layer_destroy (node_id: %d, layer_id: %d) wasn't added to the queue\n",
 							node->id, layer->id);
+					ret = 0;
 				}
 			} else {
 				if(layer_foll->state != ENTITY_CREATED) {
@@ -428,8 +440,10 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 		layer->state = ENTITY_CREATED;
 	}
 
+end:
+	pthread_mutex_unlock(&node->mutex);
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -451,13 +465,13 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	struct VSLayer *layer;
 	struct VBucket *vbucket;
 	struct VSNodeSubscriber *node_subscriber;
-
 	uint32 node_id = UINT32(layer_create_cmd->data[0]);
 	uint16 parent_layer_id = UINT16(layer_create_cmd->data[UINT32_SIZE]);
 	uint16 layer_id = UINT16(layer_create_cmd->data[UINT32_SIZE+UINT16_SIZE]);
 	uint8 data_type = UINT16(layer_create_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT16_SIZE]);
 	uint8 count = UINT16(layer_create_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT16_SIZE+UINT8_SIZE]);
 	uint16 type = UINT16(layer_create_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT16_SIZE+UINT8_SIZE+UINT8_SIZE]);
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -465,6 +479,8 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 				__FUNCTION__, node_id);
 		return 0;
 	}
+
+	pthread_mutex_lock(&node->mutex);
 
 	/* Node has to be created */
 	if( vs_node_is_created(node) != 1 ) {
@@ -479,7 +495,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		if(parent_layer == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() parent layer (id: %d) in node (id: %d) not found\n",
 					__FUNCTION__, parent_layer_id, node_id);
-			return 0;
+			goto end;
 		}
 	}
 
@@ -489,7 +505,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Client has to send layer_create command with layer_id equal to
@@ -497,14 +513,14 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	if(layer_id != RESERVED_LAYER_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer_id: %d is not 0xFFFF\n",
 				__FUNCTION__, layer_id);
-		return 0;
+		goto end;
 	}
 
 	/* Is type of Layer supported? */
 	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_REAL64)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() data_type: %d is not supported\n",
 				__FUNCTION__, data_type);
-		return 0;
+		goto end;
 	}
 
 	vbucket = node->layers.lb.first;
@@ -512,17 +528,19 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	while(vbucket != NULL) {
 		layer = vbucket->data;
 		if(layer->custom_type == type) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer type: %d is already used in layer: %d\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() layer type: %d is already used in layer: %d\n",
 					__FUNCTION__, type, layer->id);
-			return 0;
+			goto end;
 		}
 		vbucket = vbucket->next;
 	}
 
 	if (v_hash_array_count_items(&node->layers) > MAX_LAYERS_COUNT) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() max number of layers in node: %d was reached\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() max number of layers in node: %d was reached\n",
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	layer = vs_layer_create(node, parent_layer, data_type, count, type);
@@ -538,22 +556,30 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	}
 	node->last_layer_id = layer->id;
 
-	/* Try to add new Tag to the hashed linked list of tags */
-	vbucket = v_hash_array_add_item(&node->layers, (void*)layer, sizeof(struct VSLayer));
+	/* Try to add new layer to the hashed linked list of layers */
+	vbucket = v_hash_array_add_item(&node->layers,
+			(void*)layer, sizeof(struct VSLayer));
 
-	if(vbucket==NULL) {
+	if(vbucket == NULL) {
 		free(layer);
-		return 0;
+		goto end;
 	}
 
 	layer->state = ENTITY_CREATING;
 
+	ret = 1;
+
 	/* Send layer_create to all node subscribers */
 	node_subscriber = node->node_subs.first;
 	while(node_subscriber != NULL) {
-		vs_layer_send_create(node_subscriber, node, layer);
+		if(vs_layer_send_create(node_subscriber, node, layer) != 1) {
+			ret = 0;
+		}
 		node_subscriber = node_subscriber->next;
 	}
+
+end:
+	pthread_mutex_unlock(&node->mutex);
 
 	return 0;
 }
@@ -566,6 +592,7 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 	struct VSLayer *layer;
 	struct VSEntityFollower *layer_foll, *next_layer_foll;
 	struct Layer_Destroy_Ack_Cmd *layer_destroy_cmd = (struct Layer_Destroy_Ack_Cmd*)cmd;
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, layer_destroy_cmd->node_id)) == NULL) {
@@ -574,12 +601,16 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_destroy_cmd->layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_destroy_cmd->layer_id, layer_destroy_cmd->node_id);
-		return 0;
+		goto end;
 	}
+
+	ret = 1;
 
 	/* Mark the layer in this session as DELETED and remove this follower from
 	 * the list of layer followers */
@@ -600,6 +631,9 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 		vs_layer_destroy(node, layer);
 	}
 
+end:
+	pthread_mutex_unlock(&node->mutex);
+
 	return 0;
 }
 
@@ -609,9 +643,9 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSLayer *layer;
-
 	uint32 node_id = UINT32(layer_destroy_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_destroy_cmd->data[UINT32_SIZE]);
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -620,9 +654,11 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Node has to be created */
 	if( vs_node_is_created(node) != 1 ) {
-		return 0;
+		goto end;
 	}
 
 	/* User has to have permission to write to the node */
@@ -632,7 +668,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find layer */
@@ -640,7 +676,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Layer has to be created */
@@ -648,12 +684,17 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
 				__FUNCTION__, layer->id, node->id, node->state);
-		return 0;
+		goto end;
 	}
 
 	layer->state = ENTITY_DELETING;
 
-	return vs_layer_send_destroy(node, layer);
+	ret = vs_layer_send_destroy(node, layer);
+
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 
@@ -667,13 +708,11 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	struct VSEntitySubscriber *layer_subscriber;
 	struct VBucket *vbucket;
 	struct VSLayerValue *value;
-
 	uint32 node_id = UINT32(layer_subscribe_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_subscribe_cmd->data[UINT32_SIZE]);
-/*
-	uint32 version = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE]);
-	uint32 crc32 = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE]);
-*/
+/*	uint32 version = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE]);
+	uint32 crc32 = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE]); */
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -682,9 +721,11 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Node has to be created */
 	if( vs_node_is_created(node) != 1 ) {
-		return 0;
+		goto end;
 	}
 
 	/* User has to have permission to read the node */
@@ -694,7 +735,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find node subscriber */
@@ -711,7 +752,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): client has to be subscribed to the node: %d before subscribing to the layer: %d\n",
 				__FUNCTION__, node_id, layer_id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find layer */
@@ -719,7 +760,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Layer has to be created */
@@ -727,7 +768,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
 				__FUNCTION__, layer->id, node->id, node->state);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find layer subscriber (client can't be subscribed twice) */
@@ -737,7 +778,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() client already subscribed to the layer (id: %d) in node (id: %d)\n",
 					__FUNCTION__, layer_id, node_id);
-			return 0;
+			goto end;
 		}
 		layer_subscriber = layer_subscriber->next;
 	}
@@ -758,7 +799,10 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		vbucket = vbucket->next;
 	}
 
-	return 1;
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 
@@ -771,10 +815,9 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 
 	uint32 node_id = UINT32(layer_unsubscribe_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_unsubscribe_cmd->data[UINT32_SIZE]);
-/*
-	uint32 version = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE]);
-	uint32 crc32 = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE]);
-*/
+/*	uint32 version = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE]);
+	uint32 crc32 = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE]); */
+	int ret = 0;
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
@@ -783,18 +826,63 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
-		return 0;
+		goto end;
 	}
 
-	return vs_layer_unsubscribe(layer, vsession);
+	ret = vs_layer_unsubscribe(layer, vsession);
+
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
+/**
+ * \brief This function returns size of data type stored in layer item
+ */
+static int vs_layer_data_size(struct VSLayer *layer)
+{
+	int item_data_size = 0;
 
+	switch(layer->data_type) {
+		case VRS_VALUE_TYPE_UINT8:
+			item_data_size = UINT8_SIZE;
+			break;
+		case VRS_VALUE_TYPE_UINT16:
+			item_data_size = UINT16_SIZE;
+			break;
+		case VRS_VALUE_TYPE_UINT32:
+			item_data_size = UINT32_SIZE;
+			break;
+		case VRS_VALUE_TYPE_UINT64:
+			item_data_size = UINT64_SIZE;
+			break;
+		case VRS_VALUE_TYPE_REAL16:
+			item_data_size = REAL16_SIZE;
+			break;
+		case VRS_VALUE_TYPE_REAL32:
+			item_data_size = REAL32_SIZE;
+			break;
+		case VRS_VALUE_TYPE_REAL64:
+			item_data_size = REAL64_SIZE;
+			break;
+		default:
+			break;
+	}
+
+	return item_data_size;
+}
+
+/**
+ * \brief This function tries to handle received command layer_set_value
+ */
 int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct Generic_Cmd *layer_set_value_cmd,
@@ -806,6 +894,8 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	struct VSLayerValue *item, _item;
 	struct VBucket *vbucket;
 	struct VSEntitySubscriber *layer_subscriber;
+	int ret = 0;
+	int item_data_size;
 
 	uint32 node_id = UINT32(layer_set_value_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_set_value_cmd->data[UINT32_SIZE]);
@@ -818,6 +908,8 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
@@ -825,7 +917,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find layer */
@@ -833,7 +925,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
-		return 0;
+		goto end;
 	}
 
 	/* Check type of value */
@@ -841,7 +933,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() data type (%d) of layer (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
 				__FUNCTION__, layer->data_type, layer_id, node_id, data_type);
-		return 0;
+		goto end;
 	}
 
 	/* Check count of value */
@@ -849,121 +941,70 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() count of values (%d) of layer (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
 				__FUNCTION__, layer->num_vec_comp, layer_id, node_id, count);
-		return 0;
+		goto end;
 	}
 
 	/* Set item value */
 
-	/* Try to find item value first */
-	_item.id = item_id;
-	vbucket = v_hash_array_find_item(&layer->values, &_item);
-	if(vbucket == NULL) {
-		/* When this item doesn't exist yet, then allocate memory for this item
-		 * and add it to the hashed array */
-		item = calloc(1, sizeof(struct VSLayerValue));
-		item->id = item_id;
-		v_hash_array_add_item(&layer->values, item, sizeof(struct VSLayerValue));
+	item_data_size = vs_layer_data_size(layer);
+	if(item_data_size > 0) {
+		/* Try to find item value first */
+		_item.id = item_id;
+		vbucket = v_hash_array_find_item(&layer->values, &_item);
+		if(vbucket == NULL) {
+			/* When this item doesn't exist yet, then allocate memory for this item
+			 * and add it to the hashed array */
+			item = calloc(1, sizeof(struct VSLayerValue));
 
-		/* Allocate memory for values and copy data to this memory */
-		switch(layer->data_type) {
-			case VRS_VALUE_TYPE_UINT8:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(uint8));
+			if(item == NULL) {
+				v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+				goto end;
+			}
+
+			item->id = item_id;
+
+			/* Allocate memory for values and copy data to this memory */
+			item->value = (void*)calloc(layer->num_vec_comp, item_data_size);
+			if(item->value != NULL) {
+				v_hash_array_add_item(&layer->values, item, sizeof(struct VSLayerValue));
 				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT8_SIZE);
-				break;
-			case VRS_VALUE_TYPE_UINT16:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(uint16));
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT16_SIZE);
-				break;
-			case VRS_VALUE_TYPE_UINT32:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(uint32));
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT32_SIZE);
-				break;
-			case VRS_VALUE_TYPE_UINT64:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(uint64));
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT64_SIZE);
-				break;
-			case VRS_VALUE_TYPE_REAL16:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(real16));
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*REAL16_SIZE);
-				break;
-			case VRS_VALUE_TYPE_REAL32:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(real32));
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*REAL32_SIZE);
-				break;
-			case VRS_VALUE_TYPE_REAL64:
-				item->value = (void*)calloc(layer->num_vec_comp, sizeof(real64));
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*REAL64_SIZE);
-				break;
-			default:
-				return 0;
+						&layer_set_value_cmd->data[UINT32_SIZE + UINT16_SIZE + UINT32_SIZE],
+						layer->num_vec_comp * item_data_size);
+			} else {
+				free(item);
+				item = NULL;
+				v_print_log(VRS_PRINT_ERROR, "Out of memory\n");
+				goto end;
+			}
+		} else {
+			item = (struct VSLayerValue*)vbucket->data;
+			memcpy(item->value,
+					&layer_set_value_cmd->data[UINT32_SIZE + UINT16_SIZE + UINT32_SIZE],
+					layer->num_vec_comp * item_data_size);
 		}
 	} else {
-		item = (struct VSLayerValue*)vbucket->data;
-		switch(layer->data_type) {
-			case VRS_VALUE_TYPE_UINT8:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT8_SIZE);
-				break;
-			case VRS_VALUE_TYPE_UINT16:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT16_SIZE);
-				break;
-			case VRS_VALUE_TYPE_UINT32:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT32_SIZE);
-				break;
-			case VRS_VALUE_TYPE_UINT64:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*UINT64_SIZE);
-				break;
-			case VRS_VALUE_TYPE_REAL16:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*REAL16_SIZE);
-				break;
-			case VRS_VALUE_TYPE_REAL32:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*REAL32_SIZE);
-				break;
-			case VRS_VALUE_TYPE_REAL64:
-				memcpy(item->value,
-						&layer_set_value_cmd->data[UINT32_SIZE+UINT16_SIZE+UINT32_SIZE],
-						layer->num_vec_comp*REAL64_SIZE);
-				break;
-			default:
-				return 0;
-		}
+		v_print_log(VRS_PRINT_ERROR, "Unsupported data type: %d\n",
+				layer->data_type);
+		goto end;
 	}
 
 	vs_layer_inc_version(layer);
 
-	/* Send item value set to all layer subscribers */
+	ret = 1;
+
+	/* Send command layer_set_value to all layer subscribers */
 	layer_subscriber = layer->layer_subs.first;
 	while(layer_subscriber != NULL) {
-		vs_layer_send_set_value(layer_subscriber, node, layer, item);
+		if(vs_layer_send_set_value(layer_subscriber, node, layer, item) != 1) {
+			ret = 0;
+		}
 		layer_subscriber = layer_subscriber->next;
 	}
 
-	return 1;
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
 /**
@@ -1041,6 +1082,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 {
 	struct VSNode *node;
 	struct VSLayer *layer;
+	int ret = 0;
 
 	uint32 node_id = UINT32(layer_unset_value_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_unset_value_cmd->data[UINT32_SIZE]);
@@ -1053,6 +1095,8 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 		return 0;
 	}
 
+	pthread_mutex_lock(&node->mutex);
+
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
@@ -1060,7 +1104,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
-		return 0;
+		goto end;
 	}
 
 	/* Try to find layer */
@@ -1068,9 +1112,14 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
 				__FUNCTION__, layer_id, node_id);
-		return 0;
+		goto end;
 	}
 
-	return vs_layer_unset_value(node, layer, item_id, 1);
+	ret = vs_layer_unset_value(node, layer, item_id, 1);
+
+end:
+	pthread_mutex_unlock(&node->mutex);
+
+	return ret;
 }
 
