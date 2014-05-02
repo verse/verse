@@ -179,8 +179,9 @@ int vs_layer_unsubscribe(struct VSLayer *layer, struct VSession *vsession)
 
 	/* Client has to be subscribed to the layer */
 	if(layer_subscriber == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() client not subscribed to the layer (id: %d)\n",
-								__FUNCTION__, layer->id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() client not subscribed to the layer (id: %d)\n",
+				__FUNCTION__, layer->id);
 		return 0;
 	}
 
@@ -241,7 +242,8 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 	layer_follower = layer->layer_folls.first;
 	while(layer_follower != NULL) {
 		if(layer_follower->node_sub->session->session_id == node_subscriber->session->session_id) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "Client already knows about this Layer: %d\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Client already knows about this Layer: %d\n",
 					layer->id);
 			return 0;
 		}
@@ -313,11 +315,13 @@ int vs_layer_send_destroy(struct VSNode *node,
 				layer_follower->state = ENTITY_DELETING;
 				ret = 1;
 			} else {
-				v_print_log(VRS_PRINT_DEBUG_MSG, "Layer_Destroy (node_id: %d, layer_id: %d) wasn't added to the queue\n",
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"Layer_Destroy (node_id: %d, layer_id: %d) wasn't added to the queue\n",
 						node->id, layer->id);
 			}
 		} else {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "node_id: %d, layer_id: %d, layer is not in CREATED state (current state: %d)\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"node_id: %d, layer_id: %d, layer is not in CREATED state (current state: %d)\n",
 					node->id, layer->id, layer_follower->state);
 		}
 
@@ -391,8 +395,11 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_create_cmd_ack->layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_create_cmd_ack->layer_id, layer_create_cmd_ack->node_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
+				__FUNCTION__,
+				layer_create_cmd_ack->layer_id,
+				layer_create_cmd_ack->node_id);
 		goto end;
 	}
 
@@ -493,7 +500,8 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	} else {
 		parent_layer = vs_layer_find(node, parent_layer_id);
 		if(parent_layer == NULL) {
-			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() parent layer (id: %d) in node (id: %d) not found\n",
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"%s() parent layer (id: %d) in node (id: %d) not found\n",
 					__FUNCTION__, parent_layer_id, node_id);
 			goto end;
 		}
@@ -501,7 +509,8 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 
 	/* User has to have permission to write to the node */
 	if(vs_node_can_write(vsession, node) != 1) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): user: %s can't write to node: %d\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s(): user: %s can't write to node: %d\n",
 				__FUNCTION__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
@@ -518,7 +527,8 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 
 	/* Is type of Layer supported? */
 	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_REAL64)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() data_type: %d is not supported\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() data_type: %d is not supported\n",
 				__FUNCTION__, data_type);
 		goto end;
 	}
@@ -605,8 +615,11 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 
 	/* Try to find layer */
 	if( (layer = vs_layer_find(node, layer_destroy_cmd->layer_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_destroy_cmd->layer_id, layer_destroy_cmd->node_id);
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() layer (id: %d) in node (id: %d) not found\n",
+				__FUNCTION__,
+				layer_destroy_cmd->layer_id,
+				layer_destroy_cmd->node_id);
 		goto end;
 	}
 
@@ -649,7 +662,8 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"%s() node (id: %d) not found\n",
 				__FUNCTION__, node_id);
 		return 0;
 	}
