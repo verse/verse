@@ -160,7 +160,7 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 	dgram_conn->host_state = 0;
 	/* Negotiated Congestion Control and Flow Control methods */
 	dgram_conn->fc_meth = FC_RESERVED;
-	dgram_conn->cc_meth= CC_RESERVED;
+	dgram_conn->cc_meth = CC_RESERVED;
 	/* No flags */
 	dgram_conn->flags = 0;
 	/* Addresses */
@@ -192,7 +192,7 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 	dgram_conn->rwin_peer = 0xFFFFFFFF;	/* Default value */
 	dgram_conn->sent_size = 0;
 	dgram_conn->rwin_host_scale = 0;	/* rwin_host is >> by this value for outgoing packet */
-	dgram_conn->rwin_peer_scale = 0;	/* rwin_host is << by this value for incomming packet */
+	dgram_conn->rwin_peer_scale = 0;	/* rwin_host is << by this value for incoming packet */
 	dgram_conn->cwin = 0xFFFFFFFF;		/* TODO: Congestion Control */
 	/* Command compression */
 	dgram_conn->host_cmd_cmpr = CMPR_RESERVED;
