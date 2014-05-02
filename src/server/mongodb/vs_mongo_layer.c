@@ -45,8 +45,6 @@ static void vs_mongo_layer_save_version(struct VSLayer *layer,
 		uint32 version)
 {
 	bson bson_version;
-	bson bson_value;
-	VSLayer *child_layer;
 	VSLayerValue *layer_value;
 	VBucket *bucket;
 	char str_num[15];
@@ -56,44 +54,35 @@ static void vs_mongo_layer_save_version(struct VSLayer *layer,
 
 	bson_append_int(&bson_version, "crc32", layer->crc32);
 
-	bson_append_start_object(&bson_version, "child_layers");
-	child_layer = layer->child_layers.first;
-	while(child_layer != NULL) {
-		sprintf(str_num, "%d", child_layer->id);
-		bson_append_oid(&bson_version, str_num, &child_layer->oid);
-		child_layer = child_layer->next;
-	}
-	bson_append_finish_object(&bson_version);
-
 	bson_append_start_object(&bson_version, "values");
 	bucket = layer->values.lb.first;
 	while(bucket != NULL) {
 		layer_value = (struct VSLayerValue*)bucket->data;
-		bson_init(&bson_value);
-		bson_append_start_array(&bson_value, "value");
+		sprintf(str_num, "%d", layer_value->id);
+		bson_append_start_array(&bson_version, str_num);
 		switch(layer->data_type) {
 		case VRS_VALUE_TYPE_UINT8:
 			for(data_id = 0; data_id < layer->num_vec_comp; data_id++) {
 				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_value, str_num, ((uint8*)layer_value->value)[data_id]);
+				bson_append_int(&bson_version, str_num, ((uint8*)layer_value->value)[data_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_UINT16:
 			for(data_id = 0; data_id < layer->num_vec_comp; data_id++) {
 				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_value, str_num, ((uint16*)layer_value->value)[data_id]);
+				bson_append_int(&bson_version, str_num, ((uint16*)layer_value->value)[data_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_UINT32:
 			for(data_id = 0; data_id < layer->num_vec_comp; data_id++) {
 				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_value, str_num, ((uint32*)layer_value->value)[data_id]);
+				bson_append_int(&bson_version, str_num, ((uint32*)layer_value->value)[data_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_UINT64:
 			for(data_id = 0; data_id < layer->num_vec_comp; data_id++) {
 				sprintf(str_num, "%d", data_id);
-				bson_append_int(&bson_value, str_num, ((uint64*)layer_value->value)[data_id]);
+				bson_append_int(&bson_version, str_num, ((uint64*)layer_value->value)[data_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_REAL16:
@@ -102,20 +91,18 @@ static void vs_mongo_layer_save_version(struct VSLayer *layer,
 		case VRS_VALUE_TYPE_REAL32:
 			for(data_id = 0; data_id < layer->num_vec_comp; data_id++) {
 				sprintf(str_num, "%d", data_id);
-				bson_append_double(&bson_value, str_num, ((float*)layer_value->value)[data_id]);
+				bson_append_double(&bson_version, str_num, ((float*)layer_value->value)[data_id]);
 			}
 			break;
 		case VRS_VALUE_TYPE_REAL64:
 			for(data_id = 0; data_id < layer->num_vec_comp; data_id++) {
 				sprintf(str_num, "%d", data_id);
-				bson_append_double(&bson_value, str_num, ((double*)layer_value->value)[data_id]);
+				bson_append_double(&bson_version, str_num, ((double*)layer_value->value)[data_id]);
 			}
 			break;
 		}
-		bson_append_finish_array(&bson_value);
-		bson_finish(&bson_value);
-		sprintf(str_num, "%d", layer_value->id);
-		bson_append_bson(&bson_version, str_num, &bson_value);
+		bson_append_finish_array(&bson_version);
+
 		bucket = bucket->next;
 	}
 	bson_append_finish_object(&bson_version);
@@ -213,11 +200,7 @@ int vs_mongo_layer_add_new(struct VS_CTX *vs_ctx,
 	bson_append_int(&bson_layer, "current_version", layer->version);
 
 	if(layer->parent != NULL) {
-		char str_num[15];
-		bson_append_start_object(&bson_layer, "parent_layer");
-		sprintf(str_num, "%d", layer->parent->id);
-		bson_append_oid(&bson_layer, str_num, &layer->parent->oid);
-		bson_append_finish_object(&bson_layer);
+		bson_append_int(&bson_layer, "parent_layer_id", layer->parent->id);
 	}
 
 	bson_append_start_object(&bson_layer, "versions");
@@ -278,7 +261,46 @@ static void vs_mongo_layer_load_data(struct VSNode *node,
 
 	/* Try to get values of layer */
 	if( bson_find(&version_data_iter, bson_version, "values") == BSON_OBJECT ) {
-		/* TODO: load values */
+		struct VSLayerValue *item;
+		bson_iterator items_iter, values_iter;
+		const char *key;
+		uint8 val_uint8;
+/*		uint16 val_uint16;
+		uint32 val_uint32;
+		uint64 val_uint64;
+		real32 val_real32;
+		real64 val_real64;*/
+		uint32 item_id;
+		int item_data_size = vs_layer_data_size(layer);
+		int value_id;
+
+		bson_iterator_subiterator(&version_data_iter, &items_iter);
+
+		while( bson_iterator_next(&items_iter) == BSON_ARRAY ) {
+			key = bson_iterator_key(&items_iter);
+			sscanf(key, "%u", &item_id);
+
+			bson_iterator_subiterator(&items_iter, &values_iter);
+
+			item = (struct VSLayerValue*)calloc(1, sizeof(struct VSLayerValue));
+			item->value = (void*)calloc(layer->num_vec_comp, item_data_size);
+
+			value_id = 0;
+
+			while( bson_iterator_next(&values_iter) != BSON_EOO &&
+					value_id < layer->num_vec_comp)
+			{
+				switch(layer->data_type) {
+				case VRS_VALUE_TYPE_UINT8:
+					val_uint8 = (uint8)bson_iterator_int(&values_iter);
+					((uint8*)item->value)[value_id] = val_uint8;
+					break;
+				/* TODO: load other types of items */
+				default:
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -288,15 +310,16 @@ static void vs_mongo_layer_load_data(struct VSNode *node,
 struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
 		bson_oid_t *oid,
 		struct VSNode *node,
-		struct VSLayer *parent_layer,
 		uint16 layer_id,
 		uint32 req_version)
 {
 	struct VSLayer *layer = NULL;
+	struct VSLayer *parent_layer = NULL;
 	bson query;
 	mongo_cursor cursor;
 	uint32 node_id = -1, tmp_layer_id = -1, current_version = -1,
-			custom_type = -1, data_type = -1, vec_size = -1;
+			custom_type = -1, data_type = -1, vec_size = -1,
+			parent_layer_id = -1;
 	int found = 0;
 	bson_iterator layer_data_iter;
 	const bson *bson_layer;
@@ -318,11 +341,11 @@ struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
 		}
 
 		/* Try to get layer id */
-		if( bson_find(&layer_data_iter, bson_layer, "taggroup_id") == BSON_INT ) {
+		if( bson_find(&layer_data_iter, bson_layer, "layer_id") == BSON_INT ) {
 			tmp_layer_id = bson_iterator_int(&layer_data_iter);
 		}
 
-		/* ObjectID is ALMOST unique. So it is check, if node id and
+		/* ObjectID is ALMOST unique. So it is checked, if node id and
 		 * layer id matches */
 		if(node_id == node->id && tmp_layer_id == layer_id) {
 			found = 1;
@@ -352,24 +375,14 @@ struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
 			custom_type = bson_iterator_int(&layer_data_iter);
 		}
 
-		/* Try to get parent layer */
-		if( bson_find(&layer_data_iter, bson_layer, "parent_layer") == BSON_OBJECT ) {
-			bson_iterator parent_layer_iter;
-			const char *key;
-
-			bson_iterator_subiterator(&layer_data_iter, &parent_layer_iter);
-
-			if( bson_iterator_next(&parent_layer_iter) == BSON_OID) {
-				key = bson_iterator_key(&parent_layer_iter);
-				oid = bson_iterator_oid(&parent_layer_iter);
-
-				/* TODO: find parent layer */
-				(void)key;
-				(void)oid;
-			}
+		/* Try to get parent layer. It is OK, when this item does not exist. */
+		if( bson_find(&layer_data_iter, bson_layer, "parent_layer_id") == BSON_INT ) {
+			parent_layer_id = bson_iterator_int(&layer_data_iter);
+			/* Try to find parent layer. It should be already created. */
+			parent_layer = vs_layer_find(node, parent_layer_id);
 		}
 
-		/* Create tag group with specific ID */
+		/* Create layer with specific ID */
 		if((int)current_version != -1 &&
 				(int)custom_type != -1 &&
 				(int)data_type != -1 &&
@@ -395,16 +408,16 @@ struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
 
 					sprintf(str_num, "%u", req_version);
 
-					/* Try to find required version of tag group */
+					/* Try to find required version of layer */
 					if( bson_find(&version_iter, &bson_versions, str_num) == BSON_OBJECT ) {
 						bson bson_version;
 
-						/* Set version of tag group */
+						/* Set version of layer */
 						layer->version = layer->saved_version = current_version;
 
 						bson_iterator_subobject_init(&version_iter, &bson_version, 0);
 
-						/* Try to load tags */
+						/* Try to load data of layer */
 						vs_mongo_layer_load_data(node, layer, &bson_version);
 					}
 				}

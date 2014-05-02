@@ -74,6 +74,8 @@ typedef struct VSLayer {
 
 void vs_layer_inc_version(struct VSLayer *layer);
 
+int vs_layer_data_size(struct VSLayer *layer);
+
 VSLayer *vs_layer_find(struct VSNode *node, uint16 layer_id);
 
 int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,

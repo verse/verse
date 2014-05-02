@@ -861,7 +861,7 @@ end:
 /**
  * \brief This function returns size of data type stored in layer item
  */
-static int vs_layer_data_size(struct VSLayer *layer)
+int vs_layer_data_size(struct VSLayer *layer)
 {
 	int item_data_size = 0;
 
