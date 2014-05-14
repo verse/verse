@@ -397,7 +397,7 @@ struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
 				/* Save ObjectID to layer */
 				memcpy(&layer->oid, oid, sizeof(bson_oid_t));
 
-				/* Try to get versions of tag group */
+				/* Try to get versions of layer */
 				if( bson_find(&layer_data_iter, bson_layer, "versions") == BSON_OBJECT ) {
 					bson bson_versions;
 					bson_iterator version_iter;

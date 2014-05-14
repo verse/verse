@@ -96,23 +96,32 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 	while(bucket != NULL) {
 		tg = (struct VSTagGroup*)bucket->data;
 		/* Save own tag group to MongoDB */
-		vs_mongo_taggroup_save(vs_ctx, node, tg);
-		sprintf(str_num, "%d", tg->id);
-		/* Save direct reference at tag group using ObjectId */
-		bson_append_oid(&bson_version, str_num, &tg->oid);
+		if( vs_mongo_taggroup_save(vs_ctx, node, tg) == 1) {
+			sprintf(str_num, "%d", tg->id);
+			/* Save direct reference at tag group using ObjectId */
+			bson_append_oid(&bson_version, str_num, &tg->oid);
+		}
 		bucket = bucket->next;
 	}
 	bson_append_finish_object(&bson_version);
 
 	/* Save all layers */
 	bson_append_start_object(&bson_version, "layers");
+	printf(">>>> Saving layers of node ID: %d\n", node->id);
 	bucket = node->layers.lb.first;
 	while(bucket != NULL) {
 		layer = (struct VSLayer*)bucket->data;
-		vs_mongo_layer_save(vs_ctx, node, layer);
-		sprintf(str_num, "%d", layer->id);
-		/* Save direct reference at layer using ObjectId */
-		bson_append_oid(&bson_version, str_num, &layer->oid);
+		printf(">>>> Saving layer: %d\n", layer->id);
+		/* Try to save or update own layer */
+		if( vs_mongo_layer_save(vs_ctx, node, layer) == 1) {
+			int ret;
+			sprintf(str_num, "%d", layer->id);
+			/* Save direct reference at layer using ObjectId */
+			ret = bson_append_oid(&bson_version, str_num, &layer->oid);
+			printf(">>>> [OK]: %d\n", ret);
+		} else {
+			printf(">>>> [Failed]\n");
+		}
 		bucket = bucket->next;
 	}
 	bson_append_finish_object(&bson_version);
@@ -481,7 +490,30 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 
 						/* Try to get layers */
 						if( bson_find(&version_data_iter, &bson_version, "layers") == BSON_OBJECT ) {
+							bson_iterator layer_ids_iter;
+							bson_oid_t *oid;
+							uint32 layer_id;
+							const char *key;
 
+							bson_iterator_subiterator(&version_data_iter, &layer_ids_iter);
+
+							printf(">>> Loading layers\n");
+
+							/* Go through all layer ObjectIDs */
+							while( bson_iterator_next(&layer_ids_iter) == BSON_OID) {
+								key = bson_iterator_key(&layer_ids_iter);
+								oid = bson_iterator_oid(&layer_ids_iter);
+
+								sscanf(key, "%ud", &layer_id);
+
+								printf(">>> Loading layer: %d\n", layer_id);
+
+								if( vs_mongo_layer_load_linked(vs_ctx, oid, node, (uint16)layer_id, -1) == NULL) {
+									printf(">>> [Failed]\n");
+								} else {
+									printf(">>> [OK]\n");
+								}
+							}
 						}
 					}
 				} else {
