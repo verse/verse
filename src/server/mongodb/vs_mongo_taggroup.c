@@ -219,7 +219,9 @@ int vs_mongo_taggroup_add_new(struct VS_CTX *vs_ctx,
 	bson_finish(&bson_tg);
 
 	ret = mongo_insert(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &bson_tg, 0);
+
 	bson_destroy(&bson_tg);
+
 	if(ret != MONGO_OK) {
 		v_print_log(VRS_PRINT_ERROR,
 				"Unable to write tag group %d of node %d to MongoDB: %s, error: %s\n",
