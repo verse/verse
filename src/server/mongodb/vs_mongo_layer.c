@@ -299,6 +299,7 @@ static void vs_mongo_layer_load_data(struct VSNode *node,
 				default:
 					break;
 				}
+				value_id++;
 			}
 		}
 	}
