@@ -497,8 +497,6 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 
 							bson_iterator_subiterator(&version_data_iter, &layer_ids_iter);
 
-							printf(">>> Loading layers\n");
-
 							/* Go through all layer ObjectIDs */
 							while( bson_iterator_next(&layer_ids_iter) == BSON_OID) {
 								key = bson_iterator_key(&layer_ids_iter);
@@ -506,13 +504,7 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 
 								sscanf(key, "%ud", &layer_id);
 
-								printf(">>> Loading layer: %d\n", layer_id);
-
-								if( vs_mongo_layer_load_linked(vs_ctx, oid, node, (uint16)layer_id, -1) == NULL) {
-									printf(">>> [Failed]\n");
-								} else {
-									printf(">>> [OK]\n");
-								}
+								vs_mongo_layer_load_linked(vs_ctx, oid, node, (uint16)layer_id, -1);
 							}
 						}
 					}

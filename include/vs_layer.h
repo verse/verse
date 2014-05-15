@@ -34,8 +34,6 @@
 #define FIRST_LAYER_ID				0
 #define LAST_LAYER_ID				65534	/* 2^16 - 2 */
 
-#define RESERVED_LAYER_ID			0xFFFF	/* This ID sends client in LayerCreate command */
-
 #define MAX_LAYERS_COUNT			65534	/* Max number of layer that could be stored inside one node */
 
 /**
@@ -124,6 +122,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 
 struct VSLayer *vs_layer_create(struct VSNode *node,
 		struct VSLayer *parent,
+		uint16 layer_id,
 		uint8 data_type,
 		uint8 count,
 		uint16 type);

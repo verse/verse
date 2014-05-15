@@ -109,7 +109,7 @@ static void vs_mongo_layer_save_version(struct VSLayer *layer,
 
 	bson_finish(&bson_version);
 
-	sprintf(str_num, "%d", version);
+	sprintf(str_num, "%u", version);
 	bson_append_bson(bson_layer, str_num, &bson_version);
 }
 
@@ -389,7 +389,7 @@ struct VSLayer *vs_mongo_layer_load_linked(struct VS_CTX *vs_ctx,
 				(int)data_type != -1 &&
 				(int)vec_size != -1)
 		{
-			layer = vs_layer_create(node, parent_layer, data_type,
+			layer = vs_layer_create(node, parent_layer, layer_id, data_type,
 					vec_size, custom_type);
 
 			if(layer != NULL) {

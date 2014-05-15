@@ -57,6 +57,7 @@ void vs_layer_inc_version(struct VSLayer *layer)
  */
 struct VSLayer *vs_layer_create(struct VSNode *node,
 		struct VSLayer *parent,
+		uint16 layer_id,
 		uint8 data_type,
 		uint8 count,
 		uint16 type)
@@ -65,6 +66,7 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 	int i;
 #endif
 	struct VSLayer *layer = calloc(1, sizeof(struct VSLayer));
+	struct VBucket *vbucket;
 
 	if(layer == NULL) {
 		return NULL;
@@ -83,6 +85,30 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 				HASH_MOD_65536,
 				offsetof(VSLayerValue, id),
 				sizeof(uint32));
+
+	if(layer_id == VRS_RESERVED_LAYER_ID) {
+		/* Try to find first free id for layer */
+		layer->id = node->last_layer_id;
+		while( v_hash_array_find_item(&node->layers, layer) != NULL ) {
+			layer->id++;
+
+			if(layer->id > LAST_LAYER_ID) {
+				layer->id = FIRST_LAYER_ID;
+			}
+		}
+	} else {
+		layer->id = layer_id;
+	}
+	node->last_layer_id = layer->id;
+
+	/* Try to add new layer to the hashed linked list of layers */
+	vbucket = v_hash_array_add_item(&node->layers,
+			(void*)layer, sizeof(struct VSLayer));
+
+	if(vbucket == NULL) {
+		free(layer);
+		return NULL;
+	}
 
 	/* When parent layer is not NULL, then add this layer to the linked list
 	 * of child layers */
@@ -254,7 +280,7 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 		layer_create_cmd = v_layer_create_create(node->id, layer->parent->id,
 				layer->id, layer->data_type, layer->num_vec_comp, layer->custom_type);
 	} else {
-		layer_create_cmd = v_layer_create_create(node->id, RESERVED_LAYER_ID,
+		layer_create_cmd = v_layer_create_create(node->id, VRS_RESERVED_LAYER_ID,
 				layer->id, layer->data_type, layer->num_vec_comp, layer->custom_type);
 	}
 
@@ -495,7 +521,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	}
 
 	/* When parent layer id is not -1, then try to find this parent layer */
-	if(parent_layer_id == RESERVED_LAYER_ID) {
+	if(parent_layer_id == VRS_RESERVED_LAYER_ID) {
 		parent_layer = NULL;
 	} else {
 		parent_layer = vs_layer_find(node, parent_layer_id);
@@ -519,7 +545,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 
 	/* Client has to send layer_create command with layer_id equal to
 	 * the value 0xFFFF */
-	if(layer_id != RESERVED_LAYER_ID) {
+	if(layer_id != VRS_RESERVED_LAYER_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer_id: %d is not 0xFFFF\n",
 				__FUNCTION__, layer_id);
 		goto end;
@@ -553,25 +579,10 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		goto end;
 	}
 
-	layer = vs_layer_create(node, parent_layer, data_type, count, type);
+	layer = vs_layer_create(node, parent_layer, VRS_RESERVED_LAYER_ID,
+			data_type, count, type);
 
-	/* Try to find first free id for layer */
-	layer->id = node->last_layer_id;
-	while( v_hash_array_find_item(&node->layers, layer) != NULL ) {
-		layer->id++;
-
-		if(layer->id > LAST_LAYER_ID) {
-			layer->id = FIRST_LAYER_ID;
-		}
-	}
-	node->last_layer_id = layer->id;
-
-	/* Try to add new layer to the hashed linked list of layers */
-	vbucket = v_hash_array_add_item(&node->layers,
-			(void*)layer, sizeof(struct VSLayer));
-
-	if(vbucket == NULL) {
-		free(layer);
+	if(layer == NULL) {
 		goto end;
 	}
 
@@ -591,7 +602,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 end:
 	pthread_mutex_unlock(&node->mutex);
 
-	return 0;
+	return ret;
 }
 
 int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
@@ -647,7 +658,7 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 end:
 	pthread_mutex_unlock(&node->mutex);
 
-	return 0;
+	return ret;
 }
 
 int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
