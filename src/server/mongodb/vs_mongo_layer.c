@@ -265,11 +265,11 @@ static void vs_mongo_layer_load_data(struct VSNode *node,
 		bson_iterator items_iter, values_iter;
 		const char *key;
 		uint8 val_uint8;
-/*		uint16 val_uint16;
+		uint16 val_uint16;
 		uint32 val_uint32;
 		uint64 val_uint64;
 		real32 val_real32;
-		real64 val_real64;*/
+		real64 val_real64;
 		uint32 item_id;
 		int item_data_size = vs_layer_data_size(layer);
 		int value_id;
@@ -283,6 +283,7 @@ static void vs_mongo_layer_load_data(struct VSNode *node,
 			bson_iterator_subiterator(&items_iter, &values_iter);
 
 			item = (struct VSLayerValue*)calloc(1, sizeof(struct VSLayerValue));
+			item->id = item_id;
 			item->value = (void*)calloc(layer->num_vec_comp, item_data_size);
 
 			value_id = 0;
@@ -295,12 +296,33 @@ static void vs_mongo_layer_load_data(struct VSNode *node,
 					val_uint8 = (uint8)bson_iterator_int(&values_iter);
 					((uint8*)item->value)[value_id] = val_uint8;
 					break;
-				/* TODO: load other types of items */
+				case VRS_VALUE_TYPE_UINT16:
+					val_uint16 = (uint16)bson_iterator_int(&values_iter);
+					((uint16*)item->value)[value_id] = val_uint16;
+					break;
+				case VRS_VALUE_TYPE_UINT32:
+					val_uint32 = (uint32)bson_iterator_int(&values_iter);
+					((uint32*)item->value)[value_id] = val_uint32;
+					break;
+				case VRS_VALUE_TYPE_UINT64:
+					val_uint64 = (uint64)bson_iterator_long(&values_iter);
+					((uint64*)item->value)[value_id] = val_uint64;
+					break;
+				case VRS_VALUE_TYPE_REAL32:
+					val_real32 = (real32)bson_iterator_double(&values_iter);
+					((real32*)item->value)[value_id] = val_real32;
+					break;
+				case VRS_VALUE_TYPE_REAL64:
+					val_real64 = (real64)bson_iterator_double(&values_iter);
+					((real64*)item->value)[value_id] = val_real64;
+					break;
 				default:
 					break;
 				}
 				value_id++;
 			}
+
+			v_hash_array_add_item(&layer->values, item, sizeof(struct VSLayerValue));
 		}
 	}
 }

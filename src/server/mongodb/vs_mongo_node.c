@@ -107,20 +107,15 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 
 	/* Save all layers */
 	bson_append_start_object(&bson_version, "layers");
-	printf(">>>> Saving layers of node ID: %d\n", node->id);
 	bucket = node->layers.lb.first;
 	while(bucket != NULL) {
 		layer = (struct VSLayer*)bucket->data;
-		printf(">>>> Saving layer: %d\n", layer->id);
 		/* Try to save or update own layer */
 		if( vs_mongo_layer_save(vs_ctx, node, layer) == 1) {
 			int ret;
 			sprintf(str_num, "%d", layer->id);
 			/* Save direct reference at layer using ObjectId */
 			ret = bson_append_oid(&bson_version, str_num, &layer->oid);
-			printf(">>>> [OK]: %d\n", ret);
-		} else {
-			printf(">>>> [Failed]\n");
 		}
 		bucket = bucket->next;
 	}
@@ -521,6 +516,11 @@ struct VSNode *vs_mongo_node_load_linked(struct VS_CTX *vs_ctx,
 
 	bson_destroy(&query);
 	mongo_cursor_destroy(&cursor);
+
+	/* Update last used node id */
+	if(node_id > vs_ctx->data.last_common_node_id) {
+		vs_ctx->data.last_common_node_id = node_id;
+	}
 
 	return node;
 }
