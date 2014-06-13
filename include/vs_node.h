@@ -70,7 +70,7 @@ typedef struct VSNode {
 	uint16					last_tg_id;		/* Last assigned tag group ID */
 	/* Layers */
 	struct VHashArrayBase	layers;			/* List of layers */
-	uint16					last_layer_id;	/* Last assigned layer ID */
+	uint16					first_free_layer_id;	/* Last assigned layer ID */
 	/* Subscribing */
 	struct VListBase		node_folls;		/* List of verse sessions that knows about this node */
 	struct VListBase		node_subs;		/* List of verse sessions subscribed to data (child links, tag-groups, layers) of this node */

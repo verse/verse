@@ -418,7 +418,7 @@ void vs_node_init(struct VSNode *node)
 			HASH_MOD_256,
 			offsetof(VSLayer, id),
 			sizeof(uint16));
-	node->last_layer_id = 0;
+	node->first_free_layer_id = 0;
 
 	node->node_folls.first = NULL;
 	node->node_folls.last = NULL;

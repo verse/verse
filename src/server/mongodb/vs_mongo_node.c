@@ -112,10 +112,9 @@ static void vs_mongo_node_save_version(struct VS_CTX *vs_ctx,
 		layer = (struct VSLayer*)bucket->data;
 		/* Try to save or update own layer */
 		if( vs_mongo_layer_save(vs_ctx, node, layer) == 1) {
-			int ret;
 			sprintf(str_num, "%d", layer->id);
 			/* Save direct reference at layer using ObjectId */
-			ret = bson_append_oid(&bson_version, str_num, &layer->oid);
+			bson_append_oid(&bson_version, str_num, &layer->oid);
 		}
 		bucket = bucket->next;
 	}

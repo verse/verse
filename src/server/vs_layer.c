@@ -74,21 +74,14 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 
 	layer->prev = NULL;
 	layer->next = NULL;
-	layer->id = node->last_layer_id;
-	node->last_layer_id++;
 	layer->data_type = data_type;
 	layer->custom_type = type;
 	layer->parent = parent;
 	layer->num_vec_comp = count;
 
-	v_hash_array_init(&layer->values,
-				HASH_MOD_65536,
-				offsetof(VSLayerValue, id),
-				sizeof(uint32));
-
 	if(layer_id == VRS_RESERVED_LAYER_ID) {
 		/* Try to find first free id for layer */
-		layer->id = node->last_layer_id;
+		layer->id = node->first_free_layer_id;
 		while( v_hash_array_find_item(&node->layers, layer) != NULL ) {
 			layer->id++;
 
@@ -98,8 +91,15 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 		}
 	} else {
 		layer->id = layer_id;
+		if(v_hash_array_find_item(&node->layers, layer) != NULL) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Layer with %d already exists in node %d\n",
+					layer_id, node->id);
+			free(layer);
+			return NULL;
+		}
 	}
-	node->last_layer_id = layer->id;
+	node->first_free_layer_id = layer->id + 1;
 
 	/* Try to add new layer to the hashed linked list of layers */
 	vbucket = v_hash_array_add_item(&node->layers,
@@ -109,6 +109,11 @@ struct VSLayer *vs_layer_create(struct VSNode *node,
 		free(layer);
 		return NULL;
 	}
+
+	v_hash_array_init(&layer->values,
+				HASH_MOD_65536,
+				offsetof(VSLayerValue, id),
+				sizeof(uint32));
 
 	/* When parent layer is not NULL, then add this layer to the linked list
 	 * of child layers */
