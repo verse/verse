@@ -35,7 +35,7 @@ IF(NOT PYTHON_ROOT_DIR AND NOT $ENV{PYTHON_ROOT_DIR} STREQUAL "")
   SET(PYTHON_ROOT_DIR $ENV{PYTHON_ROOT_DIR})
 ENDIF()
 
-SET(PYTHON_VERSION 3.3 CACHE STRING "Python Version (major and minor only)")
+SET(PYTHON_VERSION 3.4 CACHE STRING "Python Version (major and minor only)")
 MARK_AS_ADVANCED(PYTHON_VERSION)
 
 
@@ -79,7 +79,7 @@ IF((NOT _IS_INC_DEF) OR (NOT _IS_INC_CONF_DEF) OR (NOT _IS_LIB_DEF) OR (NOT _IS_
     "$ENV{HOME}/py${_PYTHON_VERSION_NO_DOTS}"
     "/opt/py${_PYTHON_VERSION_NO_DOTS}"
     "/opt/lib/python-${PYTHON_VERSION}"
-    "/opt/rh/python33/root/usr/"
+    "/opt/rh/python{_PYTHON_VERSION_NO_DOTS}/root/usr"
   )
 
   FOREACH(_CURRENT_ABI_FLAGS ${_python_ABI_FLAGS})

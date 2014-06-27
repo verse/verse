@@ -38,7 +38,8 @@ experimental.
  * IniParser (optional) http://ndevilla.free.fr/iniparser/
  * Check (optional) http://check.sourceforge.net/
  * Spin (optional) http://spinroot.com/
- * Python3 (optional) http://www.python.org/
+ * Python3.4 (optional) http://www.python.org/
+ * Python2.x (optional) http://www.python.org/
  * WSLay (optional) http://wslay.sourceforge.net/
  * MongoDB (optional) https://github.com/mongodb/mongo-c-driver (version 0.81)
 
