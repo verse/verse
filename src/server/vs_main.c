@@ -267,6 +267,7 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 		vs_read_config_file(vs_ctx, config_file);
 	}
 #else
+	(void)vs_ctx;
 	(void)config_file;
 #endif
 }
