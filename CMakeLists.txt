@@ -24,6 +24,9 @@ set (${PROJECT_NAME}_VERSION
 	"${${PROJECT_NAME}_VERSION_MAJOR}.${${PROJECT_NAME}_VERSION_MINOR}")
 
 # Build options
+option(VERSE_SERVER "Build Verse server" ON)
+option(VERSE_CLIENT_EXAMPLE "Build example of Verse client" ON)
+option(VERSE_STATIC_LIB "Build static Verse library" OFF)
 option(VERSE_OPENSSL "Support for OpenSSL" ON)
 option(VERSE_CLANG "Use Clang Compiler" OFF)
 option(VERSE_PYTHON2_MODULE "Verse Python2 Module" ON)
@@ -185,10 +188,18 @@ if (VERSE_DOXYGEN)
 endif (VERSE_DOXYGEN)
 
 
-# Set up required subdirectories
+# Set up required subdirectory for library
 add_subdirectory (src/lib)
-add_subdirectory (src/server)
-add_subdirectory (example)
+
+# Set up optional subdirectory for server
+if (VERSE_SERVER)
+	add_subdirectory (src/server)
+endif (VERSE_SERVER)
+
+# Set up optional subdirectory for client
+if (VERSE_CLIENT_EXAMPLE)
+	add_subdirectory (example)
+endif (VERSE_CLIENT_EXAMPLE)
 
 
 # Copy ./pki directory to ${PROJECT_BINARY_DIR}
@@ -251,6 +262,18 @@ message ("")
 
     message (" * Configuration: ${CMAKE_BUILD_TYPE}")
     message (" * Generator:     ${CMAKE_GENERATOR}")
+
+if (VERSE_SERVER)
+	message (" * Build server   ON")
+else ()
+	message (" * Build server   OFF")
+endif (VERSE_SERVER)
+
+if (VERSE_CLIENT_EXAMPLE)
+	message (" * Build client   ON")
+else ()
+	message (" * Build client   OFF")
+endif (VERSE_CLIENT_EXAMPLE)
 
 if (OPENSSL_FOUND)
 	message (" * OpenSSL:       ON")

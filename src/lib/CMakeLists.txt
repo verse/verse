@@ -102,8 +102,11 @@ install (TARGETS verse_shared_lib
 	LIBRARY
 	DESTINATION lib${LIBSUFFIX})
 
-# TODO: Make building static verse library (libverse.a) optional
-#add_library (verse_static STATIC ${libverse_src})
-#set_target_properties (verse_static PROPERTIES 
-#		OUTPUT_NAME "verse"
-#		LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/static/")
+
+# WIP: Optional: Build static verse library (libverse.a)
+if (VERSE_STATIC_LIB)
+	add_library (verse_static STATIC ${libverse_src})
+	set_target_properties (verse_static PROPERTIES 
+			OUTPUT_NAME "verse"
+			LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/static/")
+endif (VERSE_STATIC_LIB)
