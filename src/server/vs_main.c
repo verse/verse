@@ -506,6 +506,9 @@ int main(int argc, char *argv[])
 	/* Set up initial state */
 	vs_ctx.state = SERVER_STATE_CONF;
 
+	/* Print starting message */
+	printf("Starting Verse server, Version: %s\n", Verse_VERSION);
+
 	/* Default debug prints of verse server */
 	v_init_print_log(VRS_PRINT_WARNING, stdout);
 

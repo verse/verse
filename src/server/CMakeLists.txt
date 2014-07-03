@@ -34,6 +34,9 @@ if (CMAKE_COMPILER_IS_GNUCC)
 endif (CMAKE_COMPILER_IS_GNUCC)
 
 
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D${PROJECT_NAME}_VERSION=\"\\\"${${PROJECT_NAME}_VERSION}\\\"\"")
+
+
 # Basic libraries used by verse_server
 set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
 
