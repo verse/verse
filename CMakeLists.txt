@@ -114,7 +114,7 @@ if (VERSE_PYTHON2_MODULE)
 	endif (PYTHONLIBS_FOUND)
 endif (VERSE_PYTHON2_MODULE)
 
-# Otherwise try to find Python 3.x module
+# Try to find Python 3.x module, when Python 3.x is selected
 if (VERSE_PYTHON3_MODULE)
 
 	# Clear variables from previous find module
@@ -154,7 +154,7 @@ endif (VERSE_PYTHON3_MODULE)
 # Support for WebSocket
 if(VERSE_WEBSOCKET)
 
-	# Try to find optional package libWebSockets
+	# Try to find optional package WSLay
 	find_package (WSLay)
 	
 endif(VERSE_WEBSOCKET)
