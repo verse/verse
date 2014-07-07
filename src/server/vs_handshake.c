@@ -467,7 +467,7 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 		char sec_proto[5];
 		int cmd_rank = 0;
 		unsigned int min_aggregation = UINT_MAX;
-		unsigned char la_port;	/* Port with lowest aggregation */
+		unsigned char la_port = 0;	/* Port with lowest aggregation */
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
