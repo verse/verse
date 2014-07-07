@@ -2344,15 +2344,21 @@ static PyTypeObject session_SessionType = {
 	(initproc)Session_init,			/* tp_init */
 	0,								/* tp_alloc */
 	Session_new,					/* tp_new */
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0
+	0,								/* tp_free*/
+	0,								/* tp_is_gc */
+	0,								/* tp_bases */
+	0,								/* tp_mro */
+	0,								/* t_cache */
+	0,								/* tp_subclasses */
+	0,								/* tp_weaklist */
+	0,								/* tp_del */
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 4
+	0,								/* tp_version_tag */
+	/* New in Python 3.4 */
+	0								/* tp_finalize*/
+#else
+	0								/* tp_version_tag */
+#endif
 };
 
 
