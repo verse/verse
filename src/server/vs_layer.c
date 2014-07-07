@@ -35,7 +35,7 @@
  */
 void vs_layer_inc_version(struct VSLayer *layer)
 {
-	/* TODO: computer CRC32 */
+	/* TODO: compute CRC32 */
 	if( (layer->version + 1 ) < UINT32_MAX ) {
 		layer->version++;
 	} else {
@@ -1007,6 +1007,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 				goto end;
 			}
 		} else {
+			/* When data exist, then only change values */
 			item = (struct VSLayerValue*)vbucket->data;
 			memcpy(item->value,
 					&layer_set_value_cmd->data[UINT32_SIZE + UINT16_SIZE + UINT32_SIZE],
