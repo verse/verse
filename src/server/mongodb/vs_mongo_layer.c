@@ -160,7 +160,7 @@ int vs_mongo_layer_update(struct VS_CTX *vs_ctx,
 	}
 	bson_finish(&op);
 
-	ret = mongo_update(vs_ctx->mongo_conn, vs_ctx->mongo_tg_ns, &cond, &op,
+	ret = mongo_update(vs_ctx->mongo_conn, vs_ctx->mongo_layer_ns, &cond, &op,
 			MONGO_UPDATE_BASIC, 0);
 
 	bson_destroy(&bson_version);
@@ -170,7 +170,7 @@ int vs_mongo_layer_update(struct VS_CTX *vs_ctx,
 	if(ret != MONGO_OK) {
 		v_print_log(VRS_PRINT_ERROR,
 				"Unable to update layer %d to MongoDB: %s, error: %s\n",
-				layer->id, vs_ctx->mongo_tg_ns,
+				layer->id, vs_ctx->mongo_layer_ns,
 				mongo_get_server_err_string(vs_ctx->mongo_conn));
 		return 0;
 	}
