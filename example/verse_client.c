@@ -754,7 +754,7 @@ static void cb_receive_connect_terminate(const uint8_t session_id,
 		printf("User authentication failed\n");
 		break;
 	case VRS_CONN_TERM_HOST_DOWN:
-		printf("Host is not accesible\n");
+		printf("Host is not accessible\n");
 		break;
 	case VRS_CONN_TERM_HOST_UNKNOWN:
 		printf("Host could not be found\n");
@@ -763,10 +763,10 @@ static void cb_receive_connect_terminate(const uint8_t session_id,
 		printf("Server is not running\n");
 		break;
 	case VRS_CONN_TERM_TIMEOUT:
-		printf("Connection timout\n");
+		printf("Connection timeout\n");
 		break;
 	case VRS_CONN_TERM_ERROR:
-		printf("Conection with server was broken\n");
+		printf("Connection with server was broken\n");
 		break;
 	case VRS_CONN_TERM_SERVER:
 		printf("Connection was terminated by server\n");
@@ -895,7 +895,7 @@ static void print_help(char *prog_name)
 	printf("   -p password      password used for login at Verse server\n");
 	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
 	printf("   -s security      security of data exchange [none|tls]\n");
-	printf("   -c compresion    compression used for data exchange [none|addrshare]\n");
+	printf("   -c compression   compression used for data exchange [none|addrshare]\n");
 	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
 }
 
