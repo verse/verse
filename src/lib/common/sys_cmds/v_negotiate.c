@@ -215,9 +215,9 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
  */
 int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct Negotiate_Cmd *negotiate_cmd)
 {
-	int str_len=0;
-	unsigned short buffer_pos = 0, length, i;
-	unsigned char length8 = 0, len8, lenlen;
+	int str_len = 0;
+	unsigned short buffer_pos = 0, cmd_length, i;
+	unsigned char cmd_header_len,length8 = 0, len8, len_of_len;
 
 	/* Unpack command ID */
 	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &negotiate_cmd->id);
@@ -227,26 +227,30 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 
 	/* Check if the length of the command is stored in the second byte of
 	 * command or is it stored in two bytes after second byte of the command */
-	if(length8==0xFF) {
-		buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &length);
-		lenlen = 3;
+	if(length8 == 0xFF) {
+		buffer_pos += vnp_raw_unpack_uint16(&buffer[buffer_pos], &cmd_length);
+		len_of_len = 3;
 	} else {
-		length = length8;
-		lenlen = 1;
+		cmd_length = length8;
+		len_of_len = 1;
 	}
+
+	cmd_header_len = 1 + len_of_len + 1;
 
 	/* Security check: check if the length of the command is not bigger
 	 * then buffer_size. If this test failed, then return buffer_size and set
 	 * count of received values to the zero. */
-	if(buffer_size < length) {
-		v_print_log(VRS_PRINT_WARNING, "Buffer size: %d < command length: %d.\n", buffer_size, length);
+	if(buffer_size < cmd_length) {
+		v_print_log(VRS_PRINT_WARNING,
+				"Buffer size: %d < command length: %d.\n", buffer_size, cmd_length);
 		negotiate_cmd->count = 0;
 		return buffer_size;
 	/* Security check: check if the length of the command is equal or bigger
 	 * then minimal length of the negotiate command: ID_len + Length_len +
 	 * Feature_len*/
-	} else if(length < (1+lenlen+1)) {
-		v_print_log(VRS_PRINT_WARNING, "Command length: %d < (1+%d+1).\n", length, lenlen);
+	} else if(cmd_length < cmd_header_len) {
+		v_print_log(VRS_PRINT_WARNING,
+				"Command length: %d < Command header length: %d.\n", cmd_length, cmd_header_len);
 		negotiate_cmd->count = 0;
 		return buffer_size;
 	}
@@ -261,12 +265,12 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 		case FTR_RSV_ID:
 			v_print_log(VRS_PRINT_WARNING, "Received RESERVED feature ID\n");
 			negotiate_cmd->count = 0;
-			return length;	/* This feature id should never be sent or received */
+			return cmd_length;	/* This feature id should never be sent or received */
 		case FTR_FC_ID:
 		case FTR_CC_ID:
 		case FTR_RWIN_SCALE:
 		case FTR_CMD_COMPRESS:
-			negotiate_cmd->count = length - (1+lenlen+1);
+			negotiate_cmd->count = cmd_length - cmd_header_len;
 			break;
 		case FTR_HOST_URL:
 		case FTR_TOKEN:
@@ -274,19 +278,19 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 		case FTR_CLIENT_NAME:
 		case FTR_CLIENT_VERSION:
 			negotiate_cmd->count = 0;
-			while(str_len < (length -(1+lenlen+1))) {
-				vnp_raw_unpack_uint8(&buffer[buffer_pos+str_len], &len8);
+			while((buffer_pos + str_len) < (cmd_length - cmd_header_len)) {
+				vnp_raw_unpack_uint8(&buffer[buffer_pos + str_len], &len8);
 				str_len += 1 + len8;
 				negotiate_cmd->count++;
 			}
 			break;
 		case FTR_FPS:
-			negotiate_cmd->count = (length - (1+lenlen))/4;
+			negotiate_cmd->count = (cmd_length - cmd_header_len)/4;
 			break;
 		default:
 			v_print_log(VRS_PRINT_WARNING, "Received UNKNOWN feature ID\n");
 			negotiate_cmd->count = 0;
-			return length;
+			return cmd_length;
 	}
 
 	/* Unpack values (preference list) */
@@ -318,13 +322,13 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 	}
 
 	/* Check if length and buffer_pos match */
-	if(buffer_pos!=length) {
+	if(buffer_pos!=cmd_length) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, length);
-		return length;
+				__FUNCTION__, buffer_pos, cmd_length);
+		return cmd_length;
 	}
 
-	return length;
+	return cmd_length;
 }
 
 /**
