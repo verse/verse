@@ -57,7 +57,7 @@ struct Generic_Cmd *v_in_queue_pop(struct VInQueue *in_queue)
 		cmd = (struct Generic_Cmd *)queue_cmd->vbucket->data;
 
 		/* There should be some data */
-		assert(cmd!=NULL);
+		assert(cmd != NULL);
 
 		/* Remove command from hashed linked list */
 		v_hash_array_remove_item(&in_queue->cmds[cmd->id]->cmds, (void*)cmd);

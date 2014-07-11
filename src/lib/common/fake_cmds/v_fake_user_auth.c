@@ -161,7 +161,7 @@ void v_user_auth_clear(struct User_Authenticate_Cmd *user_auth)
  */
 void v_user_auth_destroy(struct User_Authenticate_Cmd **user_auth)
 {
-	if(user_auth != NULL) {
+	if(user_auth != NULL && *user_auth != NULL) {
 		v_user_auth_clear(*user_auth);
 		free(*user_auth);
 		*user_auth = NULL;

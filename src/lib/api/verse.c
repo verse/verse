@@ -1474,8 +1474,11 @@ static int vc_send_command(const uint8 session_id,
 	assert(cmd != NULL);
 
 	if(vc_ctx == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
-		free(cmd);
+		if(is_log_level(VRS_PRINT_ERROR)) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Basic callback functions were not set.\n");
+		}
+		v_cmd_destroy(&cmd);
 		return VRS_NO_CB_FUNC;
 	} else {
 		/* Go through all sessions ... */
@@ -1491,8 +1494,11 @@ static int vc_send_command(const uint8 session_id,
 		}
 	}
 
-	if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Session %d does not exist.\n", session_id);
-	free(cmd);
+	if(is_log_level(VRS_PRINT_ERROR)) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Session %d does not exist.\n", session_id);
+	}
+	v_cmd_destroy(&cmd);
 	return VRS_FAILURE;
 }
 

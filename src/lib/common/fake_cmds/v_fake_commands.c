@@ -108,7 +108,7 @@ void v_fake_cmd_destroy(struct Generic_Cmd **cmd)
 		break;
 	case FAKE_CMD_USER_AUTHENTICATE:
 		/* TODO: destroy this command, when it is used in right way. */
-		/* v_User_Authenticate_destroy((struct User_Authenticate_Cmd**)cmd);*/
+		/* v_user_auth_destroy((struct User_Authenticate_Cmd**)cmd); */
 		break;
 	case FAKE_CMD_FPS:
 		v_Fps_destroy((struct Fps_Cmd**)cmd);

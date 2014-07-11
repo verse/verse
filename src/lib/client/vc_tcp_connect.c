@@ -95,15 +95,17 @@ static int vc_get_username_passwd(struct VSession *vsession,
 				v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
 				/* FIXME: this is fishy */
 				memcpy(ua_data, cmd, sizeof(struct User_Authenticate_Cmd));
-				free(cmd);
+				v_cmd_destroy(&cmd);
 				return 1;
 			case FAKE_CMD_CONNECT_TERMINATE:
 				v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
-				free(cmd);
+				v_cmd_destroy(&cmd);
 				return 0;
 			default:
-				free(cmd);
-				v_print_log(VRS_PRINT_DEBUG_MSG, "This command is not accepted during NEGOTIATE state\n");
+				v_print_log(VRS_PRINT_DEBUG_MSG,
+						"This command %d is not accepted during NEGOTIATE state\n",
+						cmd->id);
+				v_cmd_destroy(&cmd);
 				break;
 			}
 		}
