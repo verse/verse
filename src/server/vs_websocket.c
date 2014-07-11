@@ -429,6 +429,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 	struct VSession *session = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	int ret;
+	unsigned int i;
 
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
 
@@ -438,6 +439,15 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"WS Callback received binary message\n");
+
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"Binary dump\n");
+
+			/* Print dump of received data */
+			for(i=0; i<arg->msg_length; i++) {
+				v_print_log_simple(VRS_PRINT_DEBUG_MSG, "%d,", arg->msg[i]);
+			}
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
 
 			/* Copy received data to IO context */
 			memcpy(io_ctx->buf,	arg->msg, arg->msg_length);
