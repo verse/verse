@@ -35,13 +35,66 @@
 
 #include <check.h>
 
-#include "t_suites.h"
+#include "v_common.h"
+#include "v_commands.h"
+#include "v_sys_commands.h"
+#include "v_in_queue.h"
+#include "v_out_queue.h"
+
+
+#define TEST_VEC_SIZE	1
+
+
+#if 0
+/**
+ * Structure holding test values of negotiation command
+ */
+typedef struct NEG_cmd_values {
+	uint8	opcode;
+	uint8	length;
+	uint8	feature;
+	uint8	values[256];
+} NEG_cmd_values;
+
+static struct NEG_cmd_values cmd_values[TEST_VEC_SIZE] = {
+	{
+		CMD_CHANGE_L_ID,
+		4,
+		FTR_FC_ID,
+		{
+			FC_NONE, 0
+		}
+	}
+};
+#endif
 
 /**
- * \brief Test simple creation and destroying of Node_Create command
+ * \brief Test simple adding negotiate command to the list of system commands
  */
-START_TEST ( test_Negotiate_create )
+START_TEST ( test_Negotiate_add )
 {
+	union VSystemCommands sys_cmd[1];
+	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 ftr_op_code = FTR_FC_ID;
+	uint8 value = FC_NONE;
+	int ret;
+
+	v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &value, NULL);
+
+	fail_unless( ret != 1,
+			"Adding negotiate command failed");
+	fail_unless( sys_cmd->negotiate_cmd.id == cmd_op_code,
+			"Negotiate command OpCode: %d != %d",
+			sys_cmd->negotiate_cmd.id, cmd_op_code);
+	fail_unless( sys_cmd->negotiate_cmd.feature == ftr_op_code,
+			"Negotiate command feature: %d != %d",
+			sys_cmd->negotiate_cmd.feature, ftr_op_code);
+	fail_unless( sys_cmd->negotiate_cmd.count == 1,
+			"Negotiate command feature count: %d != %d",
+			sys_cmd->negotiate_cmd.count, 1);
+	fail_unless( sys_cmd->negotiate_cmd.value[0].uint8 == value,
+			"Negotiate command value: %d != %d",
+			sys_cmd->negotiate_cmd.value[0].uint8, value);
 
 }
 END_TEST
@@ -55,7 +108,7 @@ struct Suite *negotiate_suite(void)
 	struct Suite *suite = suite_create("Negotiate_Cmd");
 	struct TCase *tc_core = tcase_create("Core");
 
-	tcase_add_test(tc_core, test_Negotiate_create);
+	tcase_add_test(tc_core, test_Negotiate_add);
 
 	suite_add_tcase(suite, tc_core);
 
