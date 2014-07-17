@@ -33,14 +33,33 @@
  *
  */
 
-#ifndef T_NODE_CREATE_H_
-#define T_NODE_CREATE_H_
-
 #include <check.h>
 
-struct Suite *node_create_suite(void);
-struct Suite *node_destroy_suite(void);
-struct Suite *taggroup_create_suite(void);
-struct Suite *negotiate_suite(void);
+#include "t_suites.h"
 
-#endif /* T_NODE_CREATE_H_ */
+/**
+ * \brief Test simple creation and destroying of Node_Create command
+ */
+START_TEST ( test_Negotiate_create )
+{
+
+}
+END_TEST
+
+
+/**
+ * \brief This function creates test suite for Node_Create command
+ */
+struct Suite *negotiate_suite(void)
+{
+	struct Suite *suite = suite_create("Negotiate_Cmd");
+	struct TCase *tc_core = tcase_create("Core");
+
+	tcase_add_test(tc_core, test_Negotiate_create);
+
+	suite_add_tcase(suite, tc_core);
+
+	return suite;
+}
+
+

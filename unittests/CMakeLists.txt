@@ -13,7 +13,8 @@ set (tests_src
 		t_main.c
 		common/node_cmds/t_node_create.c
 		common/node_cmds/taggroup_cmds/t_taggroup_create.c
-		common/node_cmds/t_node_destroy.c)
+		common/node_cmds/t_node_destroy.c
+		common/sys_cmds/t_negotiate.c)
 
 # Basic libraries used by test executable
 set ( verse_test_libs ${CHECK_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} )
