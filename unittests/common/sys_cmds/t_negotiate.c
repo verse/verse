@@ -219,8 +219,7 @@ END_TEST
 
 
 /**
- * \brief Test adding negotiate command with string value
- * to the list of system commands.
+ * \brief Test of packing and unpacking negotiate command with string value.
  */
 START_TEST ( test_pack_unpack_negotiate_cmd_string_value )
 {
@@ -266,6 +265,7 @@ START_TEST ( test_pack_unpack_negotiate_cmd_string_value )
 
 }
 END_TEST
+
 
 /**
  * \brief Test packing and unpacking of negotiate command with multiple values
@@ -316,6 +316,65 @@ START_TEST ( test_pack_unpack_negotiate_cmd_multiple_values )
 }
 END_TEST
 
+
+/**
+ * \brief Test of packing and unpacking negotiate command with
+ * two string values.
+ */
+START_TEST ( test_pack_unpack_negotiate_cmd_multiple_string_values )
+{
+	union VSystemCommands send_sys_cmd[1], recv_sys_cmd[1];
+	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 ftr_op_code = FTR_CLIENT_NAME;
+	char string_val0[5] = {'a', 'h', 'o', 'y', '\0'};
+	char string_val1[4] = {'h', 'e', 'y', '\0'};
+	char buffer[255];
+	int buffer_pos = 0, cmd_len;
+
+	v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
+			string_val0, string_val1, NULL);
+
+	/* Pack negotiate command */
+	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
+			&send_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( buffer_pos == 12,
+			"Length of packed cmd: %d != %d",
+			buffer_pos, 12);
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_pos,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_pos,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_pos, cmd_len);
+	fail_unless( recv_sys_cmd->negotiate_cmd.id == cmd_op_code,
+			"Negotiate command OpCode: %d != %d",
+			recv_sys_cmd->negotiate_cmd.id, cmd_op_code);
+	fail_unless( recv_sys_cmd->negotiate_cmd.feature == ftr_op_code,
+			"Negotiate command feature: %d != %d",
+			recv_sys_cmd->negotiate_cmd.feature, ftr_op_code);
+	fail_unless( recv_sys_cmd->negotiate_cmd.count == 2,
+			"Negotiate command feature count: %d != %d",
+			recv_sys_cmd->negotiate_cmd.count, 2);
+	fail_unless( recv_sys_cmd->negotiate_cmd.value[0].string8.length == 4,
+			"Negotiate command value (string length): %d != %d",
+			recv_sys_cmd->negotiate_cmd.value[0].string8.length, 4);
+	fail_unless( strcmp((char*)recv_sys_cmd->negotiate_cmd.value[0].string8.str, "ahoy") == 0,
+			"Negotiate command value (string): %s != ahoy",
+			recv_sys_cmd->negotiate_cmd.value[0].string8.str);
+	fail_unless( recv_sys_cmd->negotiate_cmd.value[1].string8.length == 3,
+			"Negotiate command value (string length): %d != %d",
+			recv_sys_cmd->negotiate_cmd.value[1].string8.length, 3);
+	fail_unless( strcmp((char*)recv_sys_cmd->negotiate_cmd.value[1].string8.str, "hey") == 0,
+			"Negotiate command value (string): %s != hey",
+			recv_sys_cmd->negotiate_cmd.value[1].string8.str);
+
+}
+END_TEST
+
+
 /**
  * \brief This function creates test suite for Node_Create command
  */
@@ -330,6 +389,7 @@ struct Suite *negotiate_suite(void)
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_single_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_string_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_values);
+	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_string_values);
 
 	suite_add_tcase(suite, tc_core);
 
