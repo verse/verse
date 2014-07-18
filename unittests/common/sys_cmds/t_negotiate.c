@@ -100,6 +100,40 @@ START_TEST ( test_add_negotiate_cmd_single_value )
 END_TEST
 
 /**
+ * \brief Test simple adding negotiate command to the list of system commands
+ */
+START_TEST ( test_add_negotiate_cmd_string_value )
+{
+	union VSystemCommands sys_cmd[1];
+	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 ftr_op_code = FTR_CLIENT_NAME;
+	char string[5] = {'a', 'h', 'o', 'y', '\0'};
+	int ret;
+
+	v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, string, NULL);
+
+	fail_unless( ret != 1,
+			"Adding negotiate command failed");
+	fail_unless( sys_cmd->negotiate_cmd.id == cmd_op_code,
+			"Negotiate command OpCode: %d != %d",
+			sys_cmd->negotiate_cmd.id, cmd_op_code);
+	fail_unless( sys_cmd->negotiate_cmd.feature == ftr_op_code,
+			"Negotiate command feature: %d != %d",
+			sys_cmd->negotiate_cmd.feature, ftr_op_code);
+	fail_unless( sys_cmd->negotiate_cmd.count == 1,
+			"Negotiate command feature count: %d != %d",
+			sys_cmd->negotiate_cmd.count, 1);
+	fail_unless( sys_cmd->negotiate_cmd.value[0].string8.length == 4,
+			"Negotiate command value (string length): %d != %d",
+			sys_cmd->negotiate_cmd.value[0].string8.length, 4);
+	fail_unless( strcmp((char*)sys_cmd->negotiate_cmd.value[0].string8.str, "ahoy") == 0,
+			"Negotiate command value (string): %s != ahoy",
+			sys_cmd->negotiate_cmd.value[0].string8.str);
+
+}
+END_TEST
+
+/**
  * \brief Test of adding negotiate command with multiple values
  * to the list of system commands
  */
@@ -241,6 +275,7 @@ struct Suite *negotiate_suite(void)
 	struct TCase *tc_core = tcase_create("Core");
 
 	tcase_add_test(tc_core, test_add_negotiate_cmd_single_value);
+	tcase_add_test(tc_core, test_add_negotiate_cmd_string_value);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_multiple_values);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_single_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_values);
