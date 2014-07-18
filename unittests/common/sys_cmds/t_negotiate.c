@@ -71,7 +71,7 @@ static struct NEG_cmd_values cmd_values[TEST_VEC_SIZE] = {
 /**
  * \brief Test simple adding negotiate command to the list of system commands
  */
-START_TEST ( test_Negotiate_add )
+START_TEST ( test_add_single_negotiate_cmd )
 {
 	union VSystemCommands sys_cmd[1];
 	uint8 cmd_op_code = CMD_CHANGE_L_ID;
@@ -99,6 +99,40 @@ START_TEST ( test_Negotiate_add )
 }
 END_TEST
 
+/**
+ * \brief Test simple adding negotiate command to the list of system commands
+ */
+START_TEST ( test_add_multiple_negotiate_cmd )
+{
+	union VSystemCommands sys_cmd[2];
+	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 ftr_op_code = FTR_FC_ID;
+	uint8 values[2] = {FC_TCP_LIKE, FC_NONE};
+	int ret;
+
+	v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code,
+			&values[0], &values[1], NULL);
+
+	fail_unless( ret != 1,
+			"Adding negotiate command failed");
+	fail_unless( sys_cmd->negotiate_cmd.id == cmd_op_code,
+			"Negotiate command OpCode: %d != %d",
+			sys_cmd->negotiate_cmd.id, cmd_op_code);
+	fail_unless( sys_cmd->negotiate_cmd.feature == ftr_op_code,
+			"Negotiate command feature: %d != %d",
+			sys_cmd->negotiate_cmd.feature, ftr_op_code);
+	fail_unless( sys_cmd->negotiate_cmd.count == 2,
+			"Negotiate command feature count: %d != %d",
+			sys_cmd->negotiate_cmd.count, 1);
+	fail_unless( sys_cmd->negotiate_cmd.value[0].uint8 == values[0],
+			"Negotiate command value: %d != %d",
+			sys_cmd->negotiate_cmd.value[0].uint8, values[0]);
+	fail_unless( sys_cmd->negotiate_cmd.value[1].uint8 == values[1],
+			"Negotiate command value: %d != %d",
+			sys_cmd->negotiate_cmd.value[1].uint8, values[1]);
+
+}
+END_TEST
 
 /**
  * \brief This function creates test suite for Node_Create command
@@ -108,7 +142,8 @@ struct Suite *negotiate_suite(void)
 	struct Suite *suite = suite_create("Negotiate_Cmd");
 	struct TCase *tc_core = tcase_create("Core");
 
-	tcase_add_test(tc_core, test_Negotiate_add);
+	tcase_add_test(tc_core, test_add_single_negotiate_cmd);
+	tcase_add_test(tc_core, test_add_multiple_negotiate_cmd);
 
 	suite_add_tcase(suite, tc_core);
 
