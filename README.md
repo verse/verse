@@ -40,7 +40,7 @@ experimental.
  * Spin (optional) http://spinroot.com/
  * Python3.4 (optional) http://www.python.org/
  * Python2.x (optional) http://www.python.org/
- * WSLay (optional) http://wslay.sourceforge.net/
+ * WSLay (optional) https://github.com/jirihnidek/wslay
  * MongoDB (optional) https://github.com/mongodb/mongo-c-driver (version 0.81)
 
 ### Building ###
