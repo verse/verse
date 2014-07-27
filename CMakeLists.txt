@@ -93,7 +93,7 @@ if (VERSE_CHECK)
 	
 	# Set up optional subdirectory for Check unittests 
 	if (CHECK_FOUND)
-		add_subdirectory (unittests)
+		add_subdirectory (unittests EXCLUDE_FROM_ALL)
 		# Add custom target: make tests
 		add_custom_target (test COMMAND "${PROJECT_BINARY_DIR}/bin/tests"
 			DEPENDS tests)
