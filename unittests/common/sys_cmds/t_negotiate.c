@@ -451,6 +451,68 @@ END_TEST
 
 
 /**
+ * \brief Test of packing and unpacking negotiate command with string value.
+ */
+START_TEST ( test_pack_unpack_negotiate_cmd_long_string_value )
+{
+	union VSystemCommands send_sys_cmd[1], recv_sys_cmd[1];
+	uint8 cmd_op_code = CMD_CHANGE_R_ID;
+	uint8 ftr_op_code = FTR_CLIENT_NAME;
+	char string[470] = "Lorem ipsum dolor sit amet, consectetuer adipiscing "
+			"elit. Ut enim ad minim veniam, quis nostrud exercitation ullamco "
+			"laboris nisi ut aliquip ex ea commodo consequat. Nullam at arcu "
+			"a est sollicitudin euismod. Fusce consectetuer risus a nunc. "
+			"Cras pede libero, dapibus nec, pretium sit amet, tempor quis. "
+			"Etiam dictum tincidunt diam. Nullam lectus justo, vulputate "
+			"eget mollis sed, tempor sed magna. Vivamus porttitor turpis ac "
+			"leo. Suspendisse sagittis ultrices augue.";
+	char buffer[512];
+	int ret, buffer_pos = 0, cmd_len;
+
+	ret = v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code, string, NULL);
+
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+
+	/* Pack negotiate command */
+	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
+			&send_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( buffer_pos == 261,
+			"Length of packed cmd: %d != %d",
+			buffer_pos, 8);
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_pos,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_pos,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_pos, cmd_len);
+	fail_unless( recv_sys_cmd->negotiate_cmd.id == cmd_op_code,
+			"Negotiate command OpCode: %d != %d",
+			recv_sys_cmd->negotiate_cmd.id, cmd_op_code);
+	fail_unless( recv_sys_cmd->negotiate_cmd.feature == ftr_op_code,
+			"Negotiate command feature: %d != %d",
+			recv_sys_cmd->negotiate_cmd.feature, ftr_op_code);
+	fail_unless( recv_sys_cmd->negotiate_cmd.count == 1,
+			"Negotiate command feature count: %d != %d",
+			recv_sys_cmd->negotiate_cmd.count, 1);
+	fail_unless( recv_sys_cmd->negotiate_cmd.value[0].string8.length == 255,
+			"Negotiate command value (string length): %d != %d",
+			recv_sys_cmd->negotiate_cmd.value[0].string8.length, 255);
+	/* Make original string 255 bytes long */
+	string[255] = '\0';
+	fail_unless( strncmp((char*)recv_sys_cmd->negotiate_cmd.value[0].string8.str, string, 255) == 0,
+			"Negotiate command value (string): %s != %s",
+			recv_sys_cmd->negotiate_cmd.value[0].string8.str,
+			string);
+
+}
+END_TEST
+
+
+/**
  * \brief Test packing and unpacking of negotiate command with multiple values
  */
 START_TEST ( test_pack_unpack_negotiate_cmd_multiple_values )
@@ -580,6 +642,7 @@ struct Suite *negotiate_suite(void)
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_single_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_float_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_string_value);
+	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_long_string_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_values);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_string_values);
 

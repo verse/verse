@@ -52,7 +52,7 @@ typedef double				real64;
 
 typedef struct string8 {
 	uint8_t	length;
-	uint8_t	str[VRS_STRING8_MAX_SIZE+1];
+	uint8_t	str[VRS_STRING8_MAX_SIZE + 1];
 } string8;
 
 #endif /* VERSE_TYPES_H_ */

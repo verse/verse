@@ -2022,13 +2022,13 @@ uint16 v_cmd_pack_len(char *buffer, const uint16 length)
 	uint16 buffer_pos = 0;
 
     /* Pack length of the command */
-    if(length >= 0xFF){
+    if(length >= 0xFF) {
     	/* When the first byte has value 0xFF, then decoder of this command
     	 * knows that next two bytes contains length of the command. */
         buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], 0xFF);
 		/* Pack length to the 2 bytes  */
         buffer_pos += vnp_raw_pack_uint16(&buffer[buffer_pos], length);
-    }else{
+    } else {
     	/* Pack length to 1 byte */
         buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], (uint8)length);
     }

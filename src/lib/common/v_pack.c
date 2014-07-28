@@ -40,20 +40,20 @@
 /* Pack string8 to the buffer */
 size_t vnp_raw_pack_string8(void *buffer, char *string)
 {
-	int len = strlen(string);
+	size_t str_len = strlen(string);
 	unsigned char i;
 
-	len = (len>UCHAR_MAX) ? UCHAR_MAX : len;
+	str_len = (str_len > VRS_STRING8_MAX_SIZE) ? VRS_STRING8_MAX_SIZE : str_len;
 
 	/* Pack length of the string */
-	*(uint8 *) buffer = len;
+	*(uint8 *) buffer = str_len;
 
 	/* Pack the string */
-	for(i=0; i<len; i++) {
+	for(i = 0; i < str_len; i++) {
 		*((uint8 *) buffer + 1 + i) = string[i];
 	}
 
-	return 1 + len;
+	return 1 + str_len;
 }
 
 /* Pack one byte (one octet) to the buffer */

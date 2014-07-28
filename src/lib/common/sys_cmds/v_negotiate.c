@@ -63,6 +63,7 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 	va_list args;
 	void *value;
 	unsigned char ftr_rank = 0;
+	size_t str_len;
 
 	/* This need not be here, but check it. */
 	if( !(cmd_op_code == CMD_CHANGE_L_ID ||
@@ -97,8 +98,13 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 		case FTR_CLIENT_NAME:
 		case FTR_CLIENT_VERSION:
 			/* Add string */
-			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.length = strlen((char*)value);
-			strcpy((char*)sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.str, (char*)value);
+			str_len = strlen((char*)value);
+			str_len = (str_len > VRS_STRING8_MAX_SIZE) ? VRS_STRING8_MAX_SIZE : str_len;
+			sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.length = str_len;
+			strncpy((char*)sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.str,
+					(char*)value,
+					str_len);
+			((char*)sys_cmds[cmd_rank].negotiate_cmd.value[ftr_rank].string8.str)[str_len] = '\0';
 			break;
 		case FTR_FPS:
 			/* Add float value */
@@ -384,7 +390,7 @@ int v_raw_pack_negotiate_cmd(char *buffer,
 		case FTR_RWIN_SCALE:
 		case FTR_CMD_COMPRESS:
 			/* CommandID + Length + FeatureID + features */
-			length = 1 + 1 + 1 + negotiate_cmd->count*sizeof(uint8);
+			length = 1 + 1 + 1 + negotiate_cmd->count * sizeof(uint8);
 			break;
 		case FTR_HOST_URL:
 		case FTR_TOKEN:
@@ -392,15 +398,21 @@ int v_raw_pack_negotiate_cmd(char *buffer,
 		case FTR_CLIENT_NAME:
 		case FTR_CLIENT_VERSION:
 			length = 1 + 1 + 1;	/* CommandID + Length + FeatureID */
-			for(i=0; i<negotiate_cmd->count; i++) {
+			for(i = 0; i < negotiate_cmd->count; i++) {
 				/* + String length + String */
-				length += 1 + (sizeof(unsigned char))*negotiate_cmd->value[i].string8.length;
+				length += 1 + (sizeof(unsigned char)) * negotiate_cmd->value[i].string8.length;
 			}
 			break;
 		case FTR_FPS:
 			/* CommandID + Length + FeatureID + features */
-			length = 1 + 1 + 1 + negotiate_cmd->count*sizeof(real32);
+			length = 1 + 1 + 1 + negotiate_cmd->count * sizeof(real32);
 			break;
+	}
+
+	/* When length o command is bigger then 255, then length will be stored
+	 * at 3 bytes (not only one byte) */
+	if(length >= 0xFF) {
+		length += 2;
 	}
 
 	/* Pack length of the command */
