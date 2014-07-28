@@ -35,6 +35,7 @@
 
 #include <stdarg.h>
 #include <string.h>
+#include <assert.h>
 
 #include "v_sys_commands.h"
 #include "v_commands.h"
@@ -62,6 +63,16 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 	va_list args;
 	void *value;
 	unsigned char ftr_rank = 0;
+
+	/* This need not be here, but check it. */
+	if( !(cmd_op_code == CMD_CHANGE_L_ID ||
+			cmd_op_code == CMD_CHANGE_R_ID ||
+			cmd_op_code == CMD_CONFIRM_L_ID ||
+			cmd_op_code == CMD_CONFIRM_R_ID) )
+	{
+		v_print_log(VRS_PRINT_WARNING, "This is not negotiation command\n");
+		return 0;
+	}
 
 	/* Add command OpCode */
 	sys_cmds[cmd_rank].negotiate_cmd.id = cmd_op_code;
@@ -346,19 +357,13 @@ int v_raw_pack_negotiate_cmd(char *buffer,
 	unsigned short length = 0, buffer_pos = 0;
 	unsigned int i;
 
-	/* This need not be here, but check it. */
-	if( !(negotiate_cmd->id == CMD_CHANGE_L_ID ||
+	/* Add some assertations */
+	assert( (negotiate_cmd->id == CMD_CHANGE_L_ID ||
 			negotiate_cmd->id == CMD_CHANGE_R_ID ||
 			negotiate_cmd->id == CMD_CONFIRM_L_ID ||
-			negotiate_cmd->id == CMD_CONFIRM_R_ID) )
-	{
-		v_print_log(VRS_PRINT_WARNING, "This is not negotiation command\n");
-		return 0;
-	}
+			negotiate_cmd->id == CMD_CONFIRM_R_ID) );
 
-	/* List here only supported feature IDs (reserver feature ID should
-	 * never be sent) */
-	if( !(negotiate_cmd->feature == FTR_FC_ID ||
+	assert( (negotiate_cmd->feature == FTR_FC_ID ||
 		negotiate_cmd->feature == FTR_CC_ID ||
 		negotiate_cmd->feature == FTR_HOST_URL ||
 		negotiate_cmd->feature == FTR_TOKEN ||
@@ -367,12 +372,7 @@ int v_raw_pack_negotiate_cmd(char *buffer,
 		negotiate_cmd->feature == FTR_FPS ||
 		negotiate_cmd->feature == FTR_CMD_COMPRESS ||
 		negotiate_cmd->feature == FTR_CLIENT_NAME ||
-		negotiate_cmd->feature == FTR_CLIENT_VERSION) )
-	{
-		v_print_log(VRS_PRINT_WARNING, "Try to send UNKNOWN feature ID: %d\n",
-				negotiate_cmd->feature);
-		return 0;
-	}
+		negotiate_cmd->feature == FTR_CLIENT_VERSION) );
 
 	/* Pack command ID first */
 	buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], negotiate_cmd->id);
@@ -436,11 +436,7 @@ int v_raw_pack_negotiate_cmd(char *buffer,
 	}
 
 	/* Check if length and buffer_pos match */
-	if(buffer_pos!=length) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, length);
-		return length;
-	}
+	assert(buffer_pos == length);
 
 	return buffer_pos;
 }
