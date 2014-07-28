@@ -109,7 +109,7 @@ int v_add_negotiate_cmd(union VSystemCommands *sys_cmds,
 	sys_cmds[cmd_rank].negotiate_cmd.count = ftr_rank;
 
 	/* Add terminating fake command */
-	sys_cmds[cmd_rank+1].cmd.id = CMD_RESERVED_ID;
+	sys_cmds[cmd_rank + 1].cmd.id = CMD_RESERVED_ID;
 
 	return 1;
 }
@@ -176,7 +176,7 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 			break;
 	}
 
-	for(i=0; i<negotiate_cmd->count; i++) {
+	for(i = 0; i < negotiate_cmd->count; i++) {
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
 			case FTR_CC_ID:
@@ -213,7 +213,8 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
  * size has to be at least 2 bytes long (this check has to be done before
  * calling this function)
  */
-int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct Negotiate_Cmd *negotiate_cmd)
+int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size,
+		struct Negotiate_Cmd *negotiate_cmd)
 {
 	int str_len = 0;
 	unsigned short buffer_pos = 0, cmd_length, i;
@@ -242,7 +243,8 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 	 * count of received values to the zero. */
 	if(buffer_size < cmd_length) {
 		v_print_log(VRS_PRINT_WARNING,
-				"Buffer size: %d < command length: %d.\n", buffer_size, cmd_length);
+				"Buffer size: %d < command length: %d.\n",
+				buffer_size, cmd_length);
 		negotiate_cmd->count = 0;
 		return buffer_size;
 	/* Security check: check if the length of the command is equal or bigger
@@ -250,13 +252,15 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 	 * Feature_len*/
 	} else if(cmd_length < cmd_header_len) {
 		v_print_log(VRS_PRINT_WARNING,
-				"Command length: %d < Command header length: %d.\n", cmd_length, cmd_header_len);
+				"Command length: %d < Command header length: %d.\n",
+				cmd_length, cmd_header_len);
 		negotiate_cmd->count = 0;
 		return buffer_size;
 	}
 
 	/* Unpack Feature ID */
-	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos], &negotiate_cmd->feature);
+	buffer_pos += vnp_raw_unpack_uint8(&buffer[buffer_pos],
+			&negotiate_cmd->feature);
 
 	/* Compute count of values in preference list. When unknown or unsupported
 	 * feature is detected, then processing of this command is stopped and it
@@ -265,7 +269,8 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 		case FTR_RSV_ID:
 			v_print_log(VRS_PRINT_WARNING, "Received RESERVED feature ID\n");
 			negotiate_cmd->count = 0;
-			return cmd_length;	/* This feature id should never be sent or received */
+			/* This feature id should never be sent or received */
+			return cmd_length;
 		case FTR_FC_ID:
 		case FTR_CC_ID:
 		case FTR_RWIN_SCALE:
@@ -294,7 +299,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 	}
 
 	/* Unpack values (preference list) */
-	for(i=0; i<negotiate_cmd->count; i++) {
+	for(i = 0; i < negotiate_cmd->count; i++) {
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
 			case FTR_CC_ID:
@@ -322,7 +327,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
 	}
 
 	/* Check if length and buffer_pos match */
-	if(buffer_pos!=cmd_length) {
+	if(buffer_pos != cmd_length) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
 				__FUNCTION__, buffer_pos, cmd_length);
 		return cmd_length;
@@ -335,7 +340,8 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size, struct N
  * \brief This function packs negotiate commands: Change_L/R and Confirm_L/R
  * to the buffer
  */
-int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate_cmd)
+int v_raw_pack_negotiate_cmd(char *buffer,
+		const struct Negotiate_Cmd *negotiate_cmd)
 {
 	unsigned short length = 0, buffer_pos = 0;
 	unsigned int i;
@@ -350,7 +356,8 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 		return 0;
 	}
 
-	/* List here only supported feature IDs (reserver feature ID should never be sent) */
+	/* List here only supported feature IDs (reserver feature ID should
+	 * never be sent) */
 	if( !(negotiate_cmd->feature == FTR_FC_ID ||
 		negotiate_cmd->feature == FTR_CC_ID ||
 		negotiate_cmd->feature == FTR_HOST_URL ||
@@ -400,26 +407,30 @@ int v_raw_pack_negotiate_cmd(char *buffer, const struct Negotiate_Cmd *negotiate
 	buffer_pos += v_cmd_pack_len(&buffer[buffer_pos], length);
 
 	/* Pack negotiated feature */
-	buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], negotiate_cmd->feature);
+	buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos],
+			negotiate_cmd->feature);
 
 	/* Pack values of preference list */
-	for(i=0; i<negotiate_cmd->count; i++) {
+	for(i = 0; i < negotiate_cmd->count; i++) {
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
 			case FTR_CC_ID:
 			case FTR_RWIN_SCALE:
 			case FTR_CMD_COMPRESS:
-				buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos], negotiate_cmd->value[i].uint8);
+				buffer_pos += vnp_raw_pack_uint8(&buffer[buffer_pos],
+						negotiate_cmd->value[i].uint8);
 				break;
 			case FTR_HOST_URL:
 			case FTR_TOKEN:
 			case FTR_DED:
 			case FTR_CLIENT_NAME:
 			case FTR_CLIENT_VERSION:
-				buffer_pos += vnp_raw_pack_string8(&buffer[buffer_pos], (char*)negotiate_cmd->value[i].string8.str);
+				buffer_pos += vnp_raw_pack_string8(&buffer[buffer_pos],
+						(char*)negotiate_cmd->value[i].string8.str);
 				break;
 			case FTR_FPS:
-				buffer_pos += vnp_raw_pack_real32(&buffer[buffer_pos], negotiate_cmd->value[i].real32);
+				buffer_pos += vnp_raw_pack_real32(&buffer[buffer_pos],
+						negotiate_cmd->value[i].real32);
 				break;
 		}
 	}
