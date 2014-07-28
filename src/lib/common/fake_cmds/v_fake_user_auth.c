@@ -150,6 +150,11 @@ void v_user_auth_clear(struct User_Authenticate_Cmd *user_auth)
     	}
 
     	if(user_auth->data != NULL) {
+    		int i, len = strlen(user_auth->data);
+    		/* Security: Clear password from memory */
+    		for(i = 0; i < len; i++) {
+    			user_auth->data[i] = '\0';
+    		}
     		free(user_auth->data);
     		user_auth->data = NULL;
     	}

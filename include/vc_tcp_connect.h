@@ -41,6 +41,16 @@
 #include "v_session.h"
 #include "v_connection.h"
 
+/**
+ * Structure using for storing user credentials
+ */
+typedef struct VUserCredentials {
+	char						*username;
+	char						*data;
+	/* Negotiation of user authentication methods */
+	uint8						auth_meth_count;
+	uint8						*methods;
+} VUserCredentials;
 
 int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url);
 void vc_destroy_stream_conn(struct VStreamConn *stream_conn);

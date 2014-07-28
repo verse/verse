@@ -70,18 +70,16 @@
 /**
  * \brief This function tries to get username and password from
  * user of client application.
- * \param[in]	*vsession	The session with Verse server
- * \param[out]	*ua_data	The structure storing authentication data
+ * \param[in]	*vsession			The session with Verse server
+ * \param[out]	*user_credentials	The structure storing authentication data
  */
 static int vc_get_username_passwd(struct VSession *vsession,
-		struct User_Authenticate_Cmd *ua_data)
+		struct VUserCredentials *user_credentials)
 {
 	struct Generic_Cmd *cmd = NULL;
 	uint16 count, len;
 	int8 share;
-
-	/* Put request for username and password to the queue */
-	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)ua_data);
+	struct User_Authenticate_Cmd *ua_cmd;
 
 	/* Wait for the username and password from user input in client application */
 	while(1) {
@@ -92,9 +90,20 @@ static int vc_get_username_passwd(struct VSession *vsession,
 		if(cmd != NULL) {
 			switch(cmd->id) {
 			case FAKE_CMD_USER_AUTHENTICATE:
+				ua_cmd = (struct User_Authenticate_Cmd*)cmd;
 				v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
-				/* FIXME: this is fishy */
-				memcpy(ua_data, cmd, sizeof(struct User_Authenticate_Cmd));
+				if(ua_cmd->username != NULL) {
+					if(user_credentials->username != NULL) {
+						free(user_credentials->username);
+					}
+					user_credentials->username = strdup(ua_cmd->username);
+				}
+				if(ua_cmd->data != NULL) {
+					if(user_credentials->data != NULL) {
+						free(user_credentials->data);
+					}
+					user_credentials->data = strdup(ua_cmd->data);
+				}
 				v_cmd_destroy(&cmd);
 				return 1;
 			case FAKE_CMD_CONNECT_TERMINATE:
@@ -138,6 +147,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 
 	/* Put connect accept command to queue -> call callback function */
 	conn_accept = v_Connect_Accept_create(vsession->avatar_id, vsession->user_id);
+
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_accept);
 
 	/* "Never ending" loop */
@@ -463,7 +473,8 @@ static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 /**
  *
  */
-static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd *ua_data)
+static int vc_USRAUTH_data_loop(struct vContext *C,
+		struct VUserCredentials *user_credentials)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
@@ -472,6 +483,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 	struct timeval tv;
 	fd_set set;
 	int i, ret, error, buffer_pos=0, auth_succ=0;
+	struct User_Authenticate_Cmd *ua_cmd;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -479,9 +491,18 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 		printf("%c[%dm", 27, 0);
 	}
 
+	/* Create user auth command */
+	ua_cmd = v_user_auth_create(user_credentials->username,
+			user_credentials->auth_meth_count,
+			user_credentials->methods,
+			user_credentials->data);
+
+	/* Put request for password to the queue */
+	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)ua_cmd);
+
 	/* Get authentication data (password) from the
 	 * client application */
-	if( vc_get_username_passwd(vsession, ua_data) != 1 ) {
+	if( vc_get_username_passwd(vsession, user_credentials) != 1 ) {
 		return 0;
 	}
 
@@ -490,8 +511,8 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
 	/* Pack user auth command */
 	s_message->sys_cmd[0].ua_req.id = CMD_USER_AUTH_REQUEST;
 	strncpy(s_message->sys_cmd[0].ua_req.username, vsession->username, VRS_MAX_USERNAME_LENGTH);
-	s_message->sys_cmd[0].ua_req.method_type = ua_data->methods[0];
-	strncpy(s_message->sys_cmd[0].ua_req.data, ua_data->data, VRS_MAX_DATA_LENGTH);
+	s_message->sys_cmd[0].ua_req.method_type = user_credentials->methods[0];
+	strncpy(s_message->sys_cmd[0].ua_req.data, user_credentials->data, VRS_MAX_DATA_LENGTH);
 	s_message->sys_cmd[1].cmd.id = CMD_RESERVED_ID;
 
 	/* Pack all system commands to the buffer */
@@ -606,7 +627,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C, struct User_Authenticate_Cmd
  *
  */
 static int vc_USRAUTH_none_loop(struct vContext *C,
-		struct User_Authenticate_Cmd *ua_data)
+		struct VUserCredentials *user_credentials)
 {
 	struct VSession *vsession = CTX_current_session(C);
 	struct VC_CTX *vc_ctx = CTX_client_ctx(C);
@@ -616,6 +637,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 	struct timeval tv;
 	fd_set set;
 	int ret, i, error, buffer_pos=0, cmd_rank=0;
+	struct User_Authenticate_Cmd *ua_cmd;
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
@@ -623,14 +645,18 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		printf("%c[%dm", 27, 0);
 	}
 
-	v_user_auth_init(ua_data, NULL, 0, NULL, NULL);
+	/* Create user auth command */
+	ua_cmd = v_user_auth_create(NULL, 0, NULL, NULL);
 
-	if( vc_get_username_passwd(vsession, ua_data) != 1) {
+	/* Put request for username to the queue */
+	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)ua_cmd);
+
+	if( vc_get_username_passwd(vsession, user_credentials) != 1) {
 		return 0;
 	}
 
 	/* Save username to the Verse session */
-	vsession->username = strdup(ua_data->username);
+	vsession->username = strdup(user_credentials->username);
 
 	/* Send USER_AUTH_REQUEST with METHOD_NONE to get list of supported method
 	 * types */
@@ -677,11 +703,11 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 	tv.tv_usec = 0;
 
 	/* Wait for the event on the socket */
-	if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
+	if( (ret = select(io_ctx->sockfd + 1, &set, NULL, NULL, &tv)) == -1) {
 		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "select(): %s\n", strerror(errno));
 		return 0;
 	/* Was event on the TCP socket of this session */
-	} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
+	} else if(ret > 0 && FD_ISSET(io_ctx->sockfd, &set)) {
 		buffer_pos = 0;
 
 		/* Try to receive data through SSL connection */
@@ -712,7 +738,7 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 		v_print_receive_message(C);
 
 		/* Process all system commands, that are supported in this state */
-		for(i=0; i<MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id!=CMD_RESERVED_ID; i++) {
+		for(i = 0; i < MAX_SYSTEM_COMMAND_COUNT && r_message->sys_cmd[i].cmd.id != CMD_RESERVED_ID; i++) {
 			switch(r_message->sys_cmd[i].cmd.id) {
 			case CMD_USER_AUTH_FAILURE:
 				if(r_message->sys_cmd[i].ua_fail.count == 0) {
@@ -720,11 +746,12 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 					return 0;
 				} else {
 					/* Go through the list of supported authentication methods and
-					 * copy them to the ua_data */
+					 * copy them to the user credentials */
 					int j;
-					ua_data->auth_meth_count = r_message->sys_cmd[i].ua_fail.count;
+					user_credentials->auth_meth_count = r_message->sys_cmd[i].ua_fail.count;
+					user_credentials->methods = calloc(user_credentials->auth_meth_count, sizeof(uint8));
 					for(j=0; j<r_message->sys_cmd[i].ua_fail.count; j++) {
-						ua_data->methods[j] = r_message->sys_cmd[i].ua_fail.method[j];
+						user_credentials->methods[j] = r_message->sys_cmd[i].ua_fail.method[j];
 					}
 					return CMD_USER_AUTH_FAILURE;
 				}
@@ -1222,7 +1249,7 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	struct vContext *C=NULL;
 	struct VStreamConn *stream_conn=NULL;
 	struct VMessage *r_message=NULL, *s_message=NULL;
-	struct User_Authenticate_Cmd ua_data;
+	struct VUserCredentials user_credentials;
 	int ret;
 	uint8 error = 0;
 	uint8 *udp_thread_result;
@@ -1258,8 +1285,14 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	/* Update client and server states */
 	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_NONE;
 
+	/* Initialize user credentials */
+	user_credentials.username = NULL;
+	user_credentials.data = NULL;
+	user_credentials.auth_meth_count = 0;
+	user_credentials.methods = NULL;
+
 	/* Get list of supported authentication methods */
-	ret = vc_USRAUTH_none_loop(C, &ua_data);
+	ret = vc_USRAUTH_none_loop(C, &user_credentials);
 	switch(ret) {
 	case 0:
 		error = -1;
@@ -1278,9 +1311,27 @@ data:
 	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_DATA;
 
 	/* Try to authenticate user with username and password */
-	ret = vc_USRAUTH_data_loop(C, &ua_data);
-	/* Clear user auth data from client application */
-	v_user_auth_clear(&ua_data);
+	ret = vc_USRAUTH_data_loop(C, &user_credentials);
+
+	/* Clear and free user credentials data from client application */
+	if(user_credentials.username != NULL) {
+		free(user_credentials.username);
+		user_credentials.username = NULL;
+	}
+	if(user_credentials.data != NULL) {
+		unsigned int i, len = strlen(user_credentials.data);
+		for(i = 0; i < len; i++) {
+			user_credentials.data[i] = '\0';
+		}
+		free(user_credentials.data);
+		user_credentials.data = NULL;
+	}
+	user_credentials.auth_meth_count = 0;
+	if(user_credentials.methods != NULL) {
+		free(user_credentials.methods);
+		user_credentials.methods = NULL;
+	}
+
 	switch (ret) {
 		case 0:
 			error = VRS_CONN_TERM_AUTH_FAILED;
