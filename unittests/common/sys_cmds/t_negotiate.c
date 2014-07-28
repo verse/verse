@@ -75,15 +75,26 @@ static struct NEG_cmd_values cmd_values[TEST_VEC_SIZE] = {
 START_TEST ( test_add_wrong_negotiate_cmd )
 {
 	union VSystemCommands sys_cmd[1];
-	uint8 cmd_op_code = CMD_CHANGE_L_ID;
-	uint8 ftr_op_code = FTR_RSV_ID;
+	uint8 cmd_op_code;
+	uint8 ftr_op_code;
 	uint8 value = 0;
 	int ret;
 
+	/* Wrong command OpCode */
+	cmd_op_code = CMD_RESERVED_ID;
+	ftr_op_code = FTR_RSV_ID;
 	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &value, NULL);
 
 	fail_unless( ret != 1,
-			"Adding negotiate command failed");
+			"Adding wrong negotiate command not failed.");
+
+	/* Wrong feature OpCode */
+	cmd_op_code = CMD_CHANGE_L_ID;
+	ftr_op_code = FTR_RSV_ID;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &value, NULL);
+
+	fail_unless( ret != 1,
+			"Adding wrong negotiate command not failed.");
 
 }
 END_TEST
@@ -338,12 +349,62 @@ END_TEST
 
 
 /**
+ * \brief Test simple packing and unpacking of negotiate command
+ */
+START_TEST ( test_pack_unpack_negotiate_cmd_float_value )
+{
+	union VSystemCommands send_sys_cmd[1], recv_sys_cmd[1];
+	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 ftr_op_code = FTR_FPS;
+	real32 value = 60.0f;
+	char buffer[255];
+	int ret, buffer_pos = 0, cmd_len;
+
+	/* Create negotiate command */
+	ret = v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
+			&value, NULL);
+
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+
+	/* Pack negotiate command */
+	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
+			&send_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( buffer_pos == 7,
+			"Length of packed cmd: %d != %d",
+			buffer_pos, 7);
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_pos,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_pos,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_pos, cmd_len);
+	fail_unless( recv_sys_cmd->negotiate_cmd.id == cmd_op_code,
+			"Negotiate command OpCode: %d != %d",
+			recv_sys_cmd->negotiate_cmd.id, cmd_op_code);
+	fail_unless( recv_sys_cmd->negotiate_cmd.feature == ftr_op_code,
+			"Negotiate command feature: %d != %d",
+			recv_sys_cmd->negotiate_cmd.feature, ftr_op_code);
+	fail_unless( recv_sys_cmd->negotiate_cmd.count == 1,
+			"Negotiate command feature count: %d != %d",
+			recv_sys_cmd->negotiate_cmd.count, 1);
+	fail_unless( recv_sys_cmd->negotiate_cmd.value[0].real32 == value,
+			"Negotiate command value: %d != %d",
+			recv_sys_cmd->negotiate_cmd.value[0].real32, value);
+}
+END_TEST
+
+
+/**
  * \brief Test of packing and unpacking negotiate command with string value.
  */
 START_TEST ( test_pack_unpack_negotiate_cmd_string_value )
 {
 	union VSystemCommands send_sys_cmd[1], recv_sys_cmd[1];
-	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 cmd_op_code = CMD_CHANGE_R_ID;
 	uint8 ftr_op_code = FTR_CLIENT_NAME;
 	char string[5] = {'a', 'h', 'o', 'y', '\0'};
 	char buffer[255];
@@ -395,7 +456,7 @@ END_TEST
 START_TEST ( test_pack_unpack_negotiate_cmd_multiple_values )
 {
 	union VSystemCommands send_sys_cmd[1], recv_sys_cmd[1];
-	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 cmd_op_code = CMD_CONFIRM_L_ID;
 	uint8 ftr_op_code = FTR_FC_ID;
 	uint8 values[2] = {FC_TCP_LIKE, FC_NONE};
 	char buffer[255];
@@ -449,7 +510,7 @@ END_TEST
 START_TEST ( test_pack_unpack_negotiate_cmd_multiple_string_values )
 {
 	union VSystemCommands send_sys_cmd[1], recv_sys_cmd[1];
-	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 cmd_op_code = CMD_CONFIRM_R_ID;
 	uint8 ftr_op_code = FTR_CLIENT_NAME;
 	char string_val0[5] = {'a', 'h', 'o', 'y', '\0'};
 	char string_val1[4] = {'h', 'e', 'y', '\0'};
@@ -517,6 +578,7 @@ struct Suite *negotiate_suite(void)
 	tcase_add_test(tc_core, test_add_negotiate_cmd_string_value);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_multiple_values);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_single_value);
+	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_float_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_string_value);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_values);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_multiple_string_values);
