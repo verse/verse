@@ -68,6 +68,122 @@ static struct NEG_cmd_values cmd_values[TEST_VEC_SIZE] = {
 };
 #endif
 
+
+/**
+ * \brief Test adding wrong negotiate command to the list of system commands
+ */
+START_TEST ( test_add_wrong_negotiate_cmd )
+{
+	union VSystemCommands sys_cmd[1];
+	uint8 cmd_op_code = CMD_CHANGE_L_ID;
+	uint8 ftr_op_code = FTR_RSV_ID;
+	uint8 value = 0;
+	int ret;
+
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &value, NULL);
+
+	fail_unless( ret != 1,
+			"Adding negotiate command failed");
+
+}
+END_TEST
+
+
+/**
+ * \brief Test unpacking of corrupted negotiate command
+ */
+START_TEST ( test_unpack_wrong_negotiate_cmd )
+{
+	union VSystemCommands recv_sys_cmd[1];
+	char buffer[255];
+	int buffer_size, cmd_len;
+
+	/* Create buffer with corrupted negotiate command (wrong command length) */
+	buffer[0] = CMD_CHANGE_L_ID;	/* Command OpCode */
+	buffer[1] = 0;					/* Wrong Command Length */
+	buffer_size = 2;
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_size,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_size, cmd_len);
+
+	/* Create buffer with corrupted negotiate command
+	 * (wrong command feature number) */
+	buffer[0] = CMD_CHANGE_L_ID;	/* Command OpCode */
+	buffer[1] = 3;					/* Command Length */
+	buffer[2] = FTR_RSV_ID;			/* Wrong Command Feature  */
+	buffer_size = 3;
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_size,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_size, cmd_len);
+
+	/* Create buffer with corrupted negotiate command
+	 * (wrong command feature number) */
+	buffer[0] = CMD_CHANGE_L_ID;	/* Command OpCode */
+	buffer[1] = 3;					/* Command Length */
+	buffer[2] = 100;				/* Wrong Command Feature */
+	buffer_size = 3;
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_size,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_size, cmd_len);
+
+	/* Create buffer with corrupted negotiate command
+	 * (wrong size of negotiated string) */
+	buffer[0] = CMD_CHANGE_L_ID;	/* Command OpCode */
+	buffer[1] = 8;					/* Command Length */
+	buffer[2] = FTR_CLIENT_NAME;	/* Command Feature */
+	buffer[3] = 5;					/* Wrong String length */
+	buffer[4] = 'a';				/* String ... */
+	buffer[4] = 'h';
+	buffer[4] = 'o';
+	buffer[4] = 'y';
+	buffer_size = 8;
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == buffer_size,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_size, cmd_len);
+
+	/* Create buffer with corrupted negotiate command
+	 * (wrong size of command including negotiated  string) */
+	buffer[0] = CMD_CHANGE_L_ID;	/* Command OpCode */
+	buffer[1] = 7;					/* Command Length */
+	buffer[2] = FTR_CLIENT_NAME;	/* Command Feature */
+	buffer[3] = 4;					/* Wrong String length */
+	buffer[4] = 'a';				/* String ... */
+	buffer[4] = 'h';
+	buffer[4] = 'o';
+	buffer[4] = 'y';
+	buffer_size = 8;
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
+			&recv_sys_cmd[0].negotiate_cmd);
+
+	fail_unless( cmd_len == 7,
+			"Length of packed and unpacked cmd: %d != %d",
+			buffer_size, cmd_len);
+}
+END_TEST
+
+
 /**
  * \brief Test simple adding negotiate command to the list of system commands
  */
@@ -79,9 +195,9 @@ START_TEST ( test_add_negotiate_cmd_single_value )
 	uint8 value = FC_NONE;
 	int ret;
 
-	v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &value, NULL);
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &value, NULL);
 
-	fail_unless( ret != 1,
+	fail_unless( ret == 1,
 			"Adding negotiate command failed");
 	fail_unless( sys_cmd->negotiate_cmd.id == cmd_op_code,
 			"Negotiate command OpCode: %d != %d",
@@ -111,9 +227,9 @@ START_TEST ( test_add_negotiate_cmd_string_value )
 	char string[5] = {'a', 'h', 'o', 'y', '\0'};
 	int ret;
 
-	v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, string, NULL);
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, string, NULL);
 
-	fail_unless( ret != 1,
+	fail_unless( ret == 1,
 			"Adding negotiate command failed");
 	fail_unless( sys_cmd->negotiate_cmd.id == cmd_op_code,
 			"Negotiate command OpCode: %d != %d",
@@ -146,10 +262,10 @@ START_TEST ( test_add_negotiate_cmd_multiple_values )
 	uint8 values[2] = {FC_TCP_LIKE, FC_NONE};
 	int ret;
 
-	v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code,
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code,
 			&values[0], &values[1], NULL);
 
-	fail_unless( ret != 1,
+	fail_unless( ret == 1,
 			"Adding negotiate command failed");
 	fail_unless( sys_cmd->negotiate_cmd.id == cmd_op_code,
 			"Negotiate command OpCode: %d != %d",
@@ -181,11 +297,14 @@ START_TEST ( test_pack_unpack_negotiate_cmd_single_value )
 	uint8 ftr_op_code = FTR_FC_ID;
 	uint8 value = FC_NONE;
 	char buffer[255];
-	int buffer_pos = 0, cmd_len;
+	int ret, buffer_pos = 0, cmd_len;
 
 	/* Create negotiate command */
-	v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
+	ret = v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
 			&value, NULL);
+
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
 
 	/* Pack negotiate command */
 	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
@@ -228,9 +347,12 @@ START_TEST ( test_pack_unpack_negotiate_cmd_string_value )
 	uint8 ftr_op_code = FTR_CLIENT_NAME;
 	char string[5] = {'a', 'h', 'o', 'y', '\0'};
 	char buffer[255];
-	int buffer_pos = 0, cmd_len;
+	int ret, buffer_pos = 0, cmd_len;
 
-	v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code, string, NULL);
+	ret = v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code, string, NULL);
+
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
 
 	/* Pack negotiate command */
 	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
@@ -277,11 +399,14 @@ START_TEST ( test_pack_unpack_negotiate_cmd_multiple_values )
 	uint8 ftr_op_code = FTR_FC_ID;
 	uint8 values[2] = {FC_TCP_LIKE, FC_NONE};
 	char buffer[255];
-	int buffer_pos = 0, cmd_len;
+	int ret, buffer_pos = 0, cmd_len;
 
 	/* Create negotiate command */
-	v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
+	ret = v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
 			&values[0], &values[1], NULL);
+
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
 
 	/* Pack negotiate command */
 	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
@@ -329,10 +454,13 @@ START_TEST ( test_pack_unpack_negotiate_cmd_multiple_string_values )
 	char string_val0[5] = {'a', 'h', 'o', 'y', '\0'};
 	char string_val1[4] = {'h', 'e', 'y', '\0'};
 	char buffer[255];
-	int buffer_pos = 0, cmd_len;
+	int ret, buffer_pos = 0, cmd_len;
 
-	v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
+	ret = v_add_negotiate_cmd(send_sys_cmd, 0, cmd_op_code, ftr_op_code,
 			string_val0, string_val1, NULL);
+
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
 
 	/* Pack negotiate command */
 	buffer_pos += v_raw_pack_negotiate_cmd(buffer,
@@ -383,6 +511,8 @@ struct Suite *negotiate_suite(void)
 	struct Suite *suite = suite_create("Negotiate_Cmd");
 	struct TCase *tc_core = tcase_create("Core");
 
+	tcase_add_test(tc_core, test_add_wrong_negotiate_cmd);
+	tcase_add_test(tc_core, test_unpack_wrong_negotiate_cmd);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_single_value);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_string_value);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_multiple_values);
