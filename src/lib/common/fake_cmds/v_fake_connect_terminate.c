@@ -50,7 +50,7 @@ void v_fake_connect_terminate_print(const unsigned char level, struct Connect_Te
 /**
  * \brief This function initialize members of structure for Connect_Terminate command
  */
-void v_Connect_Terminate_init(struct Connect_Terminate_Cmd *conn_term,
+void v_connect_terminate_init(struct Connect_Terminate_Cmd *conn_term,
 		uint8 error)
 {
     if(conn_term != NULL) {
@@ -63,18 +63,18 @@ void v_Connect_Terminate_init(struct Connect_Terminate_Cmd *conn_term,
 /**
  * \brief this function creates new structure of Connect_Terminate command
  */
-struct Connect_Terminate_Cmd *v_Connect_Terminate_create(uint8 error)
+struct Connect_Terminate_Cmd *v_connect_terminate_create(uint8 error)
 {
     struct Connect_Terminate_Cmd *conn_term = NULL;
     conn_term = (struct Connect_Terminate_Cmd*)calloc(1, sizeof(struct Connect_Terminate_Cmd));
-    v_Connect_Terminate_init(conn_term, error);
+    v_connect_terminate_init(conn_term, error);
     return conn_term;
 }
 
 /**
  * \brief This function clear members of structure for Connect_Terminate command
  */
-void v_Connect_Terminate_clear(struct Connect_Terminate_Cmd *conn_term)
+void v_connect_terminate_clear(struct Connect_Terminate_Cmd *conn_term)
 {
     if(conn_term != NULL) {
         conn_term->error_num = 0;
@@ -84,10 +84,10 @@ void v_Connect_Terminate_clear(struct Connect_Terminate_Cmd *conn_term)
 /**
  * \brief This function destroy Connect_Terminate command
  */
-void v_Connect_Terminate_destroy(struct Connect_Terminate_Cmd **conn_term)
+void v_connect_terminate_destroy(struct Connect_Terminate_Cmd **conn_term)
 {
     if(conn_term != NULL) {
-        v_Connect_Terminate_clear(*conn_term);
+        v_connect_terminate_clear(*conn_term);
         free(*conn_term);
         *conn_term = NULL;
     }

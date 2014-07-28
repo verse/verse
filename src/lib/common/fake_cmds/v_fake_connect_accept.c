@@ -50,7 +50,7 @@ void v_fake_connect_accept_print(const unsigned char level, struct Connect_Accep
 /**
  * \brief This function initialize members of structure for Connect_Accept command
  */
-void v_Connect_Accept_init(struct Connect_Accept_Cmd *connect_accept,
+void v_connect_accept_init(struct Connect_Accept_Cmd *connect_accept,
 		uint32 avatar_id,
 		uint16 user_id)
 {
@@ -65,19 +65,19 @@ void v_Connect_Accept_init(struct Connect_Accept_Cmd *connect_accept,
 /**
  * \brief this function creates new structure of Connect_Accept command
  */
-struct Connect_Accept_Cmd *v_Connect_Accept_create(uint32 avatar_id,
+struct Connect_Accept_Cmd *v_connect_accept_create(uint32 avatar_id,
 		uint16 user_id)
 {
     struct Connect_Accept_Cmd *connect_accept = NULL;
     connect_accept = (struct Connect_Accept_Cmd*)calloc(1, sizeof(struct Connect_Accept_Cmd));
-    v_Connect_Accept_init(connect_accept, avatar_id, user_id);
+    v_connect_accept_init(connect_accept, avatar_id, user_id);
     return connect_accept;
 }
 
 /**
  * \brief This function clear members of structure for Connect_Accept command
  */
-void v_Connect_Accept_clear(struct Connect_Accept_Cmd *connect_accept)
+void v_connect_accept_clear(struct Connect_Accept_Cmd *connect_accept)
 {
     if(connect_accept != NULL) {
         connect_accept->avatar_id = -1;
@@ -88,10 +88,10 @@ void v_Connect_Accept_clear(struct Connect_Accept_Cmd *connect_accept)
 /**
  * \brief This function destroy Connect_Accept command
  */
-void v_Connect_Accept_destroy(struct Connect_Accept_Cmd **connect_accept)
+void v_connect_accept_destroy(struct Connect_Accept_Cmd **connect_accept)
 {
     if(connect_accept != NULL) {
-        v_Connect_Accept_clear(*connect_accept);
+        v_connect_accept_clear(*connect_accept);
         free(*connect_accept);
         *connect_accept = NULL;
     }

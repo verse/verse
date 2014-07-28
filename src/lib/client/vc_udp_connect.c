@@ -1414,7 +1414,7 @@ void* vc_main_dgram_loop(void *arg)
 		struct Connect_Accept_Cmd *conn_accept;
 
 		/* Put connect accept command to queue -> call callback function */
-		conn_accept = v_Connect_Accept_create(vsession->avatar_id, vsession->user_id);
+		conn_accept = v_connect_accept_create(vsession->avatar_id, vsession->user_id);
 		v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_accept);
 
 		/* Send confirmation of the URL to the server */

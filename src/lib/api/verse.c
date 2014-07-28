@@ -137,7 +137,7 @@ int vrs_send_fps(const uint8_t session_id,
 	struct Generic_Cmd *fps_cmd;
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	fps_cmd = v_Fps_create(fps, tv.tv_sec, tv.tv_usec);
+	fps_cmd = v_fps_create(fps, tv.tv_sec, tv.tv_usec);
 	return vc_send_command(session_id, prio, fps_cmd);
 }
 
@@ -1432,7 +1432,7 @@ int vrs_send_user_authenticate(const uint8_t session_id,
 int vrs_send_connect_terminate(const uint8_t session_id)
 {
 	struct Connect_Terminate_Cmd *conn_term;
-	conn_term = v_Connect_Terminate_create(0);
+	conn_term = v_connect_terminate_create(0);
 	return vc_send_command(session_id, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)conn_term);
 }
 

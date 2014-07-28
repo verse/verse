@@ -101,16 +101,16 @@ void v_fake_cmd_destroy(struct Generic_Cmd **cmd)
 {
 	switch((*cmd)->id) {
 	case FAKE_CMD_CONNECT_ACCEPT:
-		v_Connect_Accept_destroy((struct Connect_Accept_Cmd**)cmd);
+		v_connect_accept_destroy((struct Connect_Accept_Cmd**)cmd);
 		break;
 	case FAKE_CMD_CONNECT_TERMINATE:
-		v_Connect_Terminate_destroy((struct Connect_Terminate_Cmd**)cmd);
+		v_connect_terminate_destroy((struct Connect_Terminate_Cmd**)cmd);
 		break;
 	case FAKE_CMD_USER_AUTHENTICATE:
 		v_user_auth_destroy((struct User_Authenticate_Cmd**)cmd);
 		break;
 	case FAKE_CMD_FPS:
-		v_Fps_destroy((struct Fps_Cmd**)cmd);
+		v_fps_destroy((struct Fps_Cmd**)cmd);
 		break;
 	case FAKE_CMD_NODE_CREATE_ACK:
 		v_fake_node_create_ack_destroy(cmd);

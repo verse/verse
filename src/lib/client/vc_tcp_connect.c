@@ -146,7 +146,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 	}
 
 	/* Put connect accept command to queue -> call callback function */
-	conn_accept = v_Connect_Accept_create(vsession->avatar_id, vsession->user_id);
+	conn_accept = v_connect_accept_create(vsession->avatar_id, vsession->user_id);
 
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_accept);
 
@@ -1463,7 +1463,7 @@ closing:
 	}
 
 closed:
-	conn_term = v_Connect_Terminate_create(error);
+	conn_term = v_connect_terminate_create(error);
 	v_in_queue_push(vsession->in_queue, (struct Generic_Cmd*)conn_term);
 
 	/* Wait in loop to free vsession->in_queue */

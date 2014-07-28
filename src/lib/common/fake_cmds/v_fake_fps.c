@@ -50,7 +50,7 @@ void v_fake_fps_print(const unsigned char level, struct Fps_Cmd *fps_cmd)
 /**
  * \brief This function initialize members of structure for Fps command
  */
-void v_Fps_init(struct Fps_Cmd *fps_cmd,
+void v_fps_init(struct Fps_Cmd *fps_cmd,
 		real32 fps,
 		uint32 seconds,
 		uint32 useconds)
@@ -67,20 +67,20 @@ void v_Fps_init(struct Fps_Cmd *fps_cmd,
 /**
  * \brief this function creates new structure of Connect_Accept command
  */
-struct Generic_Cmd *v_Fps_create(real32 fps,
+struct Generic_Cmd *v_fps_create(real32 fps,
 		uint32 seconds,
 		uint32 useconds)
 {
 	struct Fps_Cmd *fps_cmd = NULL;
 	fps_cmd = (struct Fps_Cmd*)calloc(1, sizeof(struct Fps_Cmd));
-	v_Fps_init(fps_cmd, fps, seconds, useconds);
+	v_fps_init(fps_cmd, fps, seconds, useconds);
 	return (struct Generic_Cmd *)fps_cmd;
 }
 
 /**
  * \brief This function clear members of structure for Connect_Accept command
  */
-void v_Fps_clear(struct Fps_Cmd *fps_cmd)
+void v_fps_clear(struct Fps_Cmd *fps_cmd)
 {
 	if(fps_cmd != NULL) {
 		fps_cmd->fps = 0.0;
@@ -92,10 +92,10 @@ void v_Fps_clear(struct Fps_Cmd *fps_cmd)
 /**
  * \brief This function destroy Connect_Accept command
  */
-void v_Fps_destroy(struct Fps_Cmd **fps_cmd)
+void v_fps_destroy(struct Fps_Cmd **fps_cmd)
 {
 	if(fps_cmd != NULL) {
-		v_Fps_clear(*fps_cmd);
+		v_fps_clear(*fps_cmd);
 		free(*fps_cmd);
 		*fps_cmd = NULL;
 	}

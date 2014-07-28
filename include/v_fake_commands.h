@@ -198,31 +198,31 @@ int v_fake_cmd_struct_size(const struct Generic_Cmd *cmd);
 struct VCommandQueue *v_fake_cmd_queue_create(uint8 id, uint8 copy_bucket, uint8 fake_cmds);
 
 void v_fake_fps_print(const unsigned char level, struct Fps_Cmd *fps_cmd);
-void v_Fps_init(struct Fps_Cmd *fps_cmd,
+void v_fps_init(struct Fps_Cmd *fps_cmd,
 		real32 fps,
 		uint32 seconds,
 		uint32 useconds);
-struct Generic_Cmd *v_Fps_create(real32 fps,
+struct Generic_Cmd *v_fps_create(real32 fps,
 		uint32 seconds,
 		uint32 useconds);
-void v_Fps_clear(struct Fps_Cmd *fps_cmd);
-void v_Fps_destroy(struct Fps_Cmd **fps_cmd);
+void v_fps_clear(struct Fps_Cmd *fps_cmd);
+void v_fps_destroy(struct Fps_Cmd **fps_cmd);
 
 void v_fake_connect_accept_print(const unsigned char level, struct Connect_Accept_Cmd *connect_accpet);
-void v_Connect_Accept_init(struct Connect_Accept_Cmd *connect_accept,
+void v_connect_accept_init(struct Connect_Accept_Cmd *connect_accept,
 		uint32 avatar_id,
 		uint16 user_id);
-struct Connect_Accept_Cmd *v_Connect_Accept_create(uint32 avatar_id,
+struct Connect_Accept_Cmd *v_connect_accept_create(uint32 avatar_id,
 		uint16 user_id);
-void v_Connect_Accept_clear(struct Connect_Accept_Cmd *connect_accept);
-void v_Connect_Accept_destroy(struct Connect_Accept_Cmd **connect_accept);
+void v_connect_accept_clear(struct Connect_Accept_Cmd *connect_accept);
+void v_connect_accept_destroy(struct Connect_Accept_Cmd **connect_accept);
 
 void v_fake_connect_terminate_print(const unsigned char level, struct Connect_Terminate_Cmd *connect_terminate);
-void v_Connect_Terminate_init(struct Connect_Terminate_Cmd *conn_term,
+void v_connect_terminate_init(struct Connect_Terminate_Cmd *conn_term,
 		uint8 error);
-struct Connect_Terminate_Cmd *v_Connect_Terminate_create(uint8 error);
-void v_Connect_Terminate_clear(struct Connect_Terminate_Cmd *conn_term);
-void v_Connect_Terminate_destroy(struct Connect_Terminate_Cmd **conn_term);
+struct Connect_Terminate_Cmd *v_connect_terminate_create(uint8 error);
+void v_connect_terminate_clear(struct Connect_Terminate_Cmd *conn_term);
+void v_connect_terminate_destroy(struct Connect_Terminate_Cmd **conn_term);
 
 
 void v_fake_user_auth_print(const unsigned char level, struct User_Authenticate_Cmd *user_auth);
