@@ -276,16 +276,6 @@ void vrs_register_receive_node_owner(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Lock to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			Verse server will try to lock node with this ID
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_lock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id)
@@ -319,15 +309,6 @@ int vrs_send_node_lock(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Lock
- *
- * \param[in]	(*func)			The pointer at callback function
- * \param[in]	session_id		The ID of session with verse server
- * \param[in]	node_id			Verse server will try to lock node with this ID
- * \param[in]	avatar_id		The ID of avatar that locked the node
- *
- */
 void vrs_register_receive_node_lock(void (*func)(const uint8_t session_id,
 		uint32_t node_id,
 		uint32_t avatar_id))
@@ -337,16 +318,6 @@ void vrs_register_receive_node_lock(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_UnLock to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			Verse server will try to unlock node with this ID
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_unlock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id)
@@ -380,15 +351,6 @@ int vrs_send_node_unlock(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_UnLock
- *
- * \param[in]	(*func)			The pointer at callback function
- * \param[in]	session_id		The ID of session with verse server
- * \param[in]	node_id			Verse server will try to unlock node with this ID
- * \param[in]	avatar_id		The ID of avatar that unlocked the node
- *
- */
 void vrs_register_receive_node_unlock(void (*func)(const uint8_t session_id,
 		uint32_t node_id,
 		uint32_t avatar_id))
@@ -398,17 +360,6 @@ void vrs_register_receive_node_unlock(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Priority to the server.
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	prio		The priority of command
- * \param[in]	node_id		The ID of node, where client wants to change priority
- * \param[in]	node_prio	The new priority of Node
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_prio(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -419,20 +370,6 @@ int vrs_send_node_prio(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Link to the server.
- *
- * When client has permission to write to child and parent node, then child node
- * will have new parent node.
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	parent_node_id	The ID of parent node
- * \param[in]	child_node_id	The ID of child node
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_link(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t parent_node_id,
@@ -443,14 +380,6 @@ int vrs_send_node_link(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Link
- *
- * \param[in]	(*func)			The pointer at callback function
- * \param[in]	session_id		The ID of session with verse server
- * \param[in]	parent_node_id	The ID of parent node
- * \param[in]	child_node_id	The ID of child node
- */
 void vrs_register_receive_node_link(void (*func)(const uint8_t session_id,
 		const uint32_t parent_node_id,
 		const uint32_t child_node_id))
@@ -460,17 +389,6 @@ void vrs_register_receive_node_link(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function send command TagGroup_Create to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The ID of node, where new taggroup will be created
- * \param[in]	type			The client defined type of taggroup
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_taggroup_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -481,15 +399,6 @@ int vrs_send_taggroup_create(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command TagGroup_Create
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where taggroup was created
- * \param[in]	taggroup_id	The ID of new taggroup
- * \param[in]	type		The client defined type of received taggroup
- */
 void vrs_register_receive_taggroup_create(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -500,17 +409,6 @@ void vrs_register_receive_taggroup_create(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function send command TagGroup_Destroy to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The ID of node, where new taggroup will be destroyed
- * \param[in]	taggroup_id		The ID of taggroup that will be destroyed
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_taggroup_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -521,14 +419,6 @@ int vrs_send_taggroup_destroy(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command TagGroup_Destroy
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where taggroup was destroyed
- * \param[in]	taggroup_id	The ID of deleted taggroup
- */
 void vrs_register_receive_taggroup_destroy(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id))
@@ -538,20 +428,6 @@ void vrs_register_receive_taggroup_destroy(void (*func)(const uint8_t session_id
 }
 
 
-/**
- * \brief This function send command TagGroup_Subscribe to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The ID of node, where is subscribed taggroup
- * \param[in]	taggroup_id		The ID subscribed taggroup
- * \param[in]	version			The version that client tries to subscribed for
- * \param[in]	crc32			The crc32 of subscribed version (when version is 0,
- * then the crc32 is defined as zero)
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_taggroup_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -563,17 +439,7 @@ int vrs_send_taggroup_subscribe(const uint8_t session_id,
 	return vc_send_command(session_id, prio, taggroup_subscribe_cmd);
 }
 
-/**
- * \brief This function register callback function for command TagGroup_Subscribe
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where taggroup was subscribed
- * \param[in]	taggroup_id	The ID of subscribed taggroup
- * \param[in]	version		The version that client subscribed for
- * \param[in]	crc32		The crc32 of subscribed version (when version is 0,
- * then the crc32 is defined as zero)
- */
+
 void vrs_register_receive_taggroup_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -584,21 +450,7 @@ void vrs_register_receive_taggroup_subscribe(void (*func)(const uint8_t session_
 	vc_ctx->vfs.receive_taggroup_subscribe = func;
 }
 
-/**
- * \brief This function send command TagGroup_Unsubscribe to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The ID of node, where is unsubscribed taggroup
- * \param[in]	taggroup_id		The ID of unsubscribed taggroup
- * \param[in]   versing			The flag that specify if versioning will be requested.
- * If the versing is equal to -1 (0xFF), then versing will be requested. When the
- * versing is equal to 0 (0x00), then versing will not be requested. Other values
- * are not defined.
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
+
 int vrs_send_taggroup_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -609,17 +461,7 @@ int vrs_send_taggroup_unsubscribe(const uint8_t session_id,
 	return vc_send_command(session_id, prio, taggroup_unsubscribe_cmd);
 }
 
-/**
- * \brief This function register callback function for command TagGroup_UnSubscribe
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where taggroup was unsubscribed
- * \param[in]	taggroup_id	The ID of unsubscribed taggroup
- * \param[in]	version		The version of unsubscibed taggroup (generated by server)
- * \param[in]	crc32		The crc32 of unsubscribed version (when version is 0,
- * then the crc32 is defined as zero)
- */
+
 void vrs_register_receive_taggroup_unsubscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -630,20 +472,7 @@ void vrs_register_receive_taggroup_unsubscribe(void (*func)(const uint8_t sessio
 	vc_ctx->vfs.receive_taggroup_unsubscribe = func;
 }
 
-/**
- * \brief This function send command Tag_Create to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The ID of node, where new tag will be created
- * \param[in]	taggroup_id		The ID of taggroup, where new tag will be created
- * \param[in]	data_type		The type of value stored in tag
- * \param[in]	count			The number of values stored in one tag (1,2,3,4)
- * \param[in]	type			The client defined type of received tag
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
+
 int vrs_send_tag_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -657,18 +486,6 @@ int vrs_send_tag_create(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command TagGroup_Create
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where tag was created
- * \param[in]	taggroup_id	The ID of taggroup, where new tag was created
- * \param[in]	tag_id		The ID of new tag
- * \param[in]	data_type	The type of value stored in tag
- * \param[in]	count		The number of values stored in one tag (1,2,3,4)
- * \param[in]	type		The client defined type of received tag
- */
 void vrs_register_receive_tag_create(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -682,18 +499,6 @@ void vrs_register_receive_tag_create(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function send command Tag_Destroy to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The ID of node, where new tag will be destroyed
- * \param[in]	taggroup_id		The ID of taggroup, where new tag will be destroyed
- * \param[in[	tag_id			The ID of tag that will be destroyed
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_tag_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -705,15 +510,6 @@ int vrs_send_tag_destroy(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Tag_Destroy
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where tag was destroyed
- * \param[in]	taggroup_id	The ID of taggroup, where tag was destroyed
- * \param[in]	tag_id		The ID of destroyed tag
- */
 void vrs_register_receive_tag_destroy(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -724,21 +520,6 @@ void vrs_register_receive_tag_destroy(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function sends command Tag_Set_Value to the server
- *
- * \param[in]	session_id	The ID of session with verse server
- * \param[in]	prio		The priority of command
- * \param[in]	node_id		The ID of node, where value of tag will be set
- * \param[in]	taggroup_id	The ID of taggroup, where value of tag will be set
- * \param[in]	tag_id		The ID of tag
- * \param[in]	type		The type of value
- * \param[in]	count		The count of values (1,2,3,4)
- * \param[in]	*value		The pointer at value(s)
- *
- *  * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_tag_set_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -753,18 +534,6 @@ int vrs_send_tag_set_value(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Tag_Set_Value
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of node, where value of tag was set
- * \param[in]	taggroup_id	The ID of taggroup, where value of tag was set
- * \param[in]	tag_id		The ID of tag
- * \param[in]	type		The type of value
- * \param[in]	count		The count of values (1,2,3,4)
- * \param[in]	*value		The pointer at value(s)
- */
 void vrs_register_receive_tag_set_value(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -778,20 +547,6 @@ void vrs_register_receive_tag_set_value(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function sends command layer_create to verse server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of node
- * \param[in]	node_id			The ID of node, where layer will be created
- * \param[in]	parent_layer_id	The ID of parent layer (0xFFFF means no parent layer layer)
- * \param[in]	data_type		The type of value (uint8, uint16, uint32, etc.)
- * \param[in]	count			The count of values in one layer item
- * \param[in]	type			The client defined type
- *
- * \return	This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_layer_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -805,9 +560,6 @@ int vrs_send_layer_create(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Layer_Create
- */
 void vrs_register_receive_layer_create(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t parent_layer_id,
@@ -821,17 +573,6 @@ void vrs_register_receive_layer_create(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function sends command layer_destroy to verse server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of node
- * \param[in]	node_id			The ID of node, where layer will be destroyed
- * \param[in]	layer_id		The ID of layer that will be destroyed
- *
- * \return	This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_layer_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -842,9 +583,6 @@ int vrs_send_layer_destroy(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Layer_Destroy
- */
 void vrs_register_receive_layer_destroy(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t layer_id))
@@ -854,19 +592,6 @@ void vrs_register_receive_layer_destroy(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function sends command layer_subscribe to verse server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of node
- * \param[in]	node_id			The ID of node, where layer will be destroyed
- * \param[in]	layer_id		The ID of layer that will be destroyed
- * \param[in]	version			The version that client wants to subscribe to
- * \param[in]	crc32			The CRC32 code
- *
- * \return	This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_layer_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -879,9 +604,6 @@ int vrs_send_layer_subscribe(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Layer_Subscribe
- */
 void vrs_register_receive_layer_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -893,18 +615,6 @@ void vrs_register_receive_layer_subscribe(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function sends command layer_subscribe to verse server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of node
- * \param[in]	node_id			The ID of node, where layer will be destroyed
- * \param[in]	layer_id		The ID of layer that will be destroyed
- * \param[in]	versing			The flag if client requires versing of this layer
- *
- * \return	This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_layer_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -916,9 +626,6 @@ int vrs_send_layer_unsubscribe(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Layer_UnSubscribe
- */
 void vrs_register_receive_layer_unsubscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -930,9 +637,6 @@ void vrs_register_receive_layer_unsubscribe(void (*func)(const uint8_t session_i
 }
 
 
-/**
- * \brief This function sets value of layer item
- */
 int vrs_send_layer_set_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -947,9 +651,6 @@ int vrs_send_layer_set_value(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Layer_Set_Value
- */
 void vrs_register_receive_layer_set_value(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -963,9 +664,6 @@ void vrs_register_receive_layer_set_value(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function unset value in layer
- */
 int vrs_send_layer_unset_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -977,9 +675,6 @@ int vrs_send_layer_unset_value(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Layer_Value_Unset
- */
 void vrs_register_receive_layer_unset_value(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -990,14 +685,6 @@ void vrs_register_receive_layer_unset_value(void (*func)(const uint8_t session_i
 }
 
 
-/**
- * \brief This function register callback function for command Connect_Accept
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server
- * \param[in]	user_id		The ID of user account
- * \param[in]	avatar_id	The ID of avatar and avatar node
- */
 void vrs_register_receive_connect_accept(void (*func)(const uint8_t session_id,
       const uint16_t user_id,
       const uint32_t avatar_id))
@@ -1007,14 +694,6 @@ void vrs_register_receive_connect_accept(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for situation, when
- * connection to verse server is closed or lost.
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	error_num	The error code
- */
 void vrs_register_receive_connect_terminate(void (*func)(const uint8_t session_id,
 		const uint8_t error_num))
 {
@@ -1023,16 +702,6 @@ void vrs_register_receive_connect_terminate(void (*func)(const uint8_t session_i
 }
 
 
-/**
- * \brief This function register callback function for situation, when server
- * require user authentication from the user
- *
- * \param[in]	(*func)				The pointer at callback function
- * \param[in]	session_id			The ID of session with verse server.
- * \param[in]	*username			The string with username
- * \param[in]	auth_methods_count	The number of previous authentication attempts to the server
- * \param[in]	*methods			The list of supported authentication methods
- */
 void vrs_register_receive_user_authenticate(void (*func)(const uint8_t session_id,
 		const char *username,
 		const uint8_t auth_meth_count,
@@ -1043,16 +712,6 @@ void vrs_register_receive_user_authenticate(void (*func)(const uint8_t session_i
 }
 
 
-/**
- * \brief This function tries to connect to verse server
- * \param[in]	*hostname	The string with hostname of the server
- * \param[in]	*service	The string with port number of the server
- * \param[in]	flags		The flags with options of connection
- * \param[out]	*session_id	There will be stored ID of session with verse server
- *
- * \return This function will return VRS_SUCCESS (0), when the client was able
- * to start connection to verse server.
- */
 int vrs_send_connect_request(const char *hostname,
 		const char *service,
 		const uint16_t flags,
@@ -1192,15 +851,6 @@ int vrs_send_connect_request(const char *hostname,
 }
 
 
-/**
- * \brief This function calls appropriate callback functions, when some system
- * or node commands are in incoming queue
- *
- * \param[in]	session_id			The ID of session with verse server.
- *
- * \return This function returns VRS_SUCCESS, when session was found and when
- * at least basic callback functions were registered.
- */
 int vrs_callback_update(const uint8_t session_id)
 {
 	static Generic_Cmd *cmd;
@@ -1248,23 +898,6 @@ int vrs_callback_update(const uint8_t session_id)
 }
 
 
-/**
- * \brief This function tries to send username and some authentication data
- * (usually password) to the verse server
- *
- * This function should be called, when client receive User_Authenticate
- * command and callback function registered with
- * register_receive_user_authenticate() is called.
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	*username	The string of username
- * \param[in]	auth_type	The authentication method
- * \param[in]	data_length	The length of authentication data in bytes
- * \param[in]	*data		The pointer at authentication data
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_user_authenticate(const uint8_t session_id,
 		const char *username,
 		const uint8_t auth_type,
@@ -1278,15 +911,6 @@ int vrs_send_user_authenticate(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function switch connection to CLOSING state (start teardown,
- * exit thread) and close connection to verse server.
- *
- * \param[in]	session_id	The ID of session with verse server.
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_connect_terminate(const uint8_t session_id)
 {
 	struct Connect_Terminate_Cmd *conn_term;
@@ -1295,17 +919,6 @@ int vrs_send_connect_terminate(const uint8_t session_id)
 }
 
 
-/**
- * \brief Return error message for error_num returned by Verse API functions.
- *
- * This function should return some string with detail description of error,
- * but it doesn't do anything now.
- *
- * \param[in]	error_num	The identifier of error
- *
- * \return	This function should return string with detail description of
- * errror.
- */
 char *vrs_strerror(const uint32_t error_num)
 {
 	char *error_string = NULL;

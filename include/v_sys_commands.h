@@ -83,6 +83,13 @@
 #define CMPR_NONE				1
 #define CMPR_ADDR_SHARE			2
 
+/* Minimal and maximal count of method types in USER_AUTH_FAILURE system command */
+#define VRS_MIN_UA_METHOD_COUNT		0
+#define VRS_MAX_UA_METHOD_COUNT		1
+
+/* Reserved IDs for user and avatar */
+#define VRS_RESERVED_USER_ID		0	/* Notification, that command connect_accpet could not be unpacked correctly */
+#define VRS_RESERVED_AVATAR_ID		0	/* Notification, that command connect_accpet could not be unpacked correctly */
 
 /* Following commands are real system commands, that are packed to the packets
  * and messages. On the other side these commands are never added to the
