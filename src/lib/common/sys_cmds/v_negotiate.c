@@ -157,6 +157,7 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 	}
 
 	v_print_log_simple(level, "count: %d, ", negotiate_cmd->count);
+
 	switch(negotiate_cmd->feature) {
 		case FTR_FC_ID:
 			v_print_log_simple(level, "feature: FC_ID, ");
@@ -337,8 +338,6 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size,
 			case FTR_FPS:
 				buffer_pos += vnp_raw_unpack_real32(&buffer[buffer_pos],
 						&negotiate_cmd->value[i].real32);
-				break;
-			default:
 				break;
 		}
 	}
