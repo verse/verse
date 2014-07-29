@@ -118,6 +118,17 @@ START_TEST ( test_unpack_wrong_negotiate_cmd )
 	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
 			&recv_sys_cmd[0].negotiate_cmd);
 
+	/* Create buffer with corrupted negotiate command (small buffer size) */
+	buffer[0] = CMD_CHANGE_L_ID;	/* Command OpCode */
+	buffer[1] = 4;					/* Command Length */
+	buffer[2] = FTR_CC_ID;			/* Feature (Congestion) */
+	buffer[3] = CC_TCP_LIKE;		/* Type of congestion */
+	buffer_size = 3;
+
+	/* Unpack system command */
+	cmd_len = v_raw_unpack_negotiate_cmd(buffer, buffer_size,
+			&recv_sys_cmd[0].negotiate_cmd);
+
 	fail_unless( cmd_len == buffer_size,
 			"Length of packed and unpacked cmd: %d != %d",
 			buffer_size, cmd_len);
@@ -225,6 +236,93 @@ START_TEST ( test_add_negotiate_cmd_single_value )
 
 }
 END_TEST
+
+
+/**
+ * \brief Test simple adding negotiate command to the list of system commands
+ */
+START_TEST ( test_print_negotiate_cmds )
+{
+	union VSystemCommands sys_cmd[1];
+	uint8 cmd_op_code;
+	uint8 ftr_op_code;
+	uint8 uint8_value = 1;
+	real32 real32_value = 60.0f;
+	char string[5] = {'a', 'h', 'o', 'y', '\0'};
+	int ret;
+
+	cmd_op_code = CMD_CHANGE_R_ID;
+	ftr_op_code = FTR_FC_ID;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &uint8_value, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_CC_ID;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &uint8_value, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_R_ID;
+	ftr_op_code = FTR_HOST_URL;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &string, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_TOKEN;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &string, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_DED;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &string, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_RWIN_SCALE;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &uint8_value, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_FPS;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &real32_value, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_CMD_COMPRESS;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &uint8_value, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_CLIENT_NAME;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &string, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+
+	cmd_op_code = CMD_CONFIRM_L_ID;
+	ftr_op_code = FTR_CLIENT_VERSION;
+	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &string, NULL);
+	fail_unless( ret == 1,
+			"Adding negotiate command failed");
+	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
+}
+END_TEST
+
 
 /**
  * \brief Test adding negotiate command with string value
@@ -637,6 +735,7 @@ struct Suite *negotiate_suite(void)
 	tcase_add_test(tc_core, test_add_wrong_negotiate_cmd);
 	tcase_add_test(tc_core, test_unpack_wrong_negotiate_cmd);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_single_value);
+	tcase_add_test(tc_core, test_print_negotiate_cmds);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_string_value);
 	tcase_add_test(tc_core, test_add_negotiate_cmd_multiple_values);
 	tcase_add_test(tc_core, test_pack_unpack_negotiate_cmd_single_value);
