@@ -677,7 +677,6 @@ static int handle_ack_nak_commands(struct vContext *C)
 				/* Update ANK ID */
 				sent_packet = v_packet_history_find_packet(&vconn->packet_history, nak_id);
 				if(sent_packet != NULL) {
-					printf(">>> Try to re-send packet: %d\n", nak_id);
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Try to re-send packet: %d\n", nak_id);
 					sent_cmd = sent_packet->cmds.last;
 
