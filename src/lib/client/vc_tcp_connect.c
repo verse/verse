@@ -1117,9 +1117,9 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		return NULL;
 	}
 
-	if ( (stream_conn = (struct VStreamConn*)malloc(sizeof(struct VStreamConn))) == NULL) {
+	if ( (stream_conn = (struct VStreamConn*)calloc(1, sizeof(struct VStreamConn))) == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
-				"malloc(): %s\n", strerror(errno));
+				"calloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
 		close(sockfd);
 		*error = VRS_CONN_TERM_ERROR;
@@ -1262,9 +1262,9 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	}
 
 	/* Set up client context, connection context and IO context */
-	C = (struct vContext*)malloc(sizeof(struct vContext));
-	r_message = (struct VMessage*)malloc(sizeof(struct VMessage));
-	s_message = (struct VMessage*)malloc(sizeof(struct VMessage));
+	C = (struct vContext*)calloc(1, sizeof(struct vContext));
+	r_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
+	s_message = (struct VMessage*)calloc(1, sizeof(struct VMessage));
 	CTX_server_ctx_set(C, NULL);
 	CTX_client_ctx_set(C, vc_ctx);
 	CTX_current_session_set(C, vsession);

@@ -634,6 +634,7 @@ static int handle_ack_nak_commands(struct vContext *C)
 			} else {
 				ret = -2;
 			}
+
 			/* If this is not the last ACK command in the sequence of
 			 * ACK/NAK commands, then remove all packets from history of
 			 * sent packet, that are in following sub-sequence of ACK
@@ -658,13 +659,15 @@ static int handle_ack_nak_commands(struct vContext *C)
 				vconn->ank_id = r_packet->sys_cmd[i].ack_cmd.pay_id;
 			}
 		} else if(r_packet->sys_cmd[i].cmd.id == CMD_NAK_ID) {
+
 			/* Check if ACK and NAK commands are the first system commands */
 			if(ret!=-2 && ret==i-1) {
 				ret = i;
 			} else {
 				ret = -2;
 			}
-			/* Go through the sub-sequence of NAk commands and try to re-send
+
+			/* Go through the sub-sequence of NAK commands and try to re-send
 			 * not-obsolete data from these packets */
 			for(nak_id = r_packet->sys_cmd[i].nak_cmd.pay_id;
 					nak_id < r_packet->sys_cmd[i+1].ack_cmd.pay_id;
@@ -674,6 +677,7 @@ static int handle_ack_nak_commands(struct vContext *C)
 				/* Update ANK ID */
 				sent_packet = v_packet_history_find_packet(&vconn->packet_history, nak_id);
 				if(sent_packet != NULL) {
+					printf(">>> Try to re-send packet: %d\n", nak_id);
 					v_print_log(VRS_PRINT_DEBUG_MSG, "Try to re-send packet: %d\n", nak_id);
 					sent_cmd = sent_packet->cmds.last;
 
@@ -681,20 +685,22 @@ static int handle_ack_nak_commands(struct vContext *C)
 					 * obsolete commands to the outgoing queue */
 					while(sent_cmd != NULL) {
 						sent_cmd_prev = sent_cmd->prev;
-						if(sent_cmd->vbucket != NULL && sent_cmd->vbucket->data != NULL) {
 
+						if(sent_cmd->vbucket != NULL &&
+								sent_cmd->vbucket->data != NULL)
+						{
 							/* Try to add command back to the outgoing command queue */
 							if(v_out_queue_push_head(vsession->out_queue,
 									sent_cmd->prio,
 									(struct Generic_Cmd*)sent_cmd->vbucket->data) == 1)
 							{
 								/* Remove bucket from the history of sent commands too */
-								v_hash_array_remove_item(&vconn->packet_history.cmd_hist[sent_cmd->id]->cmds, sent_cmd->vbucket->data);
+								v_hash_array_remove_item(&vconn->packet_history.cmd_hist[sent_cmd->id]->cmds,
+										sent_cmd->vbucket->data);
 
 								/* When command was added back to the queue,
-								 * then delete only sent command */
+								 * then delete sent command (not data of command) */
 								v_list_free_item(&sent_packet->cmds, sent_cmd);
-
 							}
 						}
 						sent_cmd = sent_cmd_prev;
