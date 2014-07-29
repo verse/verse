@@ -1382,11 +1382,11 @@ void* vc_main_dgram_loop(void *arg)
 #endif
 
 	/* Packet structure for receiving */
-	r_packet = (struct VPacket*)malloc(sizeof(struct VPacket));
+	r_packet = (struct VPacket*)calloc(1, sizeof(struct VPacket));
 	CTX_r_packet_set(C, r_packet);
 
 	/* Packet structure for sending */
-	s_packet = (struct VPacket*)malloc(sizeof(struct VPacket));
+	s_packet = (struct VPacket*)calloc(1, sizeof(struct VPacket));
 	CTX_s_packet_set(C, s_packet);
 
 	/* Run loop of the first phase of the handshake */
