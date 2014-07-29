@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 	srunner_add_suite(master_sr, negotiate_suite());
 
 	/* When client was started with some arguments */
-	if(argc>1) {
+	if(argc > 1) {
 		/* Parse all options */
 		while( (opt = getopt(argc, argv, "hd:")) != -1) {
 			switch(opt) {
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	srunner_run_all(master_sr, CK_VERBOSE);
+	srunner_run_all(master_sr, CK_NORMAL);
 	number_failed = srunner_ntests_failed(master_sr);
 	srunner_free(master_sr);
 
