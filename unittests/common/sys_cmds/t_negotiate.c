@@ -272,7 +272,7 @@ START_TEST ( test_print_negotiate_cmds )
 			"Adding negotiate command failed");
 	v_print_negotiate_cmd(VRS_PRINT_NONE, &sys_cmd->negotiate_cmd);
 
-	cmd_op_code = CMD_CONFIRM_L_ID;
+	cmd_op_code = CMD_CHANGE_L_ID;
 	ftr_op_code = FTR_TOKEN;
 	ret = v_add_negotiate_cmd(sys_cmd, 0, cmd_op_code, ftr_op_code, &string, NULL);
 	fail_unless( ret == 1,
