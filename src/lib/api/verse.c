@@ -71,10 +71,6 @@ static void vc_call_callback_func(const uint8 session_id,
 static void *vc_new_session_thread(void *arg);
 
 
-/**
- * \brief This function can set debug level of verse client.
- * \param[in]	debug_level	This parameter can have values defined in verse.h
- */
 int vrs_set_debug_level(uint8_t debug_level)
 {
 	int ret = VRS_FAILURE;
@@ -101,9 +97,7 @@ int vrs_set_debug_level(uint8_t debug_level)
 	return ret;
 }
 
-/**
- * \brief This function can set name and version of current verse client.
- */
+
 int vrs_set_client_info(char *name, char *version)
 {
 	int ret = VRS_FAILURE;
@@ -123,13 +117,7 @@ int vrs_set_client_info(char *name, char *version)
 	return ret;
 }
 
-/**
- * \brief This function tries to negotiate new FPS with server
- *
- * Note: default FPS of client is 60 FPS. If you will try to negotiation this
- * value with server, then no command will be sent, because there will be no
- * need to change this value.
- */
+
 int vrs_send_fps(const uint8_t session_id,
 		const uint8_t prio,
 		const float fps)
@@ -142,24 +130,6 @@ int vrs_send_fps(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send Node_Create command to the server.
- *
- * This function does not send this command directly, but this function
- * add Node_Create to the sending queue. Sending of this command could be
- * delayed due to congestion control or flow control. When client sends this
- * command, then this command is sent with special values: node_id==-1,
- * parent_id==avatar_id and user has to be equal of current user. Note: calling
- * of this function does not guarantee delivery of this command, because
- * connection to the server could be lost before command Node_Create is sent to
- * the server. The command is added to the priority queue.
- *
- * \param[in]	session_id	The ID of session with verse server
- * \param[in]	prio		The priority of the command.
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint16_t type)
@@ -197,14 +167,6 @@ int vrs_send_node_create(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Create
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	node_id		The ID of new created node
- * \param[in]	parent_id	The ID of parent of new created node
- * \param[in]	user_id		The ID of the owner of new created node
- * \param[in]	type		The client defined type of received node
- */
 void vrs_register_receive_node_create(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t parent_id,
@@ -216,16 +178,6 @@ void vrs_register_receive_node_create(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Destroy to the server.
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	prio		The priority of the command.
- * \param[in]	node_id		The ID of node that will be destroyed.
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id)
@@ -235,13 +187,6 @@ int vrs_send_node_destroy(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Destroy
- *
- * \param[in]	(*func)		The pointer at callback function
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	node_id		The ID of destroyed node
- */
 void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 		const uint32_t node_id))
 {
@@ -250,19 +195,6 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Subscribe to the server.
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	prio		The priority of command
- * \param[in]	node_id		The ID that client wants to be subscribed for.
- * \param[in]	version		The requested version that client request. The client
- * has to have local copy of this version.
- * \param[in]	crc32		The crc32 of requested version.
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -274,15 +206,6 @@ int vrs_send_node_subscribe(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Subscribe
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	prio		The priority of command
- * \param[in]	node_id		The ID that client wants to be subscribed for.
- * \param[in]	version		The version of node
- * \param[in]	crc32		The CRC32 of the node
- */
 void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t version,
@@ -293,20 +216,6 @@ void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Unsubscribe to the server.
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	prio		The priority of command
- * \param[in]	node_id		The ID of node that client wants to unsubscribe
- * \param[in]   versing	The flag that specify if versing will be requested.
- * If the versing is equal to -1 (0xFF), then versing will be requested. When the
- * versing is equal to 0 (0x00), then versing will not be requested. Other values
- * are not defined.
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
@@ -317,15 +226,6 @@ int vrs_send_node_unsubscribe(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_UnSubscribe
- *
- * \param[in]	session_id	The ID of session with verse server.
- * \param[in]	prio		The priority of command
- * \param[in]	node_id		The ID that client wants to be unsubscribed from.
- * \param[in]	version		The version of node
- * \param[in]	crc32		The CRC32 of the node
- */
 void vrs_register_receive_node_unsubscribe(void (*func)(const uint8_t session_id,
 		const uint32_t node_id,
 		const uint32_t version,
@@ -336,19 +236,6 @@ void vrs_register_receive_node_unsubscribe(void (*func)(const uint8_t session_id
 }
 
 
-/**
- * \brief This function tries to send command Node_Permission to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The permissions will be changed for the node with this ID
- * \param[in]	user_id			The permissions will be changed for the user with this ID
- * \param[in]	permissions		The new permissions
- * \param[in]	level			The permissions will be changed for child nodes up to this level
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_perm(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id,
@@ -360,15 +247,6 @@ int vrs_send_node_perm(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Perm
- *
- * \param[in]	(*func)			The pointer at callback function
- * \param[in]	session_id		The ID of session with verse server
- * \param[in]	node_id			The permissions will be changed for the node with this ID
- * \param[in]	user_id			The permissions will be changed for the user with this ID
- * \param[in]	permissions		The new permissions
- */
 void vrs_register_receive_node_perm(void (*func)(const uint8_t session_id,
 		uint32_t node_id,
 		uint16_t user_id,
@@ -379,17 +257,6 @@ void vrs_register_receive_node_perm(void (*func)(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function tries to send command Node_Owner to the server
- *
- * \param[in]	session_id		The ID of session with verse server.
- * \param[in]	prio			The priority of command
- * \param[in]	node_id			The owner will be changed for the node with this ID
- * \param[in]	user_id			The User ID of new owner
- *
- * \return		This function returns VRS_SUCCESS (0), when the session_id
- * was valid value, it returns VRS_FAILURE (1) otherwise.
- */
 int vrs_send_node_owner(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id,
@@ -400,15 +267,6 @@ int vrs_send_node_owner(const uint8_t session_id,
 }
 
 
-/**
- * \brief This function register callback function for command Node_Owner
- *
- * \param[in]	(*func)			The pointer at callback function
- * \param[in]	session_id		The ID of session with verse server
- * \param[in]	node_id			The owner will be changed for the node with this ID
- * \param[in]	user_id			The User ID of new owner
- *
- */
 void vrs_register_receive_node_owner(void (*func)(const uint8_t session_id,
 		uint32_t node_id,
 		uint16_t user_id))
