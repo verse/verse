@@ -136,8 +136,10 @@ int vrs_send_node_create(const uint8_t session_id,
 {
 	int i;
 
+	/* This function is more complicated, because avatar ID and user ID are
+	 * stored in session */
 	if(vc_ctx == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
+		v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
 		return VRS_NO_CB_FUNC;
 	} else {
 		/* Go through all sessions ... */
@@ -161,7 +163,7 @@ int vrs_send_node_create(const uint8_t session_id,
 		}
 	}
 
-	if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Session %d does not exist.\n", session_id);
+	v_print_log(VRS_PRINT_ERROR, "Session %d does not exist.\n", session_id);
 	return VRS_FAILURE;
 
 }
