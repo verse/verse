@@ -625,6 +625,26 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 
 		ret = 1;
 	} else {
+		v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+				"Following features were not received:");
+		if(host_url_proposed != 1) {
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+							"CHANGE_R(HOST_URL), ");
+		}
+		if(host_token_proposed != 1) {
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+							"CONFIRM_R(TOKEN), ");
+		}
+		if(peer_token_confirmed != 1) {
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+							"CHANGE_R(PEER_TOKEN), ");
+		}
+		if(ded_confirmed != 1) {
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+							"CONFIRM_R(DED), ");
+		}
+		v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+						"\n");
 		ret = 0;
 	}
 
