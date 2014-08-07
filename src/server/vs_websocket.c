@@ -636,8 +636,10 @@ void *vs_websocket_loop(void *arg)
 		/* Initialize read set */
 		FD_ZERO(&read_set);
 		if(wslay_event_want_read(wslay_ctx) == 1) {
+			/*
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Waiting for WebSocket message ...\n");
+			*/
 			FD_SET(io_ctx->sockfd, &read_set);
 		}
 

@@ -466,16 +466,11 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 		char trans_proto[4];
 		char sec_proto[5];
 		int cmd_rank = 0;
-		unsigned int min_aggregation = UINT_MAX;
+		unsigned int proposed_port_number = 0, min_aggregation = UINT_MAX;
 		unsigned char la_port = 0;	/* Port with lowest aggregation */
+		int url_confirmed = 0;
 
 		buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
-
-		/* Copy address of peer */
-		memcpy(&vsession->peer_address, &io_ctx->peer_addr, sizeof(struct VNetworkAddress));
-
-		/* Do not confirm proposed URL */
-		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_HOST_URL, NULL);
 
 		/* Find first unused port from port range or port with the lowest
 		 * aggregation */
@@ -498,90 +493,131 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 			vsession->dgram_conn->io_ctx.host_addr.port = la_port;
 		}
 
-		/* Do not allow unsecure TCP data connection */
-		if(url.transport_protocol == VRS_TP_TCP) {
-			url.security_protocol = VRS_SEC_DATA_TLS;
-		}
+		/* Copy address of peer */
+		memcpy(&vsession->peer_address, &io_ctx->peer_addr, sizeof(struct VNetworkAddress));
 
-		/* Copy settings about data connection to the session */
-		vsession->flags |= url.security_protocol;
-		vsession->flags |= url.transport_protocol;
-
-		if(vsession->flags & VRS_TP_UDP) {
-			strncpy(trans_proto, "udp", 3);
-			trans_proto[3] = '\0';
-
-			/* Create copy of new Verse context for new thread */
-			new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
-			memcpy(new_C, C, sizeof(struct vContext));
-
-			/* Try to create new thread */
-			if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-				ret = 0;
-				goto end;
-			}
-
-			/* Wait for datagram thread to be in LISTEN state */
-			while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
-				/* Sleep 1 milisecond */
-				usleep(1000);
-			}
-		} else if(vsession->flags & VRS_TP_TCP) {
-			strncpy(trans_proto, "tcp", 3);
-			trans_proto[3] = '\0';
-		} else if(vsession->flags & VRS_TP_WEBSOCKET) {
-			strncpy(trans_proto, "wss", 3);
-			trans_proto[3] = '\0';
-		}
-
-#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
-		if(url.security_protocol==VRS_SEC_DATA_NONE ||
-				!(vs_ctx->security_protocol & VRS_SEC_DATA_TLS))
+		sscanf(url.service, "%ud", &proposed_port_number);
+		/* Confirm proposed URL, when WebSocket is used and proposed port is
+		 * the same as port used for data connection */
+		if( url.transport_protocol == VRS_TP_WEBSOCKET &&
+				proposed_port_number == vs_ctx->ws_port)
 		{
-			strncpy(sec_proto, "none", 4);
-			sec_proto[4] = '\0';
-		} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
-			if(vsession->flags & VRS_TP_UDP) {
-				strncpy(sec_proto, "dtls", 4);
-				sec_proto[4] = '\0';
-			} else if((vsession->flags & VRS_TP_TCP) ||
-					(vsession->flags & VRS_TP_WEBSOCKET))
-			{
-				strncpy(sec_proto, "tls", 3);
-				sec_proto[3] = '\0';
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_HOST_URL, vsession->host_url, NULL);
+			url_confirmed = 1;
+		} else {
+			/* Do not confirm proposed URL */
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_R_ID, FTR_HOST_URL, NULL);
+
+			/* Do not allow unsecure TCP data connection */
+			if(url.transport_protocol == VRS_TP_TCP) {
+				url.security_protocol = VRS_SEC_DATA_TLS;
 			}
-		} else {
+
+			/* Copy settings about data connection to the session */
+			vsession->flags |= url.security_protocol;
+			vsession->flags |= url.transport_protocol;
+
+			if(vsession->flags & VRS_TP_UDP) {
+				strncpy(trans_proto, "udp", 3);
+				trans_proto[3] = '\0';
+
+				/* Create copy of new Verse context for new thread */
+				new_C = (struct vContext*)calloc(1, sizeof(struct vContext));
+				memcpy(new_C, C, sizeof(struct vContext));
+
+				/* Try to create new thread */
+				if((ret = pthread_create(&vsession->udp_thread, NULL, vs_main_dgram_loop, (void*)new_C)) != 0) {
+					if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+					ret = 0;
+					goto end;
+				}
+
+				/* Wait for datagram thread to be in LISTEN state */
+				while(vsession->dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
+					/* Sleep 1 milisecond */
+					usleep(1000);
+				}
+			} else if(vsession->flags & VRS_TP_TCP) {
+				strncpy(trans_proto, "tcp", 3);
+				trans_proto[3] = '\0';
+			}
+
+	#if (defined WITH_OPENSSL) && OPENSSL_VERSION_NUMBER>=0x10000000
+			if(url.security_protocol==VRS_SEC_DATA_NONE ||
+					!(vs_ctx->security_protocol & VRS_SEC_DATA_TLS))
+			{
+				strncpy(sec_proto, "none", 4);
+				sec_proto[4] = '\0';
+			} else if(url.security_protocol==VRS_SEC_DATA_TLS) {
+				if(vsession->flags & VRS_TP_UDP) {
+					strncpy(sec_proto, "dtls", 4);
+					sec_proto[4] = '\0';
+				} else if(vsession->flags & VRS_TP_TCP)
+				{
+					strncpy(sec_proto, "tls", 3);
+					sec_proto[3] = '\0';
+				}
+			} else {
+				strncpy(sec_proto, "none", 4);
+				sec_proto[4] = '\0';
+			}
+	#else
 			strncpy(sec_proto, "none", 4);
 			sec_proto[4] = '\0';
-		}
-#else
-		strncpy(sec_proto, "none", 4);
-		sec_proto[4] = '\0';
-#endif
+	#endif
 
-		/* Free proposed and now obsolete URL */
-		if(vsession->host_url != NULL) {
-			free(vsession->host_url);
-			vsession->host_url = NULL;
-		}
+			/* Free proposed and now obsolete URL */
+			if(vsession->host_url != NULL) {
+				free(vsession->host_url);
+				vsession->host_url = NULL;
+			}
 
-		/* Set right host URL */
-		vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
-		if(url.ip_ver==IPV6) {
-			sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
-					trans_proto,
-					sec_proto,
-					url.node,
-					vsession->dgram_conn->io_ctx.host_addr.port);
-		} else {
-			sprintf(vsession->host_url, "verse-%s-%s://%s:%d",
-					trans_proto,
-					sec_proto,
-					url.node,
-					vsession->dgram_conn->io_ctx.host_addr.port);
+			/* Set right host URL */
+			vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
+			if(url.ip_ver==IPV6) {
+				if( (vsession->flags & VRS_TP_WEBSOCKET) &&
+						url.security_protocol==VRS_SEC_DATA_NONE)
+				{
+					sprintf(vsession->host_url, "ws://[%s]:%d",
+							url.node,
+							vsession->dgram_conn->io_ctx.host_addr.port);
+				} else if( (vsession->flags & VRS_TP_WEBSOCKET) &&
+						url.security_protocol==VRS_SEC_DATA_TLS)
+				{
+					sprintf(vsession->host_url, "wss://[%s]:%d",
+							url.node,
+							vsession->dgram_conn->io_ctx.host_addr.port);
+				} else {
+					sprintf(vsession->host_url, "verse-%s-%s://[%s]:%d",
+							trans_proto,
+							sec_proto,
+							url.node,
+							vsession->dgram_conn->io_ctx.host_addr.port);
+				}
+			} else {
+				if( (vsession->flags & VRS_TP_WEBSOCKET) &&
+						url.security_protocol==VRS_SEC_DATA_NONE)
+				{
+					sprintf(vsession->host_url, "ws://%s:%d",
+							url.node,
+							vsession->dgram_conn->io_ctx.host_addr.port);
+				} else if( (vsession->flags & VRS_TP_WEBSOCKET) &&
+						url.security_protocol==VRS_SEC_DATA_TLS)
+				{
+					sprintf(vsession->host_url, "wss://%s:%d",
+							url.node,
+							vsession->dgram_conn->io_ctx.host_addr.port);
+				} else {
+					sprintf(vsession->host_url, "verse-%s-%s://%s:%d",
+							trans_proto,
+							sec_proto,
+							url.node,
+							vsession->dgram_conn->io_ctx.host_addr.port);
+				}
+			}
+
+			v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_HOST_URL, vsession->host_url, NULL);
 		}
-		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CHANGE_L_ID, FTR_HOST_URL, vsession->host_url, NULL);
 
 		/* Set time for the host token */
 		gettimeofday(&tv, NULL);
@@ -623,7 +659,11 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 
 		v_print_send_message(C);
 
-		ret = 1;
+		if(url_confirmed == 1) {
+			ret = 2;
+		} else {
+			ret = 1;
+		}
 	} else {
 		v_print_log_simple(VRS_PRINT_DEBUG_MSG,
 				"Following features were not received:");
@@ -944,6 +984,13 @@ int vs_handle_handshake(struct vContext *C)
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 				printf("%c[%d;%dm", 27, 1, 31);
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: NEGOTIATE_newhost\n");
+				printf("%c[%dm", 27, 0);
+			}
+		} if(ret == 2) {
+			stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
+			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+				printf("%c[%d;%dm", 27, 1, 31);
+				v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: STREAM_OPEN\n");
 				printf("%c[%dm", 27, 0);
 			}
 		} else {

@@ -84,11 +84,21 @@ int v_url_parse(const char *str, struct VURL *url)
 	/* ==== Scheme ==== */
 
 	/* URL has to begin with string verse */
-	if(strncmp(&str[str_pos], "verse", strlen("verse"))!=0) {
-		return 0;
-	} else {
+	if(strncmp(&str[str_pos], "verse", strlen("verse")) == 0) {
 		str_pos += strlen("verse");
 		/* printf("\t%s\n", &str[str_pos]);*/
+	} else if(strncmp(&str[str_pos], "ws", strlen("ws")) == 0) {
+		url->security_protocol = VRS_SEC_DATA_NONE;
+		url->transport_protocol = VRS_TP_WEBSOCKET;
+		str_pos += strlen("ws");
+		goto separator;
+	} else if(strncmp(&str[str_pos], "wss", strlen("wss")) == 0) {
+		url->security_protocol = VRS_SEC_DATA_TLS;
+		url->transport_protocol = VRS_TP_WEBSOCKET;
+		str_pos += strlen("wss");
+		goto separator;
+	} else {
+		return 0;
 	}
 
 	/* There has to be '-' after "verse" string */
@@ -107,10 +117,6 @@ int v_url_parse(const char *str, struct VURL *url)
 	} else if(strncmp(&str[str_pos], "tcp", strlen("tcp"))==0) {
 		url->transport_protocol = VRS_TP_TCP;
 		str_pos += strlen("tcp");
-		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
-	} else if(strncmp(&str[str_pos], "web", strlen("web"))==0) {
-		url->transport_protocol = VRS_TP_WEBSOCKET;
-		str_pos += strlen("web");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
 	} else {
 		return 0;
@@ -141,6 +147,7 @@ int v_url_parse(const char *str, struct VURL *url)
 		return 0;
 	}
 
+separator:
 	/* There has to be separator between scheme and address  */
 	if(strncmp(&str[str_pos], "://", strlen("://"))!=0) {
 		return 0;
