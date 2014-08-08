@@ -986,7 +986,7 @@ int vs_handle_handshake(struct vContext *C)
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: NEGOTIATE_newhost\n");
 				printf("%c[%dm", 27, 0);
 			}
-		} if(ret == 2) {
+		} else if(ret == 2) {
 			stream_conn->host_state = TCP_SERVER_STATE_STREAM_OPEN;
 			if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 				printf("%c[%d;%dm", 27, 1, 31);
