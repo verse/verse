@@ -183,9 +183,9 @@ and tool called Spin. For more details go to the directory ./promela.
 Testing
 -------
 
-If you want to test Verse library, then there are several unit tests. To
-perform tests you have to go to the build directory and run make with target
-test
+If you want to test Verse library, then you have to compile Verse with support for
+unit test framework called Check and then you can perform several unit tests. To
+run unit tests you have to go to the build directory and run make with target _test_:
 
     $ cd ./build
     $ make test
