@@ -19,7 +19,6 @@ Important links
 ---------------
 
  * http://verse.github.io/
- * http://verse.github.io/verse/
  * https://github.com/verse/verse
 
 Compile
