@@ -333,7 +333,7 @@ static void vs_mongo_tag_load_data(struct VSTag *tag,
 			break;
 		case VRS_VALUE_TYPE_STRING8:
 			str_value = bson_iterator_string(&data_iter);
-			strcpy(tag->value, str_value);
+			vs_tag_set_values(tag, 1, 0, (void*)str_value);
 			break;
 		}
 	}
