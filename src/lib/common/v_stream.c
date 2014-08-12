@@ -227,7 +227,11 @@ int v_STREAM_pack_message(struct vContext *C)
 							}
 						} else {
 							buffer_pos += tot_cmd_size = v_cmd_pack(&io_ctx->buf[buffer_pos], cmd, v_cmd_size(cmd), 0);
-							v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+							if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+								printf("%c[%d;%dm", 27, 1, 32);
+								v_cmd_print(VRS_PRINT_DEBUG_MSG, cmd);
+								printf("%c[%dm", 27, 0);
+							}
 							sent_size += tot_cmd_size;
 						}
 
