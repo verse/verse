@@ -426,6 +426,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 		void *user_data)
 {
 	struct vContext *C = (struct vContext*)user_data;
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VSession *session = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	int ret;
@@ -454,7 +455,10 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 			io_ctx->buf_size = arg->msg_length;
 
 			if(session->stream_conn->host_state == TCP_SERVER_STATE_STREAM_OPEN) {
-				if(v_STREAM_handle_messages(C) == 0) {
+				if(v_STREAM_handle_messages(C) != 0) {
+					/* When some payload data were received, then poke data thread */
+					sem_post(vs_ctx->data.sem);
+				} else {
 					/* End connection */
 					session->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
 
