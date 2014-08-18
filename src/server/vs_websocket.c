@@ -481,24 +481,25 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 							13);	/* The length of close message */
 					return;
 				}
+
+				/* During handshake send response immediately. */
+
+				/* TODO: optionally send message fragmented, when it is needed using:
+				 * wslay_event_queue_fragmented_msg() */
+				msgarg.opcode = WSLAY_BINARY_FRAME;
+				msgarg.msg = (uint8_t*)io_ctx->buf;
+				msgarg.msg_length = io_ctx->buf_size;
+
+				/* Queue message for sending */
+				if((ret = wslay_event_queue_msg(wslay_ctx, &msgarg)) != 0) {
+					v_print_log(VRS_PRINT_ERROR,
+							"Unable to queue message to WebSocket: %d\n", ret);
+					return;
+				} else {
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"WebSocket message successfully queued\n");
+				}
 			}
-
-			/* TODO: optionally send message fragmented, when it is needed using:
-			 * wslay_event_queue_fragmented_msg() */
-
-		    msgarg.opcode = WSLAY_BINARY_FRAME;
-		    msgarg.msg = (uint8_t*)io_ctx->buf;
-		    msgarg.msg_length = io_ctx->buf_size;
-
-		    /* Queue message for sending */
-		    if((ret = wslay_event_queue_msg(wslay_ctx, &msgarg)) != 0) {
-				v_print_log(VRS_PRINT_ERROR,
-						"Unable to queue message to WebSocket: %d\n", ret);
-				return;
-		    } else {
-		    	v_print_log(VRS_PRINT_DEBUG_MSG,
-		    			"WebSocket message successfully queued\n");
-		    }
 
 		} else if(arg->opcode == WSLAY_TEXT_FRAME) {
 			v_print_log(VRS_PRINT_ERROR, "WebSocket text frame is not supported\n");
