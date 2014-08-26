@@ -72,7 +72,7 @@ static void vc_call_callback_func(const uint8 session_id,
 static void *vc_new_session_thread(void *arg);
 
 
-int vrs_set_debug_level(uint8_t debug_level)
+int32_t vrs_set_debug_level(uint8_t debug_level)
 {
 	int ret = VRS_FAILURE;
 
@@ -99,7 +99,7 @@ int vrs_set_debug_level(uint8_t debug_level)
 }
 
 
-int vrs_set_client_info(char *name, char *version)
+int32_t vrs_set_client_info(char *name, char *version)
 {
 	int ret = VRS_FAILURE;
 
@@ -119,7 +119,7 @@ int vrs_set_client_info(char *name, char *version)
 }
 
 
-int vrs_send_fps(const uint8_t session_id,
+int32_t vrs_send_fps(const uint8_t session_id,
 		const uint8_t prio,
 		const float fps)
 {
@@ -131,7 +131,7 @@ int vrs_send_fps(const uint8_t session_id,
 }
 
 
-int vrs_send_node_create(const uint8_t session_id,
+int32_t vrs_send_node_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint16_t type)
 {
@@ -181,7 +181,7 @@ void vrs_register_receive_node_create(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_destroy(const uint8_t session_id,
+int32_t vrs_send_node_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id)
 {
@@ -198,7 +198,7 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_subscribe(const uint8_t session_id,
+int32_t vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint32_t version,
@@ -219,7 +219,7 @@ void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_unsubscribe(const uint8_t session_id,
+int32_t vrs_send_node_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint8_t versing)
@@ -239,7 +239,7 @@ void vrs_register_receive_node_unsubscribe(void (*func)(const uint8_t session_id
 }
 
 
-int vrs_send_node_perm(const uint8_t session_id,
+int32_t vrs_send_node_perm(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id,
 		uint16_t user_id,
@@ -260,7 +260,7 @@ void vrs_register_receive_node_perm(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_owner(const uint8_t session_id,
+int32_t vrs_send_node_owner(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id,
 		uint16_t user_id)
@@ -279,7 +279,7 @@ void vrs_register_receive_node_owner(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_lock(const uint8_t session_id,
+int32_t vrs_send_node_lock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id)
 {
@@ -321,7 +321,7 @@ void vrs_register_receive_node_lock(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_unlock(const uint8_t session_id,
+int32_t vrs_send_node_unlock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id)
 {
@@ -363,7 +363,7 @@ void vrs_register_receive_node_unlock(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_node_prio(const uint8_t session_id,
+int32_t vrs_send_node_prio(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint8_t node_prio)
@@ -373,7 +373,7 @@ int vrs_send_node_prio(const uint8_t session_id,
 }
 
 
-int vrs_send_node_link(const uint8_t session_id,
+int32_t vrs_send_node_link(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t parent_node_id,
 		const uint32_t child_node_id)
@@ -392,7 +392,7 @@ void vrs_register_receive_node_link(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_taggroup_create(const uint8_t session_id,
+int32_t vrs_send_taggroup_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t type)
@@ -412,7 +412,7 @@ void vrs_register_receive_taggroup_create(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_taggroup_destroy(const uint8_t session_id,
+int32_t vrs_send_taggroup_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id)
@@ -431,7 +431,7 @@ void vrs_register_receive_taggroup_destroy(void (*func)(const uint8_t session_id
 }
 
 
-int vrs_send_taggroup_subscribe(const uint8_t session_id,
+int32_t vrs_send_taggroup_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -454,7 +454,7 @@ void vrs_register_receive_taggroup_subscribe(void (*func)(const uint8_t session_
 }
 
 
-int vrs_send_taggroup_unsubscribe(const uint8_t session_id,
+int32_t vrs_send_taggroup_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -476,7 +476,7 @@ void vrs_register_receive_taggroup_unsubscribe(void (*func)(const uint8_t sessio
 }
 
 
-int vrs_send_tag_create(const uint8_t session_id,
+int32_t vrs_send_tag_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -502,7 +502,7 @@ void vrs_register_receive_tag_create(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_tag_destroy(const uint8_t session_id,
+int32_t vrs_send_tag_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -523,7 +523,7 @@ void vrs_register_receive_tag_destroy(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_tag_set_value(const uint8_t session_id,
+int32_t vrs_send_tag_set_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -550,7 +550,7 @@ void vrs_register_receive_tag_set_value(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_layer_create(const uint8_t session_id,
+int32_t vrs_send_layer_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t parent_layer_id,
@@ -576,7 +576,7 @@ void vrs_register_receive_layer_create(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_layer_destroy(const uint8_t session_id,
+int32_t vrs_send_layer_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id)
@@ -595,7 +595,7 @@ void vrs_register_receive_layer_destroy(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_layer_subscribe(const uint8_t session_id,
+int32_t vrs_send_layer_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -618,7 +618,7 @@ void vrs_register_receive_layer_subscribe(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_layer_unsubscribe(const uint8_t session_id,
+int32_t vrs_send_layer_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -640,7 +640,7 @@ void vrs_register_receive_layer_unsubscribe(void (*func)(const uint8_t session_i
 }
 
 
-int vrs_send_layer_set_value(const uint8_t session_id,
+int32_t vrs_send_layer_set_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -667,7 +667,7 @@ void vrs_register_receive_layer_set_value(void (*func)(const uint8_t session_id,
 }
 
 
-int vrs_send_layer_unset_value(const uint8_t session_id,
+int32_t vrs_send_layer_unset_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -715,7 +715,7 @@ void vrs_register_receive_user_authenticate(void (*func)(const uint8_t session_i
 }
 
 
-int vrs_send_connect_request(const char *hostname,
+int32_t vrs_send_connect_request(const char *hostname,
 		const char *service,
 		const uint16_t flags,
 		uint8_t *session_id)
@@ -854,7 +854,7 @@ int vrs_send_connect_request(const char *hostname,
 }
 
 
-int vrs_callback_update(const uint8_t session_id)
+int32_t vrs_callback_update(const uint8_t session_id)
 {
 	static Generic_Cmd *cmd;
 	int i;
@@ -901,7 +901,7 @@ int vrs_callback_update(const uint8_t session_id)
 }
 
 
-int vrs_send_user_authenticate(const uint8_t session_id,
+int32_t vrs_send_user_authenticate(const uint8_t session_id,
 		const char *username,
 		const uint8_t auth_type,
 		const char *data)
@@ -914,7 +914,7 @@ int vrs_send_user_authenticate(const uint8_t session_id,
 }
 
 
-int vrs_send_connect_terminate(const uint8_t session_id)
+int32_t vrs_send_connect_terminate(const uint8_t session_id)
 {
 	struct Connect_Terminate_Cmd *conn_term;
 	conn_term = v_connect_terminate_create(0);

@@ -168,7 +168,7 @@ extern "C" {
  * \return This function will return VRS_SUCCESS (0), when the client was able
  * to start connection to verse server.
  */
-int vrs_send_connect_request(const char *hostname,
+int32_t vrs_send_connect_request(const char *hostname,
 		const char *service,
 		const uint16_t flags,
 		uint8_t *session_id);
@@ -190,7 +190,7 @@ int vrs_send_connect_request(const char *hostname,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_user_authenticate(const uint8_t session_id,
+int32_t vrs_send_user_authenticate(const uint8_t session_id,
 		const char *username,
 		const uint8_t auth_type,
 		const char *data);
@@ -231,7 +231,7 @@ void vrs_register_receive_connect_accept(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_connect_terminate(const uint8_t session_id);
+int32_t vrs_send_connect_terminate(const uint8_t session_id);
 
 /**
  * \brief This function register callback function for situation, when
@@ -253,18 +253,20 @@ void vrs_register_receive_connect_terminate(void (*func)(const uint8_t session_i
  * \return This function returns VRS_SUCCESS, when session was found and when
  * at least basic callback functions were registered.
  */
-int vrs_callback_update(const uint8_t session_id);
+int32_t vrs_callback_update(const uint8_t session_id);
 
 /**
  * \brief This function can set debug level of verse client.
  * \param[in]	debug_level	This parameter can have values defined in verse.h
  */
-int vrs_set_debug_level(uint8_t debug_level);
+int32_t vrs_set_debug_level(uint8_t debug_level);
+
+
 
 /**
  * \brief This function can set name and version of current verse client.
  */
-int vrs_set_client_info(char *name, char *version);
+int32_t vrs_set_client_info(char *name, char *version);
 
 /**
  * \brief Return error message for error_num returned by Verse API functions.
@@ -286,7 +288,7 @@ char *vrs_strerror(const uint32_t error_num);
  * value with server, then no command will be sent, because there will be no
  * need to change this value.
  */
-int vrs_send_fps(const uint8_t session_id,
+int32_t vrs_send_fps(const uint8_t session_id,
 		const uint8_t prio,
 		const float fps);
 
@@ -308,7 +310,7 @@ int vrs_send_fps(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_create(const uint8_t session_id,
+int32_t vrs_send_node_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint16_t type);
 
@@ -336,7 +338,7 @@ void vrs_register_receive_node_create(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_destroy(const uint8_t session_id,
+int32_t vrs_send_node_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id);
 
@@ -363,7 +365,7 @@ void vrs_register_receive_node_destroy(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_subscribe(const uint8_t session_id,
+int32_t vrs_send_node_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint32_t version,
@@ -397,7 +399,7 @@ void vrs_register_receive_node_subscribe(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_unsubscribe(const uint8_t session_id,
+int32_t vrs_send_node_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint8_t versing);
@@ -427,7 +429,7 @@ void vrs_register_receive_node_unsubscribe(void (*func)(const uint8_t session_id
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_owner(const uint8_t session_id,
+int32_t vrs_send_node_owner(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id,
 		uint16_t user_id);
@@ -458,7 +460,7 @@ void vrs_register_receive_node_owner(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_perm(const uint8_t session_id,
+int32_t vrs_send_node_perm(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id,
 		uint16_t user_id,
@@ -488,7 +490,7 @@ void vrs_register_receive_node_perm(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_lock(const uint8_t session_id,
+int32_t vrs_send_node_lock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id);
 
@@ -515,7 +517,7 @@ void vrs_register_receive_node_lock(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_unlock(const uint8_t session_id,
+int32_t vrs_send_node_unlock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id);
 
@@ -546,7 +548,7 @@ void vrs_register_receive_node_unlock(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_link(const uint8_t session_id,
+int32_t vrs_send_node_link(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t parent_node_id,
 		const uint32_t child_node_id);
@@ -574,7 +576,7 @@ void vrs_register_receive_node_link(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_node_prio(const uint8_t session_id,
+int32_t vrs_send_node_prio(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint8_t node_prio);
@@ -590,7 +592,7 @@ int vrs_send_node_prio(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_taggroup_create(const uint8_t session_id,
+int32_t vrs_send_taggroup_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t type);
@@ -620,7 +622,7 @@ void vrs_register_receive_taggroup_create(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_taggroup_destroy(const uint8_t session_id,
+int32_t vrs_send_taggroup_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id);
@@ -651,7 +653,7 @@ void vrs_register_receive_taggroup_destroy(void (*func)(const uint8_t session_id
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_taggroup_subscribe(const uint8_t session_id,
+int32_t vrs_send_taggroup_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -690,7 +692,7 @@ void vrs_register_receive_taggroup_subscribe(void (*func)(const uint8_t session_
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_taggroup_unsubscribe(const uint8_t session_id,
+int32_t vrs_send_taggroup_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -727,7 +729,7 @@ void vrs_register_receive_taggroup_unsubscribe(void (*func)(const uint8_t sessio
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_tag_create(const uint8_t session_id,
+int32_t vrs_send_tag_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -767,7 +769,7 @@ void vrs_register_receive_tag_create(void (*func)(const uint8_t session_id,
  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_tag_destroy(const uint8_t session_id,
+int32_t vrs_send_tag_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -802,7 +804,7 @@ void vrs_register_receive_tag_destroy(void (*func)(const uint8_t session_id,
  *  * \return		This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_tag_set_value(const uint8_t session_id,
+int32_t vrs_send_tag_set_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t taggroup_id,
@@ -845,7 +847,7 @@ void vrs_register_receive_tag_set_value(void (*func)(const uint8_t session_id,
  * \return	This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_layer_create(const uint8_t session_id,
+int32_t vrs_send_layer_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t parent_layer_id,
@@ -883,7 +885,7 @@ void vrs_register_receive_layer_create(void (*func)(const uint8_t session_id,
  * \return	This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_layer_destroy(const uint8_t session_id,
+int32_t vrs_send_layer_destroy(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id);
@@ -913,7 +915,7 @@ void vrs_register_receive_layer_destroy(void (*func)(const uint8_t session_id,
  * \return	This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_layer_subscribe(const uint8_t session_id,
+int32_t vrs_send_layer_subscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -948,7 +950,7 @@ void vrs_register_receive_layer_subscribe(void (*func)(const uint8_t session_id,
  * \return	This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_layer_unsubscribe(const uint8_t session_id,
+int32_t vrs_send_layer_unsubscribe(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -984,7 +986,7 @@ void vrs_register_receive_layer_unsubscribe(void (*func)(const uint8_t session_i
  * \return	This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_layer_set_value(const uint8_t session_id,
+int32_t vrs_send_layer_set_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
@@ -1025,7 +1027,7 @@ void vrs_register_receive_layer_set_value(void (*func)(const uint8_t session_id,
  * \return	This function returns VRS_SUCCESS (0), when the session_id
  * was valid value, it returns VRS_FAILURE (1) otherwise.
  */
-int vrs_send_layer_unset_value(const uint8_t session_id,
+int32_t vrs_send_layer_unset_value(const uint8_t session_id,
 		const uint8_t prio,
 		const uint32_t node_id,
 		const uint16_t layer_id,
