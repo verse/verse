@@ -39,6 +39,8 @@
 #include "verse_types.h"
 #include "v_commands.h"
 
+#define VRS_RESERVED_LAYER_ID		0xFFFF
+
 struct Generic_Cmd *v_layer_create_create(const uint32 node_id,
 		const uint16 parent_layer_id,
 		const uint16 layer_id,

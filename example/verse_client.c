@@ -525,8 +525,6 @@ static void cb_receive_node_create(const uint8_t session_id,
 		printf("\tUser Node of SuperUser\n");
 	} else if(parent_id == VRS_USERS_PARENT_NODE_ID) {
 		printf("\tUser Node\n");
-	} else if(node_id == VRS_RESERVED_NODE_ID) {
-		printf("\tReservered Node ID (should never be received by client from server)\n");
 	} else if(node_id >= VRS_FIRST_COMMON_NODE_ID) {
 		printf("\tCommon Node\n");
 	}

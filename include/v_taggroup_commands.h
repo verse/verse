@@ -39,6 +39,8 @@
 #include "verse_types.h"
 #include "v_commands.h"
 
+#define VRS_RESERVED_TAGGROUP_ID	0xFFFF
+
 struct Generic_Cmd *v_taggroup_create_create(const uint32 node_id,
 		const uint16 taggroup_id,
 		const uint16 type);

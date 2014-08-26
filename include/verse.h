@@ -68,7 +68,6 @@ extern "C" {
 #define VRS_NO_CB_USER_AUTH		5
 
 /* Error codes for connect terminate command */
-
 #define VRS_CONN_TERM_RESERVED		0	/* Reserved code */
 #define VRS_CONN_TERM_HOST_UNKNOWN	1	/* Host could not be found */
 #define VRS_CONN_TERM_HOST_DOWN		2	/* Host is not accessible */
@@ -126,12 +125,9 @@ extern "C" {
 #define VRS_FIRST_COMMON_NODE_ID	65536	/* 2^16 */
 #define VRS_LAST_COMMON_NODE_ID		4294967294U	/* 2^32 - 2 */
 
-#define VRS_RESERVED_NODE_ID		0xFFFFFFFF
-#define VRS_RESERVED_TAGGROUP_ID	0xFFFF
-#define VRS_RESERVED_LAYER_ID		0xFFFF
-
 #define VRS_MAX_COMMON_NODE_COUNT	4294901760U /* 2^32 - 2^16*/
 
+/* Default priority of commands */
 #define VRS_DEFAULT_PRIORITY		128
 
 /* Several levels of debug print */

@@ -50,6 +50,7 @@
 #include "v_out_queue.h"
 #include "v_in_queue.h"
 #include "v_commands.h"
+#include "v_node_commands.h"
 #include "v_tag_commands.h"
 #include "v_layer_commands.h"
 

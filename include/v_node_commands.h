@@ -41,6 +41,8 @@
 
 #include "verse_types.h"
 
+#define VRS_RESERVED_NODE_ID		0xFFFFFFFF
+
 struct Generic_Cmd *v_node_create_create(uint32 node_id,
 		uint32 parent_id,
 		uint16 user_id,
