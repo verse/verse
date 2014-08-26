@@ -213,7 +213,7 @@ int32_t vrs_send_node_create(const uint8_t session_id,
 		const uint8_t prio,
 		const uint16_t type)
 {
-	int i;
+	int i, ret;
 
 	/* This function is more complicated, because avatar ID and user ID are
 	 * stored in session */
@@ -234,10 +234,13 @@ int32_t vrs_send_node_create(const uint8_t session_id,
 
 				assert(node_create_cmd != NULL);
 
-				v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
+				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
 						prio, node_create_cmd);
 
-				return VRS_SUCCESS;
+				if(ret == 1)
+					return VRS_SUCCESS;
+				else
+					return VRS_FAILURE;
 			}
 		}
 	}
@@ -361,10 +364,10 @@ int32_t vrs_send_node_lock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id)
 {
-	int i;
+	int i, ret;
 
 	if(vc_ctx == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
+		v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
 		return VRS_NO_CB_FUNC;
 	} else {
 		/* Go through all sessions ... */
@@ -378,10 +381,13 @@ int32_t vrs_send_node_lock(const uint8_t session_id,
 
 				assert(node_lock_cmd != NULL);
 
-				v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
+				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
 						prio, node_lock_cmd);
 
-				return VRS_SUCCESS;
+				if(ret == 1)
+					return VRS_SUCCESS;
+				else
+					return VRS_FAILURE;
 			}
 		}
 	}
@@ -403,10 +409,10 @@ int32_t vrs_send_node_unlock(const uint8_t session_id,
 		const uint8_t prio,
 		uint32_t node_id)
 {
-	int i;
+	int i, ret;
 
 	if(vc_ctx == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
+		v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
 		return VRS_NO_CB_FUNC;
 	} else {
 		/* Go through all sessions ... */
@@ -420,10 +426,13 @@ int32_t vrs_send_node_unlock(const uint8_t session_id,
 
 				assert(node_unlock_cmd != NULL);
 
-				v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
+				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
 						prio, node_unlock_cmd);
 
-				return VRS_SUCCESS;
+				if(ret == 1)
+					return VRS_SUCCESS;
+				else
+					return VRS_FAILURE;
 			}
 		}
 	}
@@ -803,36 +812,42 @@ int32_t vrs_send_connect_request(const char *hostname,
 	int already_connected = 0, i, ret;
 
 	/* Check if CTX was initialized (initialization is done) */
-	if(vc_ctx==NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
+	if(vc_ctx == NULL) {
+		v_print_log(VRS_PRINT_ERROR,
+				"Basic callback functions were not set.\n");
 		return VRS_NO_CB_FUNC;
 	} else {
 		/* Check if all needed callback functions was set up */
-		if(vc_ctx->vfs.receive_connect_accept==NULL) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "receive_connect_accept() callback functions was not set.\n");
+		if(vc_ctx->vfs.receive_connect_accept == NULL) {
+			v_print_log(VRS_PRINT_ERROR,
+					"receive_connect_accept() callback functions was not set.\n");
 			return VRS_NO_CB_CONN_FUNC;
 		}
-		if(vc_ctx->vfs.receive_connect_terminate==NULL) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "receive_connect_terminate() callback functions was not set.\n");
+		if(vc_ctx->vfs.receive_connect_terminate == NULL) {
+			v_print_log(VRS_PRINT_ERROR,
+					"receive_connect_terminate() callback functions was not set.\n");
 			return VRS_NO_CB_TERM_FUNC;
 		}
-		if(vc_ctx->vfs.receive_user_authenticate==NULL) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "receive_user_authenticat() callback functions was not set.\n");
+		if(vc_ctx->vfs.receive_user_authenticate == NULL) {
+			v_print_log(VRS_PRINT_ERROR,
+					"receive_user_authenticat() callback functions was not set.\n");
 			return VRS_NO_CB_USER_AUTH;
 		}
 	}
 
 	/* Set security protocol */
-#if OPENSSL_VERSION_NUMBER>=0x10000000
+#if OPENSSL_VERSION_NUMBER >= 0x10000000
 	/* Check consistency of flags */
 	if((_flags & VRS_SEC_DATA_NONE) && (_flags & VRS_SEC_DATA_TLS)) {
 		if(is_log_level(VRS_PRINT_ERROR))
-			v_print_log(VRS_PRINT_ERROR, "VRS_SEC_DATA_NONE or VRS_SEC_DATA_TLS could be set, not both.\n");
+			v_print_log(VRS_PRINT_ERROR,
+					"VRS_SEC_DATA_NONE or VRS_SEC_DATA_TLS could be set, not both.\n");
 		return VRS_FAILURE;
 	}
 #else
 	if (_flags & VRS_SEC_DATA_TLS) {
-		v_print_log(VRS_PRINT_WARNING, "flag VRS_SEC_DATA_TLS could be set due to low version of OpenSSL (at least 1.0 is required).\n");
+		v_print_log(VRS_PRINT_WARNING,
+				"flag VRS_SEC_DATA_TLS could be set due to low version of OpenSSL (at least 1.0 is required).\n");
 		_flags &= ~VRS_SEC_DATA_TLS;
 		_flags |= VRS_SEC_DATA_NONE;
 	}
@@ -841,7 +856,8 @@ int32_t vrs_send_connect_request(const char *hostname,
 	/* Set transport protocol */
 	if((_flags & VRS_TP_UDP) && (_flags & VRS_TP_TCP)) {
 		if(is_log_level(VRS_PRINT_ERROR))
-			v_print_log(VRS_PRINT_ERROR, "VRS_TP_UDP or VRS_TP_TCP could be set, not both.\n");
+			v_print_log(VRS_PRINT_ERROR,
+					"VRS_TP_UDP or VRS_TP_TCP could be set, not both.\n");
 		return VRS_FAILURE;
 	} else if(!(_flags & VRS_TP_UDP) && !(_flags & VRS_TP_TCP)) {
 		/* When no transport protocol is selected, then use UDP as default */
@@ -939,7 +955,7 @@ int32_t vrs_callback_update(const uint8_t session_id)
 
 	/* Check if CTX was initialized */
 	if(vc_ctx == NULL) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
+		v_print_log(VRS_PRINT_ERROR, "Basic callback functions were not set.\n");
 		return VRS_NO_CB_FUNC;
 	} else {
 		int session_found = 0;
@@ -1021,7 +1037,7 @@ static int vc_send_command(const uint8 session_id,
 		const uint8 prio,
 		struct Generic_Cmd *cmd)
 {
-	int i;
+	int i, ret;
 
 	assert(cmd != NULL);
 
@@ -1039,9 +1055,13 @@ static int vc_send_command(const uint8 session_id,
 			if(vc_ctx->vsessions[i]!=NULL &&
 					vc_ctx->vsessions[i]->session_id==session_id)
 			{
-				v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
+				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
 						prio, cmd);
-				return VRS_SUCCESS;
+
+				if(ret == 1)
+					return VRS_SUCCESS;
+				else
+					return VRS_FAILURE;
 			}
 		}
 	}

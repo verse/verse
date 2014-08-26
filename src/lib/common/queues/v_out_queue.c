@@ -167,7 +167,16 @@ static struct VOutQueueCommand * _v_out_queue_command_create(struct VOutQueue *o
 		struct Generic_Cmd *cmd)
 {
 	/* Create new command in queue */
-	struct VOutQueueCommand *queue_cmd = (struct VOutQueueCommand*)calloc(1, sizeof(struct VOutQueueCommand));
+	struct VOutQueueCommand *queue_cmd = NULL;
+
+	/* Check if there is free space for adding new command to the queue */
+	if(out_queue->max_size < out_queue->size + out_queue->cmds[cmd->id]->item_size) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"No free space in outgoing queue for command: %d", cmd->id);
+		return NULL;
+	}
+
+	queue_cmd = (struct VOutQueueCommand*)calloc(1, sizeof(struct VOutQueueCommand));
 
 	if(queue_cmd != NULL) {
 		/* Set up id and priority of command */
@@ -183,7 +192,8 @@ static struct VOutQueueCommand * _v_out_queue_command_create(struct VOutQueue *o
 		}
 
 		/* Add new command data */
-		queue_cmd->vbucket = v_hash_array_add_item(&out_queue->cmds[cmd->id]->cmds, cmd, out_queue->cmds[cmd->id]->item_size);
+		queue_cmd->vbucket = v_hash_array_add_item(&out_queue->cmds[cmd->id]->cmds,
+				cmd, out_queue->cmds[cmd->id]->item_size);
 		queue_cmd->vbucket->ptr = (void*)queue_cmd;
 
 		assert(queue_cmd->vbucket->data != NULL);
@@ -217,6 +227,14 @@ static struct VOutQueueCommand * _v_out_queue_command_create(struct VOutQueue *o
 
 /**
  * \brief This function adds command to the head or tail of the queue
+ *
+ * \param[in] *out_queue	The outgoing queue
+ * \param[in] flag			The flag that specify place of adding command (tail/head)
+ * \param[in] prio			The priority of command
+ * \param[in] *cmd			The pointer at command
+ *
+ * \return This function returns 1, when command was added to the queue.
+ * Otherwise it returns 0.
  */
 static int _v_out_queue_push(struct VOutQueue *out_queue,
 		uint8 flag,

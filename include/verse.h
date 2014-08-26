@@ -68,13 +68,17 @@ extern "C" {
 #define VRS_DEFAULT_WEB_PORT	23456
 
 /* Return codes */
-#define VRS_SUCCESS				0
-#define VRS_FAILURE				1
-
-#define	VRS_NO_CB_FUNC			2
-#define VRS_NO_CB_CONN_FUNC		3
-#define VRS_NO_CB_TERM_FUNC		4
-#define VRS_NO_CB_USER_AUTH		5
+#define VRS_SUCCESS					 0
+#define VRS_FAILURE					-1
+#define	VRS_NO_CB_FUNC				-2
+#define VRS_NO_CB_CONN_FUNC			-3
+#define VRS_NO_CB_TERM_FUNC			-4
+#define VRS_NO_CB_USER_AUTH			-5
+#if 0
+/* Proposal of new error codes */
+#define VRS_ERR_WRONG_SESSION_ID	-6
+#define VRS_ERR_FULL_QUEUE			-7
+#endif
 
 /* Error codes for connect terminate command */
 #define VRS_CONN_TERM_RESERVED		0	/* Reserved code */
@@ -91,7 +95,7 @@ extern "C" {
 #define VRS_PERM_NODE_READ			1	/* User can read content of the node */
 #define VRS_PERM_NODE_WRITE			2	/* User can do anything with content of the node */
 #if 0
-/* Proposal */
+/* Proposal of new permission flags */
 #define VRS_PERM_NODE_APPEND		4	/* User can add new entities to node */
 #define VRS_PERM_NODE_CHANGE		8	/* User can change content of the node */
 #define VRS_PERM_NODE_CLEAR			16	/* User can delete any entity in the node */
