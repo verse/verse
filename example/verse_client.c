@@ -713,11 +713,20 @@ static void cb_receive_connect_accept(const uint8_t session_id,
       const uint16_t user_id,
       const uint32_t avatar_id)
 {
+	int in_size, out_size, in_free, out_free;
+
 	printf("%s() session_id: %d, user_id: %d, avatar_id: %d\n",
 			__FUNCTION__, session_id, user_id, avatar_id);
 
 	my_avatar_id = avatar_id;
 	my_user_id = user_id;
+
+	/* Try to decrease size of outgoing and incoming queue a little.
+	 * Keep in mind that default size is 1048576B = 1MB */
+	in_size = vrs_get(session_id, VRS_SESSION_IN_QUEUE_MAX_SIZE);
+	out_size = vrs_get(session_id, VRS_SESSION_OUT_QUEUE_MAX_SIZE);
+	vrs_set(session_id, VRS_SESSION_IN_QUEUE_MAX_SIZE, in_size - 576);
+	vrs_set(session_id, VRS_SESSION_OUT_QUEUE_MAX_SIZE, out_size - 576);
 
 	/* When client receive connect accept, then it is ready to subscribe
 	 * to the root node of the node tree. Id of root node is still 0. This
@@ -733,6 +742,13 @@ static void cb_receive_connect_accept(const uint8_t session_id,
 
 	/* Change FPS value */
 	vrs_send_fps(session_id, VRS_DEFAULT_PRIORITY+1, FPS);
+
+	/* Print free space in incoming and outgoing queue */
+	in_free = vrs_get(session_id, VRS_SESSION_IN_QUEUE_FREE_SPACE);
+	out_free = vrs_get(session_id, VRS_SESSION_OUT_QUEUE_FREE_SPACE);
+
+	printf("\tsession_id: %d, in_queue (free space): %d, out_queue (free space): %d\n",
+			session_id, in_free, out_free);
 }
 
 /**

@@ -118,6 +118,84 @@ int32_t vrs_set_client_info(char *name, char *version)
 	return ret;
 }
 
+int32_t vrs_get(const uint8_t session_id,
+	    const uint8_t param)
+{
+	int i;
+	int32_t ret = 0;
+
+	/* Go through all sessions ... */
+	for(i=0; i<vc_ctx->max_sessions; i++) {
+		/* ... and try to find session with session_id */
+		if(vc_ctx->vsessions[i]!=NULL &&
+				vc_ctx->vsessions[i]->session_id==session_id)
+		{
+			switch(param) {
+				case VRS_SESSION_IN_QUEUE_MAX_SIZE:
+					ret = vc_ctx->vsessions[i]->in_queue->max_size;
+					break;
+				case VRS_SESSION_IN_QUEUE_FREE_SPACE:
+					ret = vc_ctx->vsessions[i]->in_queue->max_size -
+						vc_ctx->vsessions[i]->in_queue->size;
+					break;
+				case VRS_SESSION_OUT_QUEUE_MAX_SIZE:
+					ret = vc_ctx->vsessions[i]->out_queue->max_size;
+					break;
+				case VRS_SESSION_OUT_QUEUE_FREE_SPACE:
+					ret = vc_ctx->vsessions[i]->out_queue->max_size -
+						vc_ctx->vsessions[i]->out_queue->size;
+					break;
+				default:
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"Try to get unsupported session parameter: %d",
+							param);
+					break;
+			}
+
+			return ret;
+		}
+	}
+
+	v_print_log(VRS_PRINT_ERROR, "Session %d does not exist.\n", session_id);
+	return ret;
+}
+
+int32_t vrs_set(const uint8_t session_id,
+	    const uint8_t param,
+	    const uint32_t value)
+{
+	int i;
+	int32_t ret = 0;
+
+	/* Go through all sessions ... */
+	for(i=0; i<vc_ctx->max_sessions; i++) {
+		/* ... and try to find session with session_id */
+		if(vc_ctx->vsessions[i]!=NULL &&
+				vc_ctx->vsessions[i]->session_id==session_id)
+		{
+			switch(param) {
+				case VRS_SESSION_IN_QUEUE_MAX_SIZE:
+					vc_ctx->vsessions[i]->in_queue->max_size = value;
+					ret = 1;
+					break;
+				case VRS_SESSION_OUT_QUEUE_MAX_SIZE:
+					vc_ctx->vsessions[i]->out_queue->max_size = value;
+					ret = 1;
+					break;
+				default:
+					v_print_log(VRS_PRINT_DEBUG_MSG,
+							"Try to set unsupported session parameter: %d",
+							param);
+					break;
+			}
+
+			return ret;
+		}
+	}
+
+	v_print_log(VRS_PRINT_ERROR, "Session %d does not exist.\n", session_id);
+	return ret;
+}
 
 int32_t vrs_send_fps(const uint8_t session_id,
 		const uint8_t prio,

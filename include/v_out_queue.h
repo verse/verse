@@ -57,6 +57,7 @@
 #define OUT_QUEUE_ADD_TAIL	1
 #define OUT_QUEUE_ADD_HEAD	2
 
+/* Maximal size of outgoing queue is 1MB */
 #define OUT_QUEUE_DEFAULT_MAX_SIZE 1048576
 
 /**

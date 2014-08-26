@@ -33,7 +33,16 @@
  *
  */
 
-/* This .h file include only type definitions and functions for Verse API */
+/**
+ * \file	verse.h
+ * \author	Jiri Hnidek (jiri.hnidek@tul.cz)
+ * \brief	This file includes type definitions and function prototypes
+ * for Verse API.
+ *
+ * Detail description of C Verse API could be found at:
+ * https://github.com/verse/verse/wiki/C-API
+ *
+ */
 
 #if !defined VERSE_H
 
@@ -146,7 +155,7 @@ extern "C" {
 #define VRS_CMD_CMPR_NONE			32	/* No command compression */
 #define VRS_CMD_CMPR_ADDR_SHARE		64	/* Share command addresses to compress commands */
 
-/* Type of verse value */
+/* Types of verse values */
 #define VRS_VALUE_TYPE_RESERVED		0
 #define VRS_VALUE_TYPE_UINT8		1
 #define VRS_VALUE_TYPE_UINT16		2
@@ -157,6 +166,11 @@ extern "C" {
 #define VRS_VALUE_TYPE_REAL64		7
 #define VRS_VALUE_TYPE_STRING8		8
 
+/* Parameters of session */
+#define VRS_SESSION_IN_QUEUE_MAX_SIZE		1
+#define VRS_SESSION_IN_QUEUE_FREE_SPACE		2
+#define VRS_SESSION_OUT_QUEUE_MAX_SIZE		3
+#define VRS_SESSION_OUT_QUEUE_FREE_SPACE	4
 
 /**
  * \brief This function tries to connect to verse server
@@ -246,7 +260,16 @@ void vrs_register_receive_connect_terminate(void (*func)(const uint8_t session_i
 
 /**
  * \brief This function calls appropriate callback functions, when some system
- * or node commands are in incoming queue
+ * or node commands are in incoming queue.
+ *
+ * This function should be called periodically in 'never ending loop' e.g.:
+ *
+ * \code
+ * while(1) {
+ *   vrs_callback_update(my_session_id);
+ *   sleep(1);
+ * }
+ * \endcode
  *
  * \param[in]	session_id			The ID of session with verse server.
  *
@@ -261,12 +284,52 @@ int32_t vrs_callback_update(const uint8_t session_id);
  */
 int32_t vrs_set_debug_level(uint8_t debug_level);
 
-
-
 /**
  * \brief This function can set name and version of current verse client.
+ *
+ * The name and version can be set only once. Changing of client name nor
+ * version is not allowed. Client name and version can be sent during
+ * handshake. Thus it is possible to call this function before calling
+ * vrs_send_connect_request().
+ *
+ * \param[in] *name		The name of verse client.
+ * \param[in] *version	The version og verse client.
+ *
+ * \return This function returns VRS_SUCCESS.
  */
 int32_t vrs_set_client_info(char *name, char *version);
+
+/**
+ * \brief This function tries to get specified session parameter.
+ *
+ * There are currently four parameters of session that can be queried.
+ * It is maximum size of outgoing/incoming queue and it is free space
+ * in outgoing/incoming queue.
+ *
+ * \param session_id	The ID of session with verse server.
+ * \param param			The ID of parameter that is queried.
+ *
+ * \return This function returns value of queried session parameter. When
+ * wrong session ID is specified, then zero is returned.
+ */
+int32_t vrs_get(const uint8_t session_id,
+	    const uint8_t param);
+
+/**
+ * \brief This function tries to set specified session parameter.
+ *
+ * There are currently two parameters of session that can be set.
+ * It is maximal size of outgoing and incoming queue.
+ *
+ * \param session_id	The ID of session with verse server.
+ * \param param			The ID of parameter that is set.
+ * \param value			The value of parameter.
+ *
+ * \return
+ */
+int32_t vrs_set(const uint8_t session_id,
+	    const uint8_t param,
+	    const uint32_t value);
 
 /**
  * \brief Return error message for error_num returned by Verse API functions.

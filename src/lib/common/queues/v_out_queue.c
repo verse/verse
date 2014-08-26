@@ -227,7 +227,7 @@ static int _v_out_queue_push(struct VOutQueue *out_queue,
 	struct VBucket *vbucket;
 	int ret = 1;
 
-	assert(cmd!=NULL);
+	assert(cmd != NULL);
 
 	/* Try to find command with the same address, when duplicities are not
 	 * allowed in command queue */
@@ -235,7 +235,7 @@ static int _v_out_queue_push(struct VOutQueue *out_queue,
 		vbucket = v_hash_array_find_item(&out_queue->cmds[cmd->id]->cmds, (void*)cmd);
 		if(vbucket != NULL) {
 			/* Bucket has to include not NULL pointer */
-			assert(vbucket->ptr!=NULL);
+			assert(vbucket->ptr != NULL);
 
 			queue_cmd = (struct VOutQueueCommand*)vbucket->ptr;
 

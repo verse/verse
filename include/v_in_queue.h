@@ -43,6 +43,7 @@
 #include "v_commands.h"
 #include "v_list.h"
 
+/* Maximal size of incoming queue is 1MB */
 #define IN_QUEUE_DEFAULT_MAX_SIZE 1048576
 
 /**
