@@ -738,6 +738,41 @@ end:
 	return ret;
 }
 
+/**
+ * \brief This function tries to push set_value to outgoing queue.
+ *
+ * When there is not enough free space in outgoing queue, then pushing more
+ * command is stopped.
+ */
+static void vs_layer_send_values(struct VSEntitySubscriber *layer_subscriber,
+		struct VSNode *node,
+		struct VSLayer *layer,
+		struct VBucket **next_item)
+{
+	struct VSLayerValue *value;
+	struct VBucket *vbucket = NULL;
+
+	/* When this sending is not invoked by sending task, but directly by
+	 * subscribe command, then begin with first bucket. */
+	if(next_item == NULL) {
+		vbucket = layer->values.lb.first;
+	} else {
+		vbucket = *next_item;
+	}
+
+	/* Send value_set cmd for all possible items in this layer */
+	while(vbucket != NULL) {
+		value = (struct VSLayerValue*)vbucket->data;
+		/* Try to push command to outgoing queue, when there is enough free
+		 * space */
+		if(vs_layer_send_set_value(layer_subscriber, node, layer, value) == -1) {
+			/* TODO: create sending task, when next_item is NULL.
+			 * Otherwise update *next_item */
+			break;
+		}
+		vbucket = vbucket->next;
+	}
+}
 
 int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
@@ -747,8 +782,6 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	struct VSLayer *layer;
 	struct VSNodeSubscriber *node_subscriber;
 	struct VSEntitySubscriber *layer_subscriber;
-	struct VBucket *vbucket;
-	struct VSLayerValue *value;
 	uint32 node_id = UINT32(layer_subscribe_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_subscribe_cmd->data[UINT32_SIZE]);
 /*	uint32 version = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE]);
@@ -829,16 +862,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	layer_subscriber->node_sub = node_subscriber;
 	v_list_add_tail(&layer->layer_subs, layer_subscriber);
 
-	/* Send value set for all items in this layer */
-	vbucket = layer->values.lb.first;
-	while(vbucket != NULL) {
-		value = (struct VSLayerValue*)vbucket->data;
-		if(vs_layer_send_set_value(layer_subscriber, node, layer, value) == -1) {
-			/* TODO: create sending task */
-			break;
-		}
-		vbucket = vbucket->next;
-	}
+	ret = vs_layer_send_values(layer_subscriber, node, layer, NULL);
 
 end:
 	pthread_mutex_unlock(&node->mutex);
