@@ -37,7 +37,6 @@
 
 typedef struct VSNodeLock {
 	struct VSession			*session;
-	struct timeval			tv;
 } VSNodeLock;
 
 typedef struct VSNodePermission {

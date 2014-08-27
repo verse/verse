@@ -362,16 +362,12 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 
 	/* Can this avatar/user write to this node? */
 	if(vs_node_can_write(vsession, node) == 1) {
-		struct timeval tv;
 
 		/* Is this new lock */
 		if(node->lock.session == NULL) {
 			struct VSNodeSubscriber *node_subscriber;
 
-			gettimeofday(&tv, NULL);
 			node->lock.session = vsession;
-			node->lock.tv.tv_sec = tv.tv_sec;
-			node->lock.tv.tv_usec = tv.tv_usec;
 
 			ret = 1;
 
@@ -384,12 +380,6 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 					ret = 0;
 				}
 			}
-
-		/* Is this keep alive lock */
-		} else if (node->lock.session == vsession) {
-			gettimeofday(&tv, NULL);
-			node->lock.tv.tv_sec = tv.tv_sec;
-			node->lock.tv.tv_usec = tv.tv_usec;
 		/* Node can't be locked, when somebody already locked this node */
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,

@@ -91,12 +91,6 @@ static void vs_handle_node_cmd(struct VS_CTX *vs_ctx,
 		case CMD_NODE_UNLOCK:
 			vs_handle_node_unlock(vs_ctx, vsession, cmd);
 			break;
-		case FAKE_CMD_NODE_LOCK_ACK:
-			/* TODO: handle this fake command */
-			break;
-		case FAKE_CMD_NODE_UNLOCK_ACK:
-			/* TODO: handle this fake command */
-			break;
 		case CMD_NODE_PRIORITY:
 			vs_handle_node_prio(vs_ctx, vsession, cmd);
 			break;
