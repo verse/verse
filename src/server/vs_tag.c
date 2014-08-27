@@ -85,6 +85,14 @@ int vs_tag_send_create(struct VSEntitySubscriber *tg_subscriber,
 	struct Generic_Cmd *tag_create;
 	struct VSEntityFollower	*tag_follower;
 
+	/* Check if this tag is in created/creating state */
+	if(!(tag->state == ENTITY_CREATING || tag->state == ENTITY_CREATED)) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"This tag: %d in node: %d and tg: %d, is in %d state\n",
+				tag->id, node->id, tg->id, tag->state);
+		return 0;
+	}
+
 	/* Check if this command, has not been already sent */
 	tag_follower = tag->tag_folls.first;
 	while(tag_follower != NULL) {
@@ -98,11 +106,16 @@ int vs_tag_send_create(struct VSEntitySubscriber *tg_subscriber,
 	tag_create = v_tag_create_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->custom_type);
 
 	/* Put command to the outgoing queue */
-	if(tag_create != NULL &&
-			(v_out_queue_push_tail(tg_subscriber->node_sub->session->out_queue,
+	if(tag_create == NULL) {
+		return 0;
+	}
+
+	if(v_out_queue_push_tail(tg_subscriber->node_sub->session->out_queue,
 					tg_subscriber->node_sub->prio,
-					tag_create))==1)
+					tag_create) == 0)
 	{
+		return -1;
+	} else {
 		tag_follower = (struct VSEntityFollower*)calloc(1, sizeof(struct VSEntityFollower));
 		tag_follower->node_sub = tg_subscriber->node_sub;
 		tag_follower->state = ENTITY_CREATING;

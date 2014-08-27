@@ -22,6 +22,11 @@
  *
  */
 
+/**
+ * \file	vs_node.h
+ * \brief	This file contains code handling commands related to nodes
+ */
+
 #ifndef VS_NODE_H_
 #define VS_NODE_H_
 

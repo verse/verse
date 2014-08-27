@@ -17,7 +17,8 @@ set (server_src
 		./vs_layer.c
 		./vs_data.c
 		./vs_auth_csv.c
-		./vs_handshake.c)
+		./vs_handshake.c
+		./vs_task.c)
 
 
 include_directories (../../include)

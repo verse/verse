@@ -72,6 +72,15 @@ struct VSTagGroup *vs_taggroup_find(struct VSNode *node,
 
 /**
  * \brief This function sends TagGroupCreate command to the client
+ *
+ * \param[in] *node_subscriber
+ * \param[in] *node
+ * \param[in] *tg
+ *
+ * \return This function return 1, when command was successfully created and
+ * pushed to outgoing queue. When some error occur (already subscribed to
+ * tag group, out of memory, etc.) then 0 is returned. When outgoing queue is
+ * empty, then -1 is returned.
  */
 int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node,
@@ -81,9 +90,17 @@ int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 	struct Generic_Cmd		*taggroup_create_cmd;
 	struct VSEntityFollower	*taggroup_follower;
 
+	/* Check if this tag group is in created/creating state */
+	if(!(tg->state == ENTITY_CREATING || tg->state == ENTITY_CREATED)) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"This tag group: %d in node: %d is in %d state\n",
+				tg->id, node->id, tg->state);
+		return 0;
+	}
+
 	/* Check if this command, has not been already sent */
 	taggroup_follower = tg->tg_folls.first;
-	while(taggroup_follower!=NULL) {
+	while(taggroup_follower != NULL) {
 		if(taggroup_follower->node_sub->session->session_id == vsession->session_id ) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Client already knows about this TagGroup: %d\n",
@@ -97,9 +114,13 @@ int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 	taggroup_create_cmd = v_taggroup_create_create(node->id, tg->id, tg->custom_type);
 
 	/* Put this command to the outgoing queue */
-	if(taggroup_create_cmd != NULL &&
-		v_out_queue_push_tail(vsession->out_queue, node_subscriber->prio, taggroup_create_cmd) == 1)
-	{
+	if(taggroup_create_cmd == NULL) {
+		return 0;
+	}
+
+	if(v_out_queue_push_tail(vsession->out_queue, node_subscriber->prio, taggroup_create_cmd) == 0) {
+		return -1;
+	} else {
 		/* Add this session to the list of session, that knows about this
 		 * taggroup. Server could send them taggroup_destroy in the future. */
 		taggroup_follower = (struct VSEntityFollower*)calloc(1, sizeof(struct VSEntityFollower));
@@ -741,16 +762,13 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		tg_subscriber->node_sub = node_subscriber;
 		v_list_add_tail(&tg->tg_subs, tg_subscriber);
 
-		/* Send tag create for all tags in this tag group
-		 * TODO: do not send all tags at once, when there is lot of tags in this
-		 * tag group. Implement this, when queue limits will be finished. */
+		/* Try to send tag_create for all tags in this tag group */
 		bucket = tg->tags.lb.first;
 		while(bucket != NULL) {
 			tag = (struct VSTag*)bucket->data;
-			if(tag->state == ENTITY_CREATING || tag->state == ENTITY_CREATED) {
-				if(vs_tag_send_create(tg_subscriber, node, tg, tag) != 1) {
-					ret = 0;
-				}
+			if(vs_tag_send_create(tg_subscriber, node, tg, tag) == -1) {
+				/* TODO: create sending task */
+				break;
 			}
 			bucket = bucket->next;
 		}

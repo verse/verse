@@ -345,6 +345,8 @@ static int _v_out_queue_push(struct VOutQueue *out_queue,
 			queue_cmd = _v_out_queue_command_create(out_queue, flag, prio, cmd);
 
 			if(queue_cmd == NULL) {
+				/* Destroy command, when it can not be added to the queue */
+				v_cmd_destroy(&cmd);
 				ret = 0;
 			}
 		}
@@ -353,6 +355,8 @@ static int _v_out_queue_push(struct VOutQueue *out_queue,
 		queue_cmd = _v_out_queue_command_create(out_queue, flag, prio, cmd);
 
 		if(queue_cmd == NULL) {
+			/* Destroy command, when it can not be added to the queue */
+			v_cmd_destroy(&cmd);
 			ret = 0;
 		}
 	}

@@ -268,7 +268,14 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 	struct VSEntityFollower *layer_follower;
 	struct Generic_Cmd		*layer_create_cmd;
 
-	/* TODO: this could be more effective */
+	/* Check if this layer is in created/creating state */
+	if(!(layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED)) {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"This layer: %d in node: %d is in %d state\n",
+				layer->id, node->id, layer->state);
+		return 0;
+	}
+
 	/* Check if this command, has not been already sent */
 	layer_follower = layer->layer_folls.first;
 	while(layer_follower != NULL) {
@@ -289,9 +296,13 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 				layer->id, layer->data_type, layer->num_vec_comp, layer->custom_type);
 	}
 
-	if(layer_create_cmd != NULL &&
-			v_out_queue_push_tail(vsession->out_queue, node_subscriber->prio, layer_create_cmd) == 1)
-	{
+	if(layer_create_cmd == NULL) {
+		return 0;
+	}
+
+	if(v_out_queue_push_tail(vsession->out_queue, node_subscriber->prio, layer_create_cmd) == 0) {
+		return -1;
+	} else {
 		/* Add this session to the list of session, that knows about this
 		 * layer. Server could send them layer_destroy in the future. */
 		layer_follower = (struct VSEntityFollower*)calloc(1, sizeof(struct VSEntityFollower));
@@ -818,14 +829,14 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	layer_subscriber->node_sub = node_subscriber;
 	v_list_add_tail(&layer->layer_subs, layer_subscriber);
 
-	/* Send value set for all items in this layer
-	 * TODO: do not push all values to outgoing queue at once, when there is lot
-	 * of values in this layer. Implement this, when queue limits will be
-	 * finished. */
+	/* Send value set for all items in this layer */
 	vbucket = layer->values.lb.first;
 	while(vbucket != NULL) {
 		value = (struct VSLayerValue*)vbucket->data;
-		vs_layer_send_set_value(layer_subscriber, node, layer, value);
+		if(vs_layer_send_set_value(layer_subscriber, node, layer, value) == -1) {
+			/* TODO: create sending task */
+			break;
+		}
 		vbucket = vbucket->next;
 	}
 

@@ -212,7 +212,10 @@ int vs_node_send_data(struct VSNode *node,
 	link = node->children_links.first;
 	while(link != NULL) {
 		child_node = link->child;
-		vs_node_send_create(node_subscriber, child_node, NULL);
+		if( vs_node_send_create(node_subscriber, child_node, NULL) == -1) {
+			/* TODO: create sending task */
+			break;
+		}
 		link = link->next;
 	}
 
@@ -220,8 +223,9 @@ int vs_node_send_data(struct VSNode *node,
 	bucket = node->tag_groups.lb.first;
 	while(bucket != NULL) {
 		tg = (struct VSTagGroup*)bucket->data;
-		if(tg->state == ENTITY_CREATING || tg->state == ENTITY_CREATED) {
-			vs_taggroup_send_create(node_subscriber, node, tg);
+		if( vs_taggroup_send_create(node_subscriber, node, tg) == -1) {
+			/* TODO: create sending task */
+			break;
 		}
 		bucket = bucket->next;
 	}
@@ -230,8 +234,9 @@ int vs_node_send_data(struct VSNode *node,
 	bucket = node->layers.lb.first;
 	while(bucket != NULL) {
 		layer = (struct VSLayer*)bucket->data;
-		if(layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED) {
-			vs_layer_send_create(node_subscriber, node, layer);
+		if( vs_layer_send_create(node_subscriber, node, layer) == -1) {
+			/* TODO: create sending task */
+			break;
 		}
 		bucket = bucket->next;
 	}
@@ -268,16 +273,20 @@ static int vs_node_subscribe(struct VSession *vsession,
 				"Version: %d != 0, versing is not supported yet\n", version);
 	}
 
-	/* Send node_perm commands to the new subscriber */
-	perm = node->permissions.first;
-	while(perm != NULL) {
-		vs_node_send_perm(node_subscriber, node, perm->user, perm->permissions);
-		perm = perm->next;
-	}
 
 	/* If the node is locked, then send node_lock to the subscriber */
 	if(node->lock.session != NULL) {
 		vs_node_send_lock(node_subscriber, node->lock.session, node);
+	}
+
+	/* Send node_perm commands to the new subscriber */
+	perm = node->permissions.first;
+	while(perm != NULL) {
+		if(vs_node_send_perm(node_subscriber, node, perm->user, perm->permissions) == 0) {
+			/* TODO: create sending task */
+			break;
+		}
+		perm = perm->next;
 	}
 
 	/* If user doesn't have permission to subscribe to this node, then send
@@ -346,11 +355,16 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 		node_create_cmd = v_node_create_create(node->id, node->parent_link->parent->id, node->owner->user_id, node->custom_type);
 	}
 
-	if ( node_create_cmd != NULL &&
-			v_out_queue_push_tail(node_subscriber->session->out_queue,
+	if(node_create_cmd == NULL) {
+		return 0;
+	}
+
+	if(v_out_queue_push_tail(node_subscriber->session->out_queue,
 					node_subscriber->prio,
-					node_create_cmd) == 1)
+					node_create_cmd) == 0)
 	{
+		return -1;
+	} else {
 		/* Add this session to the list of session, that knows about this
 		 * node. Server could send them node_destroy in the future. */
 		node_follower = (struct VSEntityFollower*)calloc(1, sizeof(struct VSEntityFollower));

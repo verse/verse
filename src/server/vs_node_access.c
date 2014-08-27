@@ -191,7 +191,7 @@ int vs_node_set_perm(struct VSNode *node, VSUser *user, uint8 permission)
 }
 
 /**
- * \brief This function send node_perm to the client
+ * \brief This function tries to send node_perm to the client
  */
 int vs_node_send_perm(struct VSNodeSubscriber *node_subscriber,
 		struct VSNode *node,
