@@ -212,10 +212,7 @@ int vs_node_send_data(struct VSNode *node,
 	link = node->children_links.first;
 	while(link != NULL) {
 		child_node = link->child;
-		if( vs_node_send_create(node_subscriber, child_node, NULL) == -1) {
-			/* TODO: create sending task */
-			break;
-		}
+		vs_node_send_create(node_subscriber, child_node, NULL);
 		link = link->next;
 	}
 
@@ -223,10 +220,7 @@ int vs_node_send_data(struct VSNode *node,
 	bucket = node->tag_groups.lb.first;
 	while(bucket != NULL) {
 		tg = (struct VSTagGroup*)bucket->data;
-		if( vs_taggroup_send_create(node_subscriber, node, tg) == -1) {
-			/* TODO: create sending task */
-			break;
-		}
+		vs_taggroup_send_create(node_subscriber, node, tg);
 		bucket = bucket->next;
 	}
 
@@ -234,10 +228,7 @@ int vs_node_send_data(struct VSNode *node,
 	bucket = node->layers.lb.first;
 	while(bucket != NULL) {
 		layer = (struct VSLayer*)bucket->data;
-		if( vs_layer_send_create(node_subscriber, node, layer) == -1) {
-			/* TODO: create sending task */
-			break;
-		}
+		vs_layer_send_create(node_subscriber, node, layer);
 		bucket = bucket->next;
 	}
 
@@ -282,10 +273,7 @@ static int vs_node_subscribe(struct VSession *vsession,
 	/* Send node_perm commands to the new subscriber */
 	perm = node->permissions.first;
 	while(perm != NULL) {
-		if(vs_node_send_perm(node_subscriber, node, perm->user, perm->permissions) == 0) {
-			/* TODO: create sending task */
-			break;
-		}
+		vs_node_send_perm(node_subscriber, node, perm->user, perm->permissions);
 		perm = perm->next;
 	}
 
@@ -360,8 +348,9 @@ int vs_node_send_create(struct VSNodeSubscriber *node_subscriber,
 	}
 
 	if(v_out_queue_push_tail(node_subscriber->session->out_queue,
-					node_subscriber->prio,
-					node_create_cmd) == 0)
+			0,
+			node_subscriber->prio,
+			node_create_cmd) == 0)
 	{
 		return -1;
 	} else {
@@ -498,7 +487,6 @@ struct VSNode *vs_node_create_linked(struct VS_CTX *vs_ctx,
 			 * have special purposes too (skip them) */
 			if(node->id > VRS_LAST_COMMON_NODE_ID)
 				node->id = VRS_FIRST_COMMON_NODE_ID;
-			/* TODO: implement faster finding of free node id */
 		}
 		vs_ctx->data.last_common_node_id = node->id;
 	} else {
@@ -670,6 +658,7 @@ static int vs_node_send_destroy(struct VSNode *node)
 			/* Push this command to the outgoing queue */
 			if ( node_destroy_cmd!= NULL &&
 					v_out_queue_push_tail(node_follower->node_sub->session->out_queue,
+							0,
 							node_follower->node_sub->prio,
 							node_destroy_cmd) == 1) {
 				node_follower->state = ENTITY_DELETING;
@@ -1044,6 +1033,7 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 					/* Push this command to the outgoing queue */
 					if ( node_destroy_cmd != NULL &&
 							v_out_queue_push_tail(node_follower->node_sub->session->out_queue,
+									0,
 									node_follower->node_sub->prio,
 									node_destroy_cmd) == 1)
 					{

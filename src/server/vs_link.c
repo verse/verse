@@ -134,6 +134,7 @@ static int vs_link_change_send(struct VSNodeSubscriber *node_subscriber,
 	node_link_cmd = v_node_link_create(link->parent->id, link->child->id);
 
 	return v_out_queue_push_tail(node_subscriber->session->out_queue,
+			0,
 			node_subscriber->prio,
 			node_link_cmd);
 }

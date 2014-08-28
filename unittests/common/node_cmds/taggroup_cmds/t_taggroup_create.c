@@ -178,7 +178,7 @@ START_TEST( _test_TagGroup_Create_out_queue )
 			type = cmd_values[i][j].type;
 
 			taggroup_create = v_taggroup_create_create(node_id, taggroup_id, type);
-			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)taggroup_create);
+			v_out_queue_push_tail(out_queue, 0, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)taggroup_create);
 		}
 
 		/* Pop commands from the queue */
@@ -244,7 +244,7 @@ START_TEST( _test_TagGroup_Create_pack_unpack )
 			type = cmd_values[i][j].type;
 
 			taggroup_create = v_taggroup_create_create(node_id, taggroup_id, type);
-			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, taggroup_create);
+			v_out_queue_push_tail(out_queue, 0, VRS_DEFAULT_PRIORITY, taggroup_create);
 		}
 
 		/* Pop CHUNK_SIZE commands from the queue */

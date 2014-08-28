@@ -235,7 +235,7 @@ int32_t vrs_send_node_create(const uint8_t session_id,
 				assert(node_create_cmd != NULL);
 
 				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
-						prio, node_create_cmd);
+						OUT_QUEUE_LIMITS, prio, node_create_cmd);
 
 				if(ret == 1)
 					return VRS_SUCCESS;
@@ -382,7 +382,7 @@ int32_t vrs_send_node_lock(const uint8_t session_id,
 				assert(node_lock_cmd != NULL);
 
 				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
-						prio, node_lock_cmd);
+						OUT_QUEUE_LIMITS, prio, node_lock_cmd);
 
 				if(ret == 1)
 					return VRS_SUCCESS;
@@ -427,7 +427,7 @@ int32_t vrs_send_node_unlock(const uint8_t session_id,
 				assert(node_unlock_cmd != NULL);
 
 				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
-						prio, node_unlock_cmd);
+						OUT_QUEUE_LIMITS, prio, node_unlock_cmd);
 
 				if(ret == 1)
 					return VRS_SUCCESS;
@@ -1056,7 +1056,7 @@ static int vc_send_command(const uint8 session_id,
 					vc_ctx->vsessions[i]->session_id==session_id)
 			{
 				ret = v_out_queue_push_tail(vc_ctx->vsessions[i]->out_queue,
-						prio, cmd);
+						OUT_QUEUE_LIMITS, prio, cmd);
 
 				if(ret == 1)
 					return VRS_SUCCESS;

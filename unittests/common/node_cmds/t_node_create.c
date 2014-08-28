@@ -212,7 +212,7 @@ START_TEST( test_Node_Create_out_queue )
 			type = cmd_values[i][j].type;
 
 			node_create = v_node_create_create(node_id, parent_id, user_id, type);
-			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)node_create);
+			v_out_queue_push_tail(out_queue, 0, VRS_DEFAULT_PRIORITY, (struct Generic_Cmd*)node_create);
 		}
 
 		fail_unless(v_out_queue_get_count_prio(out_queue, VRS_DEFAULT_PRIORITY) == CHUNK_SIZE,
@@ -284,7 +284,7 @@ START_TEST( test_Node_Create_pack_unpack )
 			type = cmd_values[i][j].type;
 
 			node_create = v_node_create_create(node_id, parent_id, user_id, type);
-			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, node_create);
+			v_out_queue_push_tail(out_queue, 0, VRS_DEFAULT_PRIORITY, node_create);
 		}
 
 		/* Pop CHUNK_SIZE commands from the queue */

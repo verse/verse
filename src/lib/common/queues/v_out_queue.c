@@ -170,7 +170,8 @@ static struct VOutQueueCommand * _v_out_queue_command_create(struct VOutQueue *o
 	struct VOutQueueCommand *queue_cmd = NULL;
 
 	/* Check if there is free space for adding new command to the queue */
-	if(out_queue->max_size < out_queue->size + out_queue->cmds[cmd->id]->item_size) {
+	if( (flag & OUT_QUEUE_LIMITS) &&
+			out_queue->max_size < out_queue->size + out_queue->cmds[cmd->id]->item_size) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"No free space in outgoing queue for command: %d", cmd->id);
 		return NULL;
@@ -247,7 +248,7 @@ static int _v_out_queue_push(struct VOutQueue *out_queue,
 
 	assert(cmd != NULL);
 
-	/* Try to find command with the same address, when duplicities are not
+	/* Try to find command with the same address, when duplications are not
 	 * allowed in command queue */
 	if(out_queue->cmds[cmd->id]->flag & REMOVE_HASH_DUPS) {
 		vbucket = v_hash_array_find_item(&out_queue->cmds[cmd->id]->cmds, (void*)cmd);
@@ -367,7 +368,9 @@ static int _v_out_queue_push(struct VOutQueue *out_queue,
 /**
  * \brief This function add command to the head of the queue
  */
-int v_out_queue_push_head(struct VOutQueue *out_queue, uint8 prio, struct Generic_Cmd *cmd)
+int v_out_queue_push_head(struct VOutQueue *out_queue,
+		uint8 prio,
+		struct Generic_Cmd *cmd)
 {
 	struct VBucket *vbucket;
 	int ret = 0;
@@ -381,15 +384,17 @@ int v_out_queue_push_head(struct VOutQueue *out_queue, uint8 prio, struct Generi
 		vbucket = v_hash_array_find_item(&out_queue->cmds[cmd->id]->cmds, (void*)cmd);
 		/* Add command from history of sent command to the outgoing queue
 		 * only in situation, when there isn't already newer command in the
-		 * queue */
-		if(vbucket==NULL) {
-			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\tRe-sending command: %d\n", cmd->id);
+		 * queue. */
+		if(vbucket == NULL) {
+			v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+					"\tRe-sending command: %d\n", cmd->id);
 			v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)cmd);
 
 			ret = _v_out_queue_push(out_queue, OUT_QUEUE_ADD_HEAD, prio, cmd);
 		}
 	} else {
-		v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\tRe-sending command: %d\n", cmd->id);
+		v_print_log_simple(VRS_PRINT_DEBUG_MSG,
+				"\tRe-sending command: %d\n", cmd->id);
 		v_cmd_print(VRS_PRINT_DEBUG_MSG, (struct Generic_Cmd*)cmd);
 
 		ret = _v_out_queue_push(out_queue, OUT_QUEUE_ADD_HEAD, prio, cmd);
@@ -403,14 +408,19 @@ int v_out_queue_push_head(struct VOutQueue *out_queue, uint8 prio, struct Generi
 /**
  * \brief This function add command to the tail of the queue
  */
-int v_out_queue_push_tail(struct VOutQueue *out_queue, uint8 prio, struct Generic_Cmd *cmd)
+int v_out_queue_push_tail(struct VOutQueue *out_queue,
+		uint8 flag,
+		uint8 prio,
+		struct Generic_Cmd *cmd)
 {
 	int ret = 0;
 
 	/* Lock mutex */
 	pthread_mutex_lock(&out_queue->lock);
 
-	ret = _v_out_queue_push(out_queue, OUT_QUEUE_ADD_TAIL, prio, cmd);
+	assert(flag == 0 || flag == OUT_QUEUE_LIMITS);
+
+	ret = _v_out_queue_push(out_queue, (flag | OUT_QUEUE_ADD_TAIL), prio, cmd);
 
 	pthread_mutex_unlock(&out_queue->lock);
 

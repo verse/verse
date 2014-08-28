@@ -49,7 +49,7 @@ int vs_tag_send_set(struct VSession *vsession,
 	tag_set_cmd = v_tag_set_create(node->id, tg->id, tag->id, tag->data_type, tag->count, tag->value);
 
 	if(tag_set_cmd != NULL) {
-		return v_out_queue_push_tail(vsession->out_queue, prio, tag_set_cmd);
+		return v_out_queue_push_tail(vsession->out_queue, 0, prio, tag_set_cmd);
 	}
 
 	return 0;
@@ -111,8 +111,9 @@ int vs_tag_send_create(struct VSEntitySubscriber *tg_subscriber,
 	}
 
 	if(v_out_queue_push_tail(tg_subscriber->node_sub->session->out_queue,
-					tg_subscriber->node_sub->prio,
-					tag_create) == 0)
+			0,
+			tg_subscriber->node_sub->prio,
+			tag_create) == 0)
 	{
 		return -1;
 	} else {
@@ -147,6 +148,7 @@ int vs_tag_send_destroy(struct VSNode *node,
 
 			if( tag_destroy_cmd != NULL &&
 					(v_out_queue_push_tail(tag_follower->node_sub->session->out_queue,
+							0,
 							tag_follower->node_sub->prio,
 							tag_destroy_cmd) == 1)) {
 				tag_follower->state = ENTITY_DELETING;
@@ -412,6 +414,7 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 
 				if( tag_destroy_cmd != NULL &&
 						(v_out_queue_push_tail(tag_follower->node_sub->session->out_queue,
+								0,
 								tag_follower->node_sub->prio,
 								tag_destroy_cmd) == 1))
 				{

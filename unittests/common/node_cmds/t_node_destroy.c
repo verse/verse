@@ -149,7 +149,7 @@ START_TEST( test_Node_Destroy_out_queue )
 			node_id = cmd_values[i][j].node_id;
 
 			node_destroy = v_node_destroy_create(node_id);
-			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, node_destroy);
+			v_out_queue_push_tail(out_queue, 0, VRS_DEFAULT_PRIORITY, node_destroy);
 		}
 
 		cmd_count = v_out_queue_get_count(out_queue);
@@ -213,7 +213,7 @@ START_TEST( test_Node_Destroy_pack_unpack )
 		for(j=0; j < CHUNK_SIZE; j++) {
 			node_id = cmd_values[i][j].node_id;
 			node_destroy = v_node_destroy_create(node_id);
-			v_out_queue_push_tail(out_queue, VRS_DEFAULT_PRIORITY, node_destroy);
+			v_out_queue_push_tail(out_queue, 0, VRS_DEFAULT_PRIORITY, node_destroy);
 		}
 
 		cmd_count = v_out_queue_get_count(out_queue);

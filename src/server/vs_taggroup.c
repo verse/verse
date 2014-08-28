@@ -118,7 +118,11 @@ int vs_taggroup_send_create(struct VSNodeSubscriber *node_subscriber,
 		return 0;
 	}
 
-	if(v_out_queue_push_tail(vsession->out_queue, node_subscriber->prio, taggroup_create_cmd) == 0) {
+	if(v_out_queue_push_tail(vsession->out_queue,
+			0,
+			node_subscriber->prio,
+			taggroup_create_cmd) == 0)
+	{
 		return -1;
 	} else {
 		/* Add this session to the list of session, that knows about this
@@ -155,6 +159,7 @@ int vs_taggroup_send_destroy(struct VSNode *node,
 			/* Put this command to the outgoing queue */
 			if( tg_destroy_cmd != NULL &&
 					(v_out_queue_push_tail(tg_follower->node_sub->session->out_queue,
+							0,
 							tg_follower->node_sub->prio,
 							tg_destroy_cmd) == 1))
 			{
@@ -511,6 +516,7 @@ int vs_handle_taggroup_create_ack(struct VS_CTX *vs_ctx,
 					/* Push this command to the outgoing queue */
 					if ( taggroup_destroy_cmd!= NULL &&
 							v_out_queue_push_tail(tg_foll->node_sub->session->out_queue,
+									0,
 									tg_foll->node_sub->prio,
 									taggroup_destroy_cmd) == 1) {
 						tg_foll->state = ENTITY_DELETING;
@@ -766,10 +772,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		bucket = tg->tags.lb.first;
 		while(bucket != NULL) {
 			tag = (struct VSTag*)bucket->data;
-			if(vs_tag_send_create(tg_subscriber, node, tg, tag) == -1) {
-				/* TODO: create sending task */
-				break;
-			}
+			vs_tag_send_create(tg_subscriber, node, tg, tag);
 			bucket = bucket->next;
 		}
 	} else {

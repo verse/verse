@@ -56,6 +56,11 @@
 
 #define OUT_QUEUE_ADD_TAIL	1
 #define OUT_QUEUE_ADD_HEAD	2
+#define OUT_QUEUE_LIMITS	4
+/* TODO: Add reference at data at Verse server to preserver useless
+ * duplications of data stored in nodes and added to outgoing queue.
+#define OUT_QUEUE_ADD_REF	8
+*/
 
 /* Maximal size of outgoing queue is 1MB */
 #define OUT_QUEUE_DEFAULT_MAX_SIZE 1048576
@@ -106,8 +111,14 @@ int	v_out_queue_init(struct VOutQueue *out_queue, int max_size);
 struct VOutQueue *v_out_queue_create(void);
 void v_out_queue_destroy(struct VOutQueue **out_queue);
 
-int v_out_queue_push_head(struct VOutQueue *out_queue, uint8 prio, struct Generic_Cmd *cmd);
-int v_out_queue_push_tail(struct VOutQueue *out_queue, uint8 prio, struct Generic_Cmd *cmd);
+int v_out_queue_push_head(struct VOutQueue *out_queue,
+		uint8 prio,
+		struct Generic_Cmd *cmd);
+int v_out_queue_push_tail(struct VOutQueue *out_queue,
+		uint8 flag,
+		uint8 prio,
+		struct Generic_Cmd *cmd);
+
 struct Generic_Cmd * v_out_queue_pop(struct VOutQueue *out_queue, uint8 prio, uint16 *count, int8 *share, uint16 *len);
 struct Generic_Cmd *v_out_queue_find_cmd(struct VOutQueue *out_queue, struct Generic_Cmd *cmd);
 

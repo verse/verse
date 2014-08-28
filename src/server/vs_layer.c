@@ -300,7 +300,7 @@ int vs_layer_send_create(struct VSNodeSubscriber *node_subscriber,
 		return 0;
 	}
 
-	if(v_out_queue_push_tail(vsession->out_queue, node_subscriber->prio, layer_create_cmd) == 0) {
+	if(v_out_queue_push_tail(vsession->out_queue, 0, node_subscriber->prio, layer_create_cmd) == 0) {
 		return -1;
 	} else {
 		/* Add this session to the list of session, that knows about this
@@ -351,6 +351,7 @@ int vs_layer_send_destroy(struct VSNode *node,
 			/* Put this command to the outgoing queue */
 			if( layer_destroy_cmd != NULL &&
 					(v_out_queue_push_tail(layer_follower->node_sub->session->out_queue,
+							0,
 							layer_follower->node_sub->prio,
 							layer_destroy_cmd) == 1))
 			{
@@ -386,6 +387,7 @@ int vs_layer_send_unset_value(struct VSEntitySubscriber *layer_subscriber,
 	unset_value_cmd = v_layer_unset_value_create(node->id, layer->id, value->id);
 
 	return v_out_queue_push_tail(layer_subscriber->node_sub->session->out_queue,
+			0,
 			layer_subscriber->node_sub->prio,
 			unset_value_cmd);
 }
@@ -405,8 +407,9 @@ int vs_layer_send_set_value(struct VSEntitySubscriber *layer_subscriber,
 
 	if(set_value_cmd != NULL) {
 		return v_out_queue_push_tail(layer_subscriber->node_sub->session->out_queue,
-			layer_subscriber->node_sub->prio,
-			set_value_cmd);
+				0,
+				layer_subscriber->node_sub->prio,
+				set_value_cmd);
 	} else {
 		return 0;
 	}
@@ -467,6 +470,7 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 				/* Push this command to the outgoing queue */
 				if ( layer_destroy_cmd != NULL &&
 						v_out_queue_push_tail(layer_foll->node_sub->session->out_queue,
+								0,
 								layer_foll->node_sub->prio,
 								layer_destroy_cmd) == 1)
 				{
@@ -738,42 +742,6 @@ end:
 	return ret;
 }
 
-/**
- * \brief This function tries to push set_value to outgoing queue.
- *
- * When there is not enough free space in outgoing queue, then pushing more
- * command is stopped.
- */
-static void vs_layer_send_values(struct VSEntitySubscriber *layer_subscriber,
-		struct VSNode *node,
-		struct VSLayer *layer,
-		struct VBucket **next_item)
-{
-	struct VSLayerValue *value;
-	struct VBucket *vbucket = NULL;
-
-	/* When this sending is not invoked by sending task, but directly by
-	 * subscribe command, then begin with first bucket. */
-	if(next_item == NULL) {
-		vbucket = layer->values.lb.first;
-	} else {
-		vbucket = *next_item;
-	}
-
-	/* Send value_set cmd for all possible items in this layer */
-	while(vbucket != NULL) {
-		value = (struct VSLayerValue*)vbucket->data;
-		/* Try to push command to outgoing queue, when there is enough free
-		 * space */
-		if(vs_layer_send_set_value(layer_subscriber, node, layer, value) == -1) {
-			/* TODO: create sending task, when next_item is NULL.
-			 * Otherwise update *next_item */
-			break;
-		}
-		vbucket = vbucket->next;
-	}
-}
-
 int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		struct VSession *vsession,
 		struct Generic_Cmd *layer_subscribe_cmd)
@@ -782,6 +750,8 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	struct VSLayer *layer;
 	struct VSNodeSubscriber *node_subscriber;
 	struct VSEntitySubscriber *layer_subscriber;
+	struct VBucket *vbucket;
+	struct VSLayerValue *value;
 	uint32 node_id = UINT32(layer_subscribe_cmd->data[0]);
 	uint16 layer_id = UINT16(layer_subscribe_cmd->data[UINT32_SIZE]);
 /*	uint32 version = UINT32(layer_subscribe_cmd->data[UINT32_SIZE+UINT16_SIZE]);
@@ -863,7 +833,13 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	v_list_add_tail(&layer->layer_subs, layer_subscriber);
 	ret = 1;
 
-	vs_layer_send_values(layer_subscriber, node, layer, NULL);
+	vbucket = layer->values.lb.first;
+	/* Send value_set cmd for all items in this layer */
+	while(vbucket != NULL) {
+		value = (struct VSLayerValue*)vbucket->data;
+		vs_layer_send_set_value(layer_subscriber, node, layer, value);
+		vbucket = vbucket->next;
+	}
 
 end:
 	pthread_mutex_unlock(&node->mutex);
