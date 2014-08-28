@@ -861,8 +861,9 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	layer_subscriber = (struct VSEntitySubscriber*)malloc(sizeof(struct VSEntitySubscriber));
 	layer_subscriber->node_sub = node_subscriber;
 	v_list_add_tail(&layer->layer_subs, layer_subscriber);
+	ret = 1;
 
-	ret = vs_layer_send_values(layer_subscriber, node, layer, NULL);
+	vs_layer_send_values(layer_subscriber, node, layer, NULL);
 
 end:
 	pthread_mutex_unlock(&node->mutex);
