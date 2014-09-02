@@ -135,7 +135,8 @@ class MySession(vrs.Session):
         """Callback function for connect accept"""
         print("MY connect_accept(): ",
               "user_id: ", user_id,
-              ", avatar_id: ", avatar_id)
+              ", avatar_id: ", avatar_id,
+              ", out queue size: ", self.get(vrs.SESSION_OUT_QUEUE_MAX_SIZE));
         self.state = "CONNECTED"
         self.user_id = user_id
         self.avatar_id = avatar_id
