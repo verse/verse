@@ -1717,6 +1717,44 @@ static PyObject *Session_send_fps(PyObject *self, PyObject *args, PyObject *kwds
 
 
 /**
+ * \brief This function tries to get session parameter
+ *
+ * @param *self		The pointer at session
+ * @param *args		The pointer at function argument
+ * @param *kwds		The pointer at named function arguments
+ *
+ * @return			This function returns int object
+ */
+static PyObject *Sesssion_get(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	session_SessionObject *session = (session_SessionObject *)self;
+	PyObject *value;
+	uint8_t param;
+	int ret;
+	static char *kwlist[] = {"param", NULL};
+
+	/* Parse arguments */
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|B", kwlist,
+			&param)) {
+		return NULL;
+	}
+
+	/* Call C API function */
+	ret = vrs_get(session->session_id, param);
+
+	/* Check if calling function was successful */
+	if(ret == 0) {
+		PyErr_SetString(VerseError, "Unable to get session param");
+		return NULL;
+	}
+
+	value = PyLong_FromLong(ret);
+
+	return value;
+}
+
+
+/**
  * \brief Default Python callback function for connect_accept
  */
 static PyObject *Session_receive_connect_accept(PyObject *self, PyObject *args)
@@ -2070,6 +2108,13 @@ static PyMethodDef Session_methods[] = {
 				"send_fps(self, fps) -> None\n\n"
 				"Send FPS used by this client to the server\n"
 				"fps:	double value of Frames per Second"
+		},
+		{"get",
+				(PyCFunction)Sesssion_get,
+				METH_VARARGS | METH_KEYWORDS,
+				"get(self, param) -> int\n\n"
+				"Get session parameter\n"
+				"param:	parameter of session"
 		},
 		/* Node commands */
 		{"send_node_create",
@@ -2575,6 +2620,12 @@ void initverse(void)
 	/* User ID of special users */
 	PyModule_AddIntConstant(module, "SUPER_USER_UID", VRS_SUPER_USER_UID);
 	PyModule_AddIntConstant(module, "OTHER_USERS_UID", VRS_OTHER_USERS_UID);
+
+	/* Session properties */
+	PyModule_AddIntConstant(module, "SESSION_IN_QUEUE_MAX_SIZE", VRS_SESSION_IN_QUEUE_MAX_SIZE);
+	PyModule_AddIntConstant(module, "SESSION_IN_QUEUE_FREE_SPACE", VRS_SESSION_IN_QUEUE_FREE_SPACE);
+	PyModule_AddIntConstant(module, "SESSION_OUT_QUEUE_MAX_SIZE", VRS_SESSION_OUT_QUEUE_MAX_SIZE);
+	PyModule_AddIntConstant(module, "SESSION_OUT_QUEUE_FREE_SPACE", VRS_SESSION_OUT_QUEUE_FREE_SPACE);
 
 #if PY_MAJOR_VERSION >= 3
 	return module;
