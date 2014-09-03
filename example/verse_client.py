@@ -133,10 +133,11 @@ class MySession(vrs.Session):
 
     def _receive_connect_accept(self, user_id, avatar_id):
         """Callback function for connect accept"""
+        out_queue_size = self.get(vrs.SESSION_OUT_QUEUE_MAX_SIZE)
         print("MY connect_accept(): ",
               "user_id: ", user_id,
               ", avatar_id: ", avatar_id,
-              ", out queue size: ", self.get(vrs.SESSION_OUT_QUEUE_MAX_SIZE));
+              ", out queue size: ", out_queue_size)
         self.state = "CONNECTED"
         self.user_id = user_id
         self.avatar_id = avatar_id
@@ -148,6 +149,10 @@ class MySession(vrs.Session):
         self.send_node_subscribe(prio=vrs.DEFAULT_PRIORITY, node_id=0, version=0, crc32=0)
         # Create my new node
         self.send_node_create(prio=vrs.DEFAULT_PRIORITY, custom_type=32)
+        # Try to decrease size of outgoing queue a little
+        self.set(vrs.SESSION_OUT_QUEUE_MAX_SIZE, out_queue_size - 576)
+        # Print new queue size
+        print("    new queue size: ", self.get(vrs.SESSION_OUT_QUEUE_MAX_SIZE))
 
     def _receive_user_authenticate(self, username, methods):
         """Callback function for user authenticate"""
