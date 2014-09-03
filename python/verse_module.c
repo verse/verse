@@ -1744,7 +1744,7 @@ static PyObject *Sesssion_get(PyObject *self, PyObject *args, PyObject *kwds)
 
 	/* Check if calling function was successful */
 	if(ret == 0) {
-		PyErr_SetString(VerseError, "Unable to get session param");
+		PyErr_SetString(VerseError, "Unable to get session parameter.");
 		return NULL;
 	}
 
@@ -1753,6 +1753,40 @@ static PyObject *Sesssion_get(PyObject *self, PyObject *args, PyObject *kwds)
 	return value;
 }
 
+/**
+ * \brief This function tries to set session parameter
+ *
+ * @param *self		The pointer at session
+ * @param *args		The pointer at function argument
+ * @param *kwds		The pointer at named function arguments
+ *
+ * @return			This function returns None object
+ */
+static PyObject *Sesssion_set(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	session_SessionObject *session = (session_SessionObject *)self;
+	uint8_t param;
+	uint32_t value;
+	int ret;
+	static char *kwlist[] = {"param", "value", NULL};
+
+	/* Parse arguments */
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "|BI", kwlist,
+			&param, &value)) {
+		return NULL;
+	}
+
+	/* Call C API function */
+	ret = vrs_set(session->session_id, param, value);
+
+	/* Check if calling function was successful */
+	if(ret == 0) {
+		PyErr_SetString(VerseError, "Unable to get session parameter.");
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
 
 /**
  * \brief Default Python callback function for connect_accept
@@ -2115,6 +2149,14 @@ static PyMethodDef Session_methods[] = {
 				"get(self, param) -> int\n\n"
 				"Get session parameter\n"
 				"param:	parameter of session"
+		},
+		{"set",
+				(PyCFunction)Sesssion_set,
+				METH_VARARGS | METH_KEYWORDS,
+				"get(self, param, value) -> None\n\n"
+				"Try to set session parameter\n"
+				"param:	parameter of session\n"
+				"value: value of parameter"
 		},
 		/* Node commands */
 		{"send_node_create",
