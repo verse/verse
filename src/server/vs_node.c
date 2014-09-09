@@ -635,21 +635,30 @@ int vs_node_destroy_branch(struct VS_CTX *vs_ctx,
  */
 static int vs_node_send_destroy(struct VSNode *node)
 {
+	struct VSNode *child_node;
+	struct VSLink *link;
 	struct VSEntityFollower *node_follower;
 	struct Generic_Cmd *node_destroy_cmd=NULL;
 	int ret = 0;
 
-	/* Has node any child? */
-	if(node->children_links.first != NULL) {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "node (id: %d) has children\n",
-				node->id);
-		goto end;
+	/* Has node any child node in created state? */
+	link = node->children_links.first;
+	while(link != NULL) {
+		child_node = link->child;
+		if (child_node->state == ENTITY_CREATED || child_node->state == ENTITY_CREATING) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"node (id: %d) has child node (id: %d) in created state\n",
+					node->id,
+					child_node->id);
+			goto end;
+		}
+		link = link->next;
 	}
 
 	/* Send node_destroy to all clients, that knows about this node. These
 	 * clients received node_create command. */
 	node_follower = node->node_folls.first;
-	while(node_follower!=NULL) {
+	while(node_follower != NULL) {
 		/* Node has to be in CREATED state */
 		if(node_follower->state == ENTITY_CREATED) {
 			/* Create Destroy_Node command */
