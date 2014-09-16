@@ -608,9 +608,7 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 							url.node,
 							vsession->dgram_conn->io_ctx.host_addr.port);
 				} else {
-					sprintf(vsession->host_url, "verse-%s-%s://%s:%d",
-							trans_proto,
-							sec_proto,
+					sprintf(vsession->host_url, "wss://%s:%d",
 							url.node,
 							vsession->dgram_conn->io_ctx.host_addr.port);
 				}
