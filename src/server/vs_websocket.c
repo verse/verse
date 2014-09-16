@@ -567,6 +567,8 @@ void *vs_websocket_loop(void *arg)
 			vs_ws_recv_msg_callback
 	};
 
+	vsession->flags |= VRS_TP_WEBSOCKET;
+
 	/* Set socket non-blocking */
 	flags = fcntl(io_ctx->sockfd, F_GETFL, 0);
 	if( fcntl(io_ctx->sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
