@@ -216,7 +216,7 @@ int vc_NEGOTIATE_newhost(struct vContext *C, char *host_url)
 
 	buffer_pos = VERSE_MESSAGE_HEADER_SIZE;
 
-	if(host_url!=NULL) {
+	if(host_url != NULL) {
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_HOST_URL, host_url, NULL);
 	} else {
 		v_add_negotiate_cmd(s_message->sys_cmd, cmd_rank++, CMD_CONFIRM_L_ID, FTR_HOST_URL, NULL);
@@ -300,13 +300,19 @@ static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 		} else {
 			/* Default security policy is to use DTLS and default transport protocol
 			 * is UDP */
-			sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
+            if(vsession->flags & VRS_TP_TCP) {
+                sprintf(vsession->host_url, "verse-tcp-tls://%s:*", str_addr);
+            } else if(vsession->flags & VRS_TP_UDP) {
+                sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
+            } else {
+                sprintf(vsession->host_url, "verse-udp-dtls://%s:*", str_addr);
+            }
 		}
 	} else if (io_ctx->peer_addr.ip_ver == IPV6) {
 		char str_addr[INET6_ADDRSTRLEN];
 		inet_ntop(AF_INET6, &(io_ctx->peer_addr.addr.ipv6.sin6_addr), str_addr, sizeof(str_addr));
 
-		if(vsession->host_url!=NULL) {
+		if(vsession->host_url != NULL) {
 			free(vsession->host_url);
 		}
 		vsession->host_url = (char*)malloc((22+INET6_ADDRSTRLEN)*sizeof(char));
@@ -332,7 +338,13 @@ static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 			}
 		} else {
 			/* Default security policy is to use DTLS and default transport protocol is UDP*/
-			sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
+            if(vsession->flags & VRS_TP_TCP) {
+                sprintf(vsession->host_url, "verse-tcp-tls://[%s]:*", str_addr);
+            } else if(vsession->flags & VRS_TP_UDP) {
+                sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
+            } else {
+                sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
+            }
 		}
 	}
 

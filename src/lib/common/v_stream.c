@@ -117,7 +117,7 @@ end:
  * \brief This function try to pack message that is going to be
  * sent in STREAM OPEN state
  *
- * \param[in] *C The pointer at cpntext
+ * \param[in] *C The pointer at context
  *
  * \return This function return 1, when there is something to send,
  * it returns -1, when there is nothing to send and it returns 0, when
