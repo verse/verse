@@ -330,7 +330,7 @@ static int vc_NEGOTIATE_token_dtd_loop(struct vContext *C)
 		} else if(vsession->flags & VRS_SEC_DATA_TLS) {
 			if(vsession->flags & VRS_TP_UDP) {
 				sprintf(vsession->host_url, "verse-udp-dtls://[%s]:*", str_addr);
-			} else if(vsession->flags & VRS_TP_UDP) {
+			} else if(vsession->flags & VRS_TP_TCP) {
 				sprintf(vsession->host_url, "verse-tcp-tls://[%s]:*", str_addr);
 			} else {
 				/* Default transport protocol is UDP */
