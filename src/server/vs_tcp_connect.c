@@ -132,7 +132,8 @@ void *vs_tcp_conn_loop(void *arg)
 	}
 
 	/* "Never ending" loop */
-	while(1)
+	while(!(vsession->stream_conn->host_state == TCP_SERVER_STATE_CLOSING ||
+			vsession->stream_conn->host_state == TCP_SERVER_STATE_CLOSED))
 	{
 		FD_ZERO(&set);
 		FD_SET(io_ctx->sockfd, &set);
@@ -141,7 +142,7 @@ void *vs_tcp_conn_loop(void *arg)
 		tv.tv_usec = 0;
 
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
+			v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
 					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
@@ -166,7 +167,8 @@ void *vs_tcp_conn_loop(void *arg)
 			}
 
 		} else {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "No response in %d seconds\n", VRS_TIMEOUT);
+			v_print_log(VRS_PRINT_ERROR,
+					"No response in %d seconds\n", VRS_TIMEOUT);
 			goto end;
 		}
 	}
@@ -222,6 +224,9 @@ end:
 	/* Try to destroy avatar node */
 	vs_node_destroy_avatar_node(vs_ctx, vsession);
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
+
+	/* Close socket */
+	close(io_ctx->sockfd);
 
 	/* This session could be used again for authentication */
 	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
@@ -290,7 +295,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 		int flag;
 
 		/* Try to accept client connection (do TCP handshake) */
-		if(io_ctx->host_addr.ip_ver==IPV4) {
+		if(io_ctx->host_addr.ip_ver == IPV4) {
 			/* Prepare IPv4 variables for TCP handshake */
 			struct sockaddr_in *client_addr4 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv4;
 			current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV4;
@@ -304,7 +309,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Save the IPv4 of the client as string in verse session */
 			inet_ntop(AF_INET, &client_addr4->sin_addr, current_session->peer_hostname, INET_ADDRSTRLEN);
-		} else if(io_ctx->host_addr.ip_ver==IPV6) {
+		} else if(io_ctx->host_addr.ip_ver == IPV6) {
 			/* Prepare IPv6 variables for TCP handshake */
 			struct sockaddr_in6 *client_addr6 = &current_session->stream_conn->io_ctx.peer_addr.addr.ipv6;
 			current_session->stream_conn->io_ctx.peer_addr.ip_ver = IPV6;
@@ -445,7 +450,7 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 		/* Debug print */
 		gettimeofday(&tv, NULL);
 		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-			if(tv.tv_sec==start.tv_sec)
+			if(tv.tv_sec == start.tv_sec)
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+0s");
 			else
 				v_print_log(VRS_PRINT_DEBUG_MSG, "\t+%lds", (long int)(tv.tv_sec - start.tv_sec));
@@ -483,7 +488,7 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 		/* Wait for event on listening sockets */
 		if( (ret = select(sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
 			int err = errno;
-			if(err==EINTR) {
+			if(err == EINTR) {
 				break;
 			} else {
 				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR,
@@ -495,7 +500,7 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 				return -1;
 			}
 			/* Was event on the listen socket */
-		} else if(ret>0) {
+		} else if(ret > 0) {
 			if (FD_ISSET(vs_ctx->tcp_io_ctx.sockfd, &set))
 			{
 				v_print_log(VRS_PRINT_DEBUG_MSG, "TCP Connection attempt\n");
@@ -530,7 +535,7 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 
 			}
 		}
-		if(tmp==0) {
+		if(tmp == 0) {
 			vs_ctx->state = SERVER_STATE_CLOSED;
 		} else {
 			sleep(1);

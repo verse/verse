@@ -768,7 +768,7 @@ end:
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 	/* This session could be used again for authentication */
-	stream_conn->host_state=TCP_SERVER_STATE_LISTEN;
+	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
 
 	/* Clear session flags */
 	vsession->flags = 0;

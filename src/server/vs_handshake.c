@@ -232,7 +232,8 @@ int vs_STREAM_OPEN_tcp_loop(struct vContext *C)
 	}
 
 	/* "Never ending" loop */
-	while(1)
+	while(!(vsession->stream_conn->host_state == TCP_SERVER_STATE_CLOSING ||
+			vsession->stream_conn->host_state == TCP_SERVER_STATE_CLOSED))
 	{
 		FD_ZERO(&set);
 		FD_SET(io_ctx->sockfd, &set);

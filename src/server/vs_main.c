@@ -75,13 +75,15 @@ static void vs_request_terminate(struct VS_CTX *vs_ctx)
 				vs_ctx->vsessions[i]->stream_conn->host_state != TCP_SERVER_STATE_LISTEN) {
 
 			if(vs_ctx->vsessions[i]->dgram_conn != NULL &&
-					vs_ctx->vsessions[i]->dgram_conn->host_state != UDP_SERVER_STATE_CLOSED) {
+					vs_ctx->vsessions[i]->dgram_conn->host_state != UDP_SERVER_STATE_CLOSED)
+			{
 				v_print_log(VRS_PRINT_DEBUG_MSG, "Try to terminate connection: %d\n",
 						vs_ctx->vsessions[i]->dgram_conn->host_id);
 				/* Try to close session in friendly way */
 				vs_close_dgram_conn(vs_ctx->vsessions[i]->dgram_conn);
 			} else if(vs_ctx->vsessions[i]->stream_conn != NULL) {
-				/* TODO: close stream connection (strange state) */
+				/* Close stream connection */
+				vs_ctx->vsessions[i]->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
 			} else {
 				/* TODO: destroy session (strange state) */
 			}

@@ -218,7 +218,13 @@ int v_STREAM_pack_message(struct vContext *C)
 						/* Is this command fake command? */
 						if(cmd->id < MIN_CMD_ID) {
 							if(cmd->id == FAKE_CMD_CONNECT_TERMINATE) {
-								/* TODO */
+								/* Close connection */
+								struct VS_CTX *vs_ctx = CTX_server_ctx(C);
+								if(vs_ctx != NULL) {
+									vsession->stream_conn->host_state = TCP_SERVER_STATE_CLOSING;
+								} else {
+									vsession->stream_conn->host_state = TCP_CLIENT_STATE_CLOSING;
+								}
 							} else if(cmd->id == FAKE_CMD_FPS) {
 								struct Fps_Cmd *fps_cmd = (struct Fps_Cmd*)cmd;
 								/* Change value of FPS. It will be sent in negotiate command
