@@ -345,7 +345,7 @@ int vs_layer_send_destroy(struct VSNode *node,
 	layer_follower = layer->layer_folls.first;
 	while(layer_follower != NULL) {
 		if(layer_follower->state == ENTITY_CREATED) {
-			/* Create TagGroup_Destroy command */
+			/* Create Layer_Destroy command */
 			layer_destroy_cmd = v_layer_destroy_create(node->id, layer->id);
 
 			/* Put this command to the outgoing queue */
