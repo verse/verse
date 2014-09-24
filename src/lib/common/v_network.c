@@ -65,8 +65,10 @@ static int v_compare_ipv6_addr(const struct in6_addr *addr1, const struct in6_ad
 
 /**
  * \brief Parse string of URL and store items in structure VURL
+ *
  * \param[in]	*str	The string of URL
  * \param[out]	*url	The structure for storing data from parsed URL
+ *
  * \return		This function returns 1, when it was correct URL and it
  * contained all needed items and it returns 0, when there were some problem
  * during parsing.
@@ -75,7 +77,7 @@ int v_url_parse(const char *str, struct VURL *url)
 {
 	int str_pos=0;
 
-	if(str==NULL) {
+	if(str == NULL) {
 		return 0;
 	}
 
@@ -102,19 +104,19 @@ int v_url_parse(const char *str, struct VURL *url)
 	}
 
 	/* There has to be '-' after "verse" string */
-	if(str[str_pos]!='-') {
+	if(str[str_pos] != '-') {
 		return 0;
 	} else {
 		str_pos += 1;
 		/* printf("\t%s\n", &str[str_pos]);*/
 	}
 
-	/* There has to be "udp" or "tcp" or "wss" protocol  */
-	if(strncmp(&str[str_pos], "udp", strlen("udp"))==0) {
+	/* There has to be "udp" or "tcp" protocol  */
+	if(strncmp(&str[str_pos], "udp", strlen("udp")) == 0) {
 		url->transport_protocol = VRS_TP_UDP;
 		str_pos += strlen("udp");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
-	} else if(strncmp(&str[str_pos], "tcp", strlen("tcp"))==0) {
+	} else if(strncmp(&str[str_pos], "tcp", strlen("tcp")) == 0) {
 		url->transport_protocol = VRS_TP_TCP;
 		str_pos += strlen("tcp");
 		/*printf("\t%s\n", &vsession->host_url[str_pos]);*/
@@ -123,7 +125,7 @@ int v_url_parse(const char *str, struct VURL *url)
 	}
 
 	/* There has to be '-' after "udp" or "tcp" string */
-	if(str[str_pos]!='-') {
+	if(str[str_pos] != '-') {
 		return 0;
 	} else {
 		str_pos += 1;
@@ -131,15 +133,15 @@ int v_url_parse(const char *str, struct VURL *url)
 	}
 
 	/* There could be "none" or "dtls" or "tls" string */
-	if(strncmp(&str[str_pos], "none", strlen("none"))==0) {
+	if(strncmp(&str[str_pos], "none", strlen("none")) == 0) {
 		url->security_protocol = VRS_SEC_DATA_NONE;
 		str_pos += strlen("none");
 		/*printf("\t%s\n", &str[str_pos]);*/
-	} else if(strncmp(&str[str_pos], "dtls", strlen("dtls"))==0) {
+	} else if(strncmp(&str[str_pos], "dtls", strlen("dtls")) == 0) {
 		url->security_protocol = VRS_SEC_DATA_TLS;
 		str_pos += strlen("dtls");
 		/*printf("\t%s\n", &str[str_pos]);*/
-	} else if(strncmp(&str[str_pos], "tls", strlen("tls"))==0) {
+	} else if(strncmp(&str[str_pos], "tls", strlen("tls")) == 0) {
 		url->security_protocol = VRS_SEC_DATA_TLS;
 		str_pos += strlen("tls");
 		/*printf("\t%s\n", &str[str_pos]);*/
@@ -149,7 +151,7 @@ int v_url_parse(const char *str, struct VURL *url)
 
 separator:
 	/* There has to be separator between scheme and address  */
-	if(strncmp(&str[str_pos], "://", strlen("://"))!=0) {
+	if(strncmp(&str[str_pos], "://", strlen("://")) != 0) {
 		return 0;
 	} else {
 		url->scheme = strndup(str, str_pos);
@@ -158,7 +160,7 @@ separator:
 	}
 
 	/* Get address from URL */
-	if(str[str_pos]=='[') {
+	if(str[str_pos] == '[') {
 		size_t i;
 		int j;
 		for(i=str_pos, j=0; i<strlen(str); i++, j++) {
@@ -185,7 +187,12 @@ separator:
 	}
 
 	url->service = strdup(&str[str_pos]);
-	/*printf("service: %s\n", *service);*/
+
+	/*
+	printf(">>> url->node: %s\n", url->node);
+	printf(">>> url->service: %s\n", url->service);
+	printf(">>> url->scheme: %s\n", url->scheme);
+	*/
 
 	return 1;
 }
@@ -194,18 +201,25 @@ void v_url_print(const int level, struct VURL *url)
 {
 	v_print_log(level, "URL:\n");
 	v_print_log_simple(level, "\tscheme: %s\n", url->scheme);
-	if(url->transport_protocol==VRS_TP_UDP) {
-		v_print_log_simple(level, "\tdgram_protocol: UDP\n");
+	/* Print transport protocol */
+	if(url->transport_protocol == VRS_TP_UDP) {
+		v_print_log_simple(level, "\ttransport_protocol: UDP\n");
+	} else if(url->transport_protocol == VRS_TP_TCP) {
+		v_print_log_simple(level, "\ttransport_protocol: TCP\n");
+	} else if(url->transport_protocol == VRS_TP_WEBSOCKET) {
+		v_print_log_simple(level, "\ttransport_protocol: WebSocket\n");
 	} else {
-		v_print_log_simple(level, "\tdgram_protocol: unknow\n");
+		v_print_log_simple(level, "\ttransport_protocol: unknown\n");
 	}
-	if(url->security_protocol==VRS_SEC_DATA_NONE) {
+	/* Print security protocol */
+	if(url->security_protocol == VRS_SEC_DATA_NONE) {
 		v_print_log_simple(level, "\tsecurity_protocol: NONE\n");
-	} else if(url->security_protocol==VRS_SEC_DATA_TLS) {
+	} else if(url->security_protocol == VRS_SEC_DATA_TLS) {
 		v_print_log_simple(level, "\tsecurity_protocol: DTLS\n");
 	} else {
 		v_print_log_simple(level, "\tsecurity_protocol: unknown\n");
 	}
+	/* Print URL */
 	v_print_log_simple(level, "\tnode: %s\n", url->node);
 	v_print_log_simple(level, "\tservice: %s\n", url->service);
 }
