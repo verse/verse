@@ -577,13 +577,13 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 			vsession->host_url = calloc(UCHAR_MAX, sizeof(char));
 			if(url.ip_ver==IPV6) {
 				if( (vsession->flags & VRS_TP_WEBSOCKET) &&
-						url.security_protocol==VRS_SEC_DATA_NONE)
+						url.security_protocol == VRS_SEC_DATA_NONE)
 				{
 					sprintf(vsession->host_url, "ws://[%s]:%d",
 							url.node,
 							vsession->dgram_conn->io_ctx.host_addr.port);
 				} else if( (vsession->flags & VRS_TP_WEBSOCKET) &&
-						url.security_protocol==VRS_SEC_DATA_TLS)
+						url.security_protocol == VRS_SEC_DATA_TLS)
 				{
 					sprintf(vsession->host_url, "wss://[%s]:%d",
 							url.node,
@@ -597,19 +597,21 @@ int vs_NEGOTIATE_token_ded_loop(struct vContext *C)
 				}
 			} else {
 				if( (vsession->flags & VRS_TP_WEBSOCKET) &&
-						url.security_protocol==VRS_SEC_DATA_NONE)
+						url.security_protocol == VRS_SEC_DATA_NONE)
 				{
 					sprintf(vsession->host_url, "ws://%s:%d",
 							url.node,
 							vsession->dgram_conn->io_ctx.host_addr.port);
 				} else if( (vsession->flags & VRS_TP_WEBSOCKET) &&
-						url.security_protocol==VRS_SEC_DATA_TLS)
+						url.security_protocol == VRS_SEC_DATA_TLS)
 				{
 					sprintf(vsession->host_url, "wss://%s:%d",
 							url.node,
 							vsession->dgram_conn->io_ctx.host_addr.port);
 				} else {
-					sprintf(vsession->host_url, "wss://%s:%d",
+					sprintf(vsession->host_url, "verse-%s-%s://%s:%d",
+							trans_proto,
+							sec_proto,
 							url.node,
 							vsession->dgram_conn->io_ctx.host_addr.port);
 				}
