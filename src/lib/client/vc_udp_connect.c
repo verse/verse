@@ -1158,6 +1158,8 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 	srand(tv.tv_sec - tv.tv_usec);
 #endif
 
+	v_url_init(&url);
+
 	if (v_url_parse(vsession->host_url, &url) != 1) {
 		goto end;
 	} else {
