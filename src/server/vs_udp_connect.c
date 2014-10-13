@@ -1338,7 +1338,7 @@ static int vs_init_dgram_ctx(struct vContext *C)
 				(struct sockaddr*)&(dgram_conn->io_ctx.host_addr.addr.ipv6),
 				sizeof(dgram_conn->io_ctx.host_addr.addr.ipv6)) == -1)
 		{
-			v_print_log(VRS_PRINT_ERROR, "bind(): %d\n", strerror(errno));
+			v_print_log(VRS_PRINT_ERROR, "bind(): %s\n", strerror(errno));
 			return -1;
 		}
 	}
