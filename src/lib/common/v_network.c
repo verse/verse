@@ -515,10 +515,10 @@ static int v_compare_ipv4_addr(const struct in_addr *addr1, const struct in_addr
 
 static int v_compare_ipv6_addr(const struct in6_addr *addr1, const struct in6_addr *addr2)
 {
-	if((addr1->s6_addr[0]==addr2->s6_addr[0]) &&
-			(addr1->s6_addr[1]==addr2->s6_addr[1]) &&
-			(addr1->s6_addr[2]==addr2->s6_addr[2]) &&
-			(addr1->s6_addr[3]==addr2->s6_addr[3]))
+	if((addr1->s6_addr[0] == addr2->s6_addr[0]) &&
+			(addr1->s6_addr[1] == addr2->s6_addr[1]) &&
+			(addr1->s6_addr[2] == addr2->s6_addr[2]) &&
+			(addr1->s6_addr[3] == addr2->s6_addr[3]))
 		return 1;
 	else
 		return 0;
@@ -527,10 +527,10 @@ static int v_compare_ipv6_addr(const struct in6_addr *addr1, const struct in6_ad
 /* Compare two addresses */
 int v_compare_addr(const struct VNetworkAddress *addr1, const struct VNetworkAddress *addr2)
 {
-	if(addr1->ip_ver==IPV4 && addr2->ip_ver==IPV4) {
+	if(addr1->ip_ver == IPV4 && addr2->ip_ver == IPV4) {
 		return v_compare_ipv4_addr(&addr1->addr.ipv4.sin_addr, &addr2->addr.ipv4.sin_addr);
 	}
-	else if(addr1->ip_ver==IPV6 && addr2->ip_ver==IPV6) {
+	else if(addr1->ip_ver == IPV6 && addr2->ip_ver == IPV6) {
 		return v_compare_ipv6_addr(&addr1->addr.ipv6.sin6_addr, &addr2->addr.ipv6.sin6_addr);
 	}
 	else {
@@ -541,14 +541,14 @@ int v_compare_addr(const struct VNetworkAddress *addr1, const struct VNetworkAdd
 /* Compare two addresses and ports */
 int v_compare_addr_and_port(const struct VNetworkAddress *addr1, const struct VNetworkAddress *addr2)
 {
-	if(addr1->ip_ver==IPV4 && addr2->ip_ver==IPV4) {
+	if(addr1->ip_ver == IPV4 && addr2->ip_ver == IPV4) {
 		if(v_compare_ipv4_addr(&addr1->addr.ipv4.sin_addr, &addr2->addr.ipv4.sin_addr) &&
 		  addr1->addr.ipv4.sin_port == addr2->addr.ipv4.sin_port)
 			return 1;
 		else
 			return 0;
 	}
-	else if(addr1->ip_ver==IPV6 && addr2->ip_ver==IPV6) {
+	else if(addr1->ip_ver == IPV6 && addr2->ip_ver == IPV6) {
 		if(v_compare_ipv6_addr(&addr1->addr.ipv6.sin6_addr, &addr2->addr.ipv6.sin6_addr) &&
 		  addr1->addr.ipv6.sin6_port == addr2->addr.ipv6.sin6_port)
 			return 1;
@@ -565,13 +565,13 @@ void v_print_addr_port(const unsigned char level, const struct VNetworkAddress *
 {
 	unsigned short port;
 
-	if(addr->ip_ver==IPV4) {
+	if(addr->ip_ver == IPV4) {
 		char str_addr[INET_ADDRSTRLEN];
 		inet_ntop(AF_INET, &(addr->addr.ipv4.sin_addr), str_addr, sizeof(str_addr));
 		port = ntohs(addr->addr.ipv4.sin_port);
 		v_print_log_simple(level, "%s:%d ", str_addr, port);
 	}
-	else if(addr->ip_ver==IPV6) {
+	else if(addr->ip_ver == IPV6) {
 		char str_addr[INET6_ADDRSTRLEN];
 		inet_ntop(AF_INET6, &(addr->addr.ipv6.sin6_addr), str_addr, sizeof(str_addr));
 		port = ntohs(addr->addr.ipv6.sin6_port);
@@ -582,12 +582,12 @@ void v_print_addr_port(const unsigned char level, const struct VNetworkAddress *
 /* Print network address */
 void v_print_addr(const unsigned char level, const struct VNetworkAddress *addr)
 {
-	if(addr->ip_ver==IPV4) {
+	if(addr->ip_ver == IPV4) {
 		char str_addr[INET_ADDRSTRLEN];
 		inet_ntop(AF_INET, &(addr->addr.ipv4.sin_addr), str_addr, sizeof(str_addr));
 		v_print_log_simple(level, "%s ", str_addr);
 	}
-	else if(addr->ip_ver==IPV6) {
+	else if(addr->ip_ver == IPV6) {
 		char str_addr[INET6_ADDRSTRLEN];
 		inet_ntop(AF_INET6, &(addr->addr.ipv6.sin6_addr), str_addr, sizeof(str_addr));
 		v_print_log_simple(level, "%s ", str_addr);
