@@ -104,8 +104,8 @@ size_t vnp_raw_unpack_real64(const void *buffer, real64 *data)
 {
 	union { uint32 uint[2]; real64 real; } punt;
 	uint32	size;
-	size =  vnp_raw_unpack_uint32(buffer, &punt.uint[0]);
-	size += vnp_raw_unpack_uint32(((uint8 *)buffer) + size, &punt.uint[1]);
+	size =  vnp_raw_unpack_uint32(buffer, &punt.uint[1]);
+	size += vnp_raw_unpack_uint32(((uint8 *)buffer) + size, &punt.uint[0]);
 	*data = punt.real;
 	return size;
 }
