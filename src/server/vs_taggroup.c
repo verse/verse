@@ -773,8 +773,11 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		while(bucket != NULL) {
 			tag = (struct VSTag*)bucket->data;
 			vs_tag_send_create(tg_subscriber, node, tg, tag);
-			if((vsession->flags & VRS_TP_TCP) ||
-					(vsession->flags & VRS_TP_WEBSOCKET))
+			/* When TCP/WebSocket is used and tag is intialized, then it
+			 * is possible (necessary) to send value too. */
+			if( ((vsession->flags & VRS_TP_TCP) ||
+					(vsession->flags & VRS_TP_WEBSOCKET)) &&
+					(tag->flag & TAG_INITIALIZED))
 			{
 				vs_tag_send_set(vsession, node_subscriber->prio, node, tg, tag);
 			}
