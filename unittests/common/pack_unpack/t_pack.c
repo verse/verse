@@ -27,21 +27,27 @@
 #include "v_common.h"
 #include "v_pack.h"
 
+
 #define UINT8_BUF_SIZE		8
+#define UINT16_BUF_SIZE		16
 #define REAL64_BUF_SIZE		64
 
+
+/**
+ * \brief Unit test of packing uint8 values
+ */
 START_TEST ( test_Pack_Uint8 )
 {
 	size_t buf_pos = 0;
 	unsigned char buffer[UINT8_BUF_SIZE] = {0, };
 	unsigned char expected_results[UINT8_BUF_SIZE] = {
-			0,
-			1,
-			2,
-			4,
-			16,
-			23,
-			255,
+			0x00,	/* 0 */
+			0x01,	/* 1 */
+			0x02,	/* 2 */
+			0x04,	/* 4 */
+			0x10,	/* 16 */
+			0x17,	/* 23 */
+			0xff,	/* 255 */
 			0
 	};
 	int i;
@@ -66,6 +72,46 @@ START_TEST ( test_Pack_Uint8 )
 }
 END_TEST
 
+
+/**
+ * \brief Unit test of packing uint8 values
+ */
+START_TEST ( test_Pack_Uint16 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[UINT16_BUF_SIZE] = {0, };
+	unsigned char expected_results[UINT16_BUF_SIZE] = {
+			0x00, 0x00,	/* 0 */
+			0x00, 0x01,	/* 1 */
+			0x02, 0x00,	/* 512 */
+			0x04, 0x06,	/* 1030 */
+			0xff, 0xff,	/* 65535 */
+			0,
+	};
+	int i;
+
+	buf_pos += vnp_raw_pack_uint16((void*)&buffer[buf_pos], 0);
+	buf_pos += vnp_raw_pack_uint16((void*)&buffer[buf_pos], 1);
+	buf_pos += vnp_raw_pack_uint16((void*)&buffer[buf_pos], 512);
+	buf_pos += vnp_raw_pack_uint16((void*)&buffer[buf_pos], 1030);
+	buf_pos += vnp_raw_pack_uint16((void*)&buffer[buf_pos], 65535);
+
+	fail_unless( buf_pos == 10,
+			"Size of uint16 buffer: %d != 10",
+			buf_pos);
+
+	for(i = 0; i < UINT16_BUF_SIZE; i++) {
+		fail_unless( buffer[i] == expected_results[i],
+			"Buffer of uint16 differs at position: %d (%d != %d)",
+			i, buffer[i], expected_results[i]);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief Unit test of packing real64 (double) values
+ */
 START_TEST ( test_Pack_Real64 )
 {
 	size_t buf_pos = 0;
@@ -106,6 +152,7 @@ struct Suite *pack_suite(void)
 	struct TCase *tc_core = tcase_create("Core");
 
 	tcase_add_test(tc_core, test_Pack_Uint8);
+	tcase_add_test(tc_core, test_Pack_Uint16);
 	tcase_add_test(tc_core, test_Pack_Real64);
 
 	suite_add_tcase(suite, tc_core);
