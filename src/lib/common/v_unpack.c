@@ -87,7 +87,7 @@ size_t vnp_raw_unpack_uint64(const void *buffer, uint64 *data)
 	return size;
 }
 
-/* Unpack float value */
+/* Unpack half-float value */
 size_t vnp_raw_unpack_real16(const void *buffer, real16 *data)
 {
 	return vnp_raw_unpack_uint16(buffer, (uint16 *) data);

@@ -111,7 +111,7 @@ size_t vnp_raw_pack_real32(void *buffer, real32 data)
 	return vnp_raw_pack_uint32(buffer, punt.uint);
 }
 
-/* Pack double (eight octet) to the buffer */
+/* Pack double (eight octets) to the buffer */
 size_t vnp_raw_pack_real64(void *buffer, real64 data)
 {
 	union { uint32 uint[2]; real64 real; } punt;
