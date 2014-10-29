@@ -42,5 +42,6 @@ struct Suite *node_create_suite(void);
 struct Suite *node_destroy_suite(void);
 struct Suite *taggroup_create_suite(void);
 struct Suite *negotiate_suite(void);
+struct Suite *pack_suite(void);
 
 #endif /* T_NODE_CREATE_H_ */
