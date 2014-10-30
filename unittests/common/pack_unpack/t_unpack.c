@@ -41,6 +41,12 @@
 #define UINT8_BUF_SIZE		8
 #define UINT8_TV_SIZE		8
 
+#define UINT16_BUF_SIZE		16
+#define UINT16_TV_SIZE		8
+
+#define UINT32_BUF_SIZE		32
+#define UINT32_TV_SIZE		8
+
 #define REAL64_BUF_SIZE		64
 #define REAL64_TV_SIZE		8
 
@@ -96,6 +102,108 @@ START_TEST ( test_UnPack_Uint8 )
 	for(i = 0; i < UINT8_TV_SIZE; i++) {
 		fail_unless( results[i] == expected_results[i],
 				"Test vector of uint8 differs at position: %d (%d != %d)",
+				i, results[i], expected_results[i]);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief Unit test of packing uint16 values
+ */
+START_TEST ( test_UnPack_Uint16 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[UINT16_BUF_SIZE] = {
+			0x00, 0x00,	/* 0 */
+			0x00, 0x01,	/* 1 */
+			0x02, 0x00,	/* 512 */
+			0x04, 0x06,	/* 1030 */
+			0xff, 0xff,	/* 65535 */
+			0,
+	};
+	uint16 expected_results[UINT16_TV_SIZE] = {
+			0,
+			1,
+			512,
+			1030,
+			65535,
+			0,
+	};
+	uint16 results[UINT16_TV_SIZE] = {0,};
+	int i = 0;
+
+	buf_pos += vnp_raw_unpack_uint16((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint16((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint16((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint16((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint16((void*)&buffer[buf_pos],
+			&results[i++]);
+
+	fail_unless( buf_pos == 5*2,
+			"Size of uint16 buffer: %d != 10",
+			buf_pos);
+
+	for(i = 0; i < UINT16_TV_SIZE; i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of uint16 differs at position: %d (%d != %d)",
+				i, results[i], expected_results[i]);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief Unit test of packing uint32 values
+ */
+START_TEST ( test_UnPack_Uint32 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[UINT32_BUF_SIZE] = {
+			0x00, 0x00, 0x00, 0x00,	/* 0 */
+			0x00, 0x00, 0x00, 0x01,	/* 1 */
+			0x00, 0x00, 0x02, 0x00,	/* 512 */
+			0x00, 0x01, 0x00, 0x04,	/* 65540 */
+			0x01, 0x00, 0x00, 0x00,	/* 16 777 216 */
+			0xff, 0xff, 0xff, 0xff,	/* 4 294 967 295 */
+			0,
+	};
+	uint32 expected_results[UINT32_TV_SIZE] = {
+			0,
+			1,
+			512,
+			65540,
+			16777216,
+			4294967295,
+			0,
+	};
+	uint32 results[UINT32_TV_SIZE] = {0,};
+	int i = 0;
+
+	buf_pos += vnp_raw_unpack_uint32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint32((void*)&buffer[buf_pos],
+			&results[i++]);
+
+	fail_unless( buf_pos == 6*4,
+			"Size of uint32 buffer: %d != 24",
+			buf_pos);
+
+	for(i = 0; i < UINT32_TV_SIZE; i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of uint32 differs at position: %d (%d != %d)",
 				i, results[i], expected_results[i]);
 	}
 }
@@ -160,6 +268,8 @@ struct Suite *unpack_suite(void)
 	struct TCase *tc_core = tcase_create("Core");
 
 	tcase_add_test(tc_core, test_UnPack_Uint8);
+	tcase_add_test(tc_core, test_UnPack_Uint16);
+	tcase_add_test(tc_core, test_UnPack_Uint32);
 	tcase_add_test(tc_core, test_UnPack_Real64);
 
 	suite_add_tcase(suite, tc_core);
