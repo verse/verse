@@ -81,8 +81,8 @@ size_t vnp_raw_unpack_uint64(const void *buffer, uint64 *data)
 {
 	union { uint32 uint[2]; uint64 ulong; } punt;
 	uint32	size;
-	size =  vnp_raw_unpack_uint32(buffer, &punt.uint[0]);
-	size += vnp_raw_unpack_uint32(((uint8 *)buffer) + size, &punt.uint[1]);
+	size =  vnp_raw_unpack_uint32(buffer, &punt.uint[1]);
+	size += vnp_raw_unpack_uint32(((uint8 *)buffer) + size, &punt.uint[0]);
 	*data = punt.ulong;
 	return size;
 }
