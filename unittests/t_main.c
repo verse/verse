@@ -106,6 +106,7 @@ int main(int argc, char *argv[])
 	srunner_add_suite(master_sr, taggroup_create_suite());
 	srunner_add_suite(master_sr, negotiate_suite());
 	srunner_add_suite(master_sr, pack_suite());
+	srunner_add_suite(master_sr, unpack_suite());
 
 	/* When client was started with some arguments */
 	if(argc > 1) {
