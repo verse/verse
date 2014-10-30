@@ -189,6 +189,42 @@ END_TEST
 
 
 /**
+ * \brief Unit test of packing real32 (float) values
+ */
+START_TEST ( test_Pack_Real32 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[REAL32_BUF_SIZE] = {0, };
+	unsigned char expected_results[REAL32_BUF_SIZE] = {
+		0x00, 0x00, 0x00, 0x00,	/*  0.0 */
+		0x40, 0x00, 0x00, 0x01, /*  2.00000024 */
+		0x40, 0x00, 0x00, 0x00, /*  2.0 */
+		0xc0, 0x00, 0x00, 0x00, /* -2.0 */
+		0x3f, 0xff, 0xff, 0xfe, /*  1.99999976 */
+		0,
+	};
+	int i;
+
+	buf_pos += vnp_raw_pack_real32((void*)&buffer[buf_pos], 0);
+	buf_pos += vnp_raw_pack_real32((void*)&buffer[buf_pos], 2.00000024);
+	buf_pos += vnp_raw_pack_real32((void*)&buffer[buf_pos], 2.0);
+	buf_pos += vnp_raw_pack_real32((void*)&buffer[buf_pos], -2.0);
+	buf_pos += vnp_raw_pack_real32((void*)&buffer[buf_pos], 1.99999976);
+
+	fail_unless( buf_pos == 5*4,
+			"Size of real64 buffer: %d != 20 (bytes)",
+			buf_pos);
+
+	for(i = 0; i < REAL32_BUF_SIZE; i++) {
+		fail_unless( buffer[i] == expected_results[i],
+				"Buffer of real32 differs at position: %d (%d != %d)",
+				i, buffer[i], expected_results[i]);
+	}
+}
+END_TEST
+
+
+/**
  * \brief Unit test of packing real64 (double) values
  */
 START_TEST ( test_Pack_Real64 )
@@ -201,6 +237,7 @@ START_TEST ( test_Pack_Real64 )
 		0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/*  2.0 */
 		0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* -2.0 */
 		0x3f, 0xd5, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55,	/*  1/3 */
+		0,
 	};
 	int i;
 
@@ -216,8 +253,8 @@ START_TEST ( test_Pack_Real64 )
 
 	for(i = 0; i < REAL64_BUF_SIZE; i++) {
 		fail_unless( buffer[i] == expected_results[i],
-				"Buffer of real64 differs at position: %d",
-				i);
+				"Buffer of real64 differs at position: %d (%d != %d)",
+				i, buffer[i], expected_results[i]);
 	}
 }
 END_TEST
@@ -234,6 +271,7 @@ struct Suite *pack_suite(void)
 	tcase_add_test(tc_core, test_Pack_Uint16);
 	tcase_add_test(tc_core, test_Pack_Uint32);
 	tcase_add_test(tc_core, test_Pack_Uint64);
+	tcase_add_test(tc_core, test_Pack_Real32);
 	tcase_add_test(tc_core, test_Pack_Real64);
 
 	suite_add_tcase(suite, tc_core);
