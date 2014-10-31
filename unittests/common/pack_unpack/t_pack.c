@@ -270,7 +270,7 @@ START_TEST ( test_Pack_Real64 )
 END_TEST
 
 /**
- * \brief This function creates test suite for Node_Destroy command
+ * \brief This function creates test suite for packing values
  */
 struct Suite *pack_suite(void)
 {
