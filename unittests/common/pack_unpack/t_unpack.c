@@ -33,6 +33,7 @@
  *
  */
 
+#include <stdlib.h>
 #include <check.h>
 
 #include "v_unpack.h"
@@ -56,6 +57,8 @@
 #define REAL64_BUF_SIZE		64
 #define REAL64_TV_SIZE		8
 
+#define STRING8_BUF_SIZE	8
+#define STRING8_TV_SIZE		8
 
 /**
  * \brief Unit test of packing uint8 values
@@ -368,7 +371,45 @@ END_TEST
 
 
 /**
- * \brief This function creates test suite for Node_Destroy command
+ * \brief Unit test of packing string value
+ */
+START_TEST ( test_UnPack_String8 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[STRING8_BUF_SIZE] = {
+			0x04, 0x41, 0x68, 0x6f, 0x79, 0x00, 0x00, 0x00 /* 4 'Ahoy' */
+	};
+	char expected_results[STRING8_TV_SIZE] = {
+			'A', 'h', 'o', 'y', '\0',
+	};
+	char *results = NULL;
+	unsigned int i = 0;
+
+	buf_pos += vnp_raw_unpack_string8((void*)&buffer[buf_pos],
+			STRING8_BUF_SIZE, (char**)&results);
+
+	fail_unless( buf_pos == 1+4,
+			"Size of string8 buffer: %d != 1+4",
+			buf_pos);
+
+	fail_unless( results != NULL,
+			"String8 was not unpacked");
+
+	for(i = 0; i < strlen(results); i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of string differs at position: %d (%c != %c)",
+				i, results[i], expected_results[i]);
+	}
+
+	if(results != NULL) {
+		free(results);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief This function creates test suite for unpacking values
  */
 struct Suite *unpack_suite(void)
 {
@@ -381,6 +422,7 @@ struct Suite *unpack_suite(void)
 	tcase_add_test(tc_core, test_UnPack_Uint64);
 	tcase_add_test(tc_core, test_UnPack_Real32);
 	tcase_add_test(tc_core, test_UnPack_Real64);
+	tcase_add_test(tc_core, test_UnPack_String8);
 
 	suite_add_tcase(suite, tc_core);
 
