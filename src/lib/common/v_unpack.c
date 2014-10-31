@@ -155,8 +155,8 @@ size_t vnp_raw_unpack_string8_(const void *buffer, const size_t buffer_size, str
  * 				structure.
  * \param[in]	*buffer			The received buffer
  * \param[in]	*buffer_size	The remaining size of buffer, that could be processed
- * \param[out]	str[VRS_STRING8_MAX_SIZE+1]			The pointer at string8. Informations from buffer are
- * 								copied to this variable.
+ * \param[out]	**str			The pointer at pointer of string. Informations from buffer are
+ * 								copied to new alloacated buffer.
  * \return		This function return size of unpacked data in bytes.
  */
 size_t vnp_raw_unpack_string8(const char *buffer,
