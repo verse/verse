@@ -47,6 +47,12 @@
 #define UINT32_BUF_SIZE		32
 #define UINT32_TV_SIZE		8
 
+#define UINT64_BUF_SIZE		64
+#define UINT64_TV_SIZE		8
+
+#define REAL32_BUF_SIZE		32
+#define REAL32_TV_SIZE		8
+
 #define REAL64_BUF_SIZE		64
 #define REAL64_TV_SIZE		8
 
@@ -211,6 +217,108 @@ END_TEST
 
 
 /**
+ * \brief Unit test of packing uint64 values
+ */
+START_TEST ( test_UnPack_Uint64 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[UINT64_BUF_SIZE] = {
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* 0 */
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,	/* 1 */
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,	/* 512 */
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04,	/* 65540 */
+			0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,	/* 4 294 967 296 */
+			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,	/* 18 446 744 073 709 551 615 */
+			0,
+	};
+	uint64 expected_results[UINT64_TV_SIZE] = {
+			0,
+			1,
+			512,
+			65540,
+			4294967296,
+			0xffffffffffffffff,
+			0,
+	};
+	uint64 results[UINT64_TV_SIZE] = {0,};
+	int i = 0;
+
+	buf_pos += vnp_raw_unpack_uint64((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint64((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint64((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint64((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint64((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_uint64((void*)&buffer[buf_pos],
+			&results[i++]);
+
+	fail_unless( buf_pos == 6*8,
+			"Size of uint64 buffer: %d != 48",
+			buf_pos);
+
+	for(i = 0; i < UINT64_TV_SIZE; i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of uint64 differs at position: %d (%d != %d)",
+				i, results[i], expected_results[i]);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief Unit test of packing real32 values
+ */
+START_TEST ( test_UnPack_Real32 )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[REAL32_BUF_SIZE] = {
+			0x00, 0x00, 0x00, 0x00,	/*  0.0 */
+			0x40, 0x00, 0x00, 0x01, /*  2.00000024 */
+			0x40, 0x00, 0x00, 0x00, /*  2.0 */
+			0xc0, 0x00, 0x00, 0x00, /* -2.0 */
+			0x3f, 0xff, 0xff, 0xfe, /*  1.99999976 */
+			0,
+	};
+	real32 expected_results[REAL32_TV_SIZE] = {
+			0.0,
+			2.00000024,
+			2.0,
+			-2.0,
+			1.99999976,
+			0,
+	};
+	real32 results[REAL32_TV_SIZE] = {0,};
+	int i = 0;
+
+	buf_pos += vnp_raw_unpack_real32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_real32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_real32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_real32((void*)&buffer[buf_pos],
+			&results[i++]);
+	buf_pos += vnp_raw_unpack_real32((void*)&buffer[buf_pos],
+			&results[i++]);
+
+	fail_unless( buf_pos == 5*4,
+			"Size of real32 buffer: %d != 20",
+			buf_pos);
+
+	for(i = 0; i < REAL32_TV_SIZE; i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of real32 differs at position: %d (%f != %f)",
+				i, results[i], expected_results[i]);
+	}
+}
+END_TEST
+
+
+/**
  * \brief Unit test of packing real64 values
  */
 START_TEST ( test_UnPack_Real64 )
@@ -247,7 +355,7 @@ START_TEST ( test_UnPack_Real64 )
 			&results[i++]);
 
 	fail_unless( buf_pos == 5*8,
-			"Size of uint8 buffer: %d != 40",
+			"Size of real64 buffer: %d != 40",
 			buf_pos);
 
 	for(i = 0; i < REAL64_TV_SIZE; i++) {
@@ -270,6 +378,8 @@ struct Suite *unpack_suite(void)
 	tcase_add_test(tc_core, test_UnPack_Uint8);
 	tcase_add_test(tc_core, test_UnPack_Uint16);
 	tcase_add_test(tc_core, test_UnPack_Uint32);
+	tcase_add_test(tc_core, test_UnPack_Uint64);
+	tcase_add_test(tc_core, test_UnPack_Real32);
 	tcase_add_test(tc_core, test_UnPack_Real64);
 
 	suite_add_tcase(suite, tc_core);
