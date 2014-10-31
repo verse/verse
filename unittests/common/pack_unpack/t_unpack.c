@@ -385,7 +385,7 @@ START_TEST ( test_UnPack_String8 )
 	char *results = NULL;
 	unsigned int i = 0;
 
-	buf_pos += vnp_raw_unpack_string8((void*)&buffer[buf_pos],
+	buf_pos += vnp_raw_unpack_string8_to_str((void*)&buffer[buf_pos],
 			STRING8_BUF_SIZE, (char**)&results);
 
 	fail_unless( buf_pos == 1+4,
@@ -409,6 +409,112 @@ END_TEST
 
 
 /**
+ * \brief Unit test of unpacking empty string
+ */
+START_TEST ( test_UnPack_String8_empty_string )
+{
+	size_t buf_pos = 0;
+	unsigned char buffer[STRING8_BUF_SIZE] = {
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 /* 0 '' */
+	};
+	char expected_results[STRING8_TV_SIZE] = {
+			'\0',
+	};
+	char *results = NULL;
+	unsigned int i = 0;
+
+	buf_pos += vnp_raw_unpack_string8_to_str((void*)&buffer[buf_pos],
+			STRING8_BUF_SIZE, (char**)&results);
+
+	fail_unless( buf_pos == 1,
+			"Size of string8 buffer: %d != 1",
+			buf_pos);
+
+	fail_unless( results != NULL,
+			"String8 was not unpacked");
+
+	for(i = 0; i < strlen(results); i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of string differs at position: %d (%c != %c)",
+				i, results[i], expected_results[i]);
+	}
+
+	if(results != NULL) {
+		free(results);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief Unit test of unpacking string into the small buffer
+ */
+START_TEST ( test_UnPack_String8_small_buffer )
+{
+	size_t buf_pos = 0;
+	size_t buf_size = 2;
+	unsigned char buffer[STRING8_BUF_SIZE] = {
+			0x04, 0x41, 0x68, 0x6f, 0x79, 0x00, 0x00, 0x00 /* 4 'Ahoy' */
+	};
+	char expected_results[STRING8_TV_SIZE] = {
+			'A', '\0',
+	};
+	char *results = NULL;
+	unsigned int i = 0;
+
+	buf_pos += vnp_raw_unpack_string8_to_str((void*)&buffer[buf_pos],
+			buf_size, (char**)&results);
+
+	fail_unless( buf_pos == buf_size,
+			"Size of string8 buffer: %d != %d",
+			buf_pos, buf_size);
+
+	fail_unless( results != NULL,
+			"String8 was not unpacked");
+
+	for(i = 0; i < strlen(results); i++) {
+		fail_unless( results[i] == expected_results[i],
+				"Test vector of string differs at position: %d (%c != %c)",
+				i, results[i], expected_results[i]);
+	}
+
+	if(results != NULL) {
+		free(results);
+	}
+}
+END_TEST
+
+
+/**
+ * \brief Unit test of unpacking string into the too small buffer
+ */
+START_TEST ( test_UnPack_String8_too_small_buffer )
+{
+	size_t buf_pos = 0;
+	size_t buf_size = 1;
+	unsigned char buffer[STRING8_BUF_SIZE] = {
+			0x04, 0x41, 0x68, 0x6f, 0x79, 0x00, 0x00, 0x00 /* 4 'Ahoy' */
+	};
+	char *results = NULL;
+
+	buf_pos += vnp_raw_unpack_string8_to_str((void*)&buffer[buf_pos],
+			buf_size, (char**)&results);
+
+	fail_unless( buf_pos == buf_size,
+			"Size of string8 buffer: %d != %d",
+			buf_pos, buf_size);
+
+	fail_unless( results == NULL,
+			"String8 was allocated despite it is not able to unpack string");
+
+	if(results != NULL) {
+		free(results);
+	}
+}
+END_TEST
+
+
+/**
  * \brief This function creates test suite for unpacking values
  */
 struct Suite *unpack_suite(void)
@@ -423,6 +529,9 @@ struct Suite *unpack_suite(void)
 	tcase_add_test(tc_core, test_UnPack_Real32);
 	tcase_add_test(tc_core, test_UnPack_Real64);
 	tcase_add_test(tc_core, test_UnPack_String8);
+	tcase_add_test(tc_core, test_UnPack_String8_empty_string);
+	tcase_add_test(tc_core, test_UnPack_String8_small_buffer);
+	tcase_add_test(tc_core, test_UnPack_String8_too_small_buffer);
 
 	suite_add_tcase(suite, tc_core);
 

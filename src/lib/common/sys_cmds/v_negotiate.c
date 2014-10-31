@@ -331,7 +331,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size,
 			case FTR_DED:
 			case FTR_CLIENT_NAME:
 			case FTR_CLIENT_VERSION:
-				buffer_pos += vnp_raw_unpack_string8_(&buffer[buffer_pos],
+				buffer_pos += vnp_raw_unpack_string8_to_string8(&buffer[buffer_pos],
 						buffer_size-buffer_pos,
 						&negotiate_cmd->value[i].string8);
 				break;

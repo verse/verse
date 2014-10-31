@@ -117,16 +117,18 @@ size_t vnp_raw_unpack_real64(const void *buffer, real64 *data)
  * 				structure.
  * \param[in]	*buffer			The received buffer
  * \param[in]	*buffer_size	The remaining size of buffer, that could be processed
- * \param[out]	*str			The pointer at string8. Informations from buffer are
+ * \param[out]	*data			The pointer at string8. Informations from buffer are
  * 								copied to this variable.
  * \return		This function return size of unpacked data in bytes.
  */
-size_t vnp_raw_unpack_string8_(const void *buffer, const size_t buffer_size, struct string8 *data)
+size_t vnp_raw_unpack_string8_to_string8(const void *buffer,
+		const size_t buffer_size,
+		struct string8 *data)
 {
 	uint32 i, size=0;
 
 	/* Check if buffer_size is bigger then minimal length of string8 */
-	if(buffer_size<2) {
+	if(buffer_size < 2) {
 		return buffer_size;
 	}
 
@@ -142,7 +144,7 @@ size_t vnp_raw_unpack_string8_(const void *buffer, const size_t buffer_size, str
 	for(i=0; i<data->length; i++) {
 		size += vnp_raw_unpack_uint8(((uint8 *)buffer) + size, &data->str[i]);
 	}
-	/* Make from received string real string terminated with '\0' character. */
+	/* Make real string terminated with '\0' character. */
 	data->str[data->length] = '\0';
 
 	return size;
@@ -156,10 +158,10 @@ size_t vnp_raw_unpack_string8_(const void *buffer, const size_t buffer_size, str
  * \param[in]	*buffer			The received buffer
  * \param[in]	*buffer_size	The remaining size of buffer, that could be processed
  * \param[out]	**str			The pointer at pointer of string. Informations from buffer are
- * 								copied to new alloacated buffer.
+ * 								copied to new allocated buffer.
  * \return		This function return size of unpacked data in bytes.
  */
-size_t vnp_raw_unpack_string8(const char *buffer,
+size_t vnp_raw_unpack_string8_to_str(const char *buffer,
 		const size_t buffer_size,
 		char **str)
 {
@@ -168,7 +170,7 @@ size_t vnp_raw_unpack_string8(const char *buffer,
 	uint8 length;
 
 	/* Check if buffer_size is bigger then minimal length of string8 */
-	if(buffer_size<2) {
+	if(buffer_size < 2) {
 		return buffer_size;
 	}
 
@@ -177,8 +179,8 @@ size_t vnp_raw_unpack_string8(const char *buffer,
 
 	/* Crop length of the string, when length of the string is
 	 * bigger then available buffer */
-	if(length > buffer_size) {
-		length = buffer_size;
+	if( (size_t)(length + 1) > buffer_size ) {
+		length = buffer_size - 1;
 	}
 
 	*str = string8 = (char*)malloc((length+1)*sizeof(char));

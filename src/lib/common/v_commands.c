@@ -1943,7 +1943,7 @@ static int _v_cmd_unpack(const char *buffer,
 							(real64*)&cmd->data[cmd_struct[cmd->id].items[j].offset]);
 					break;
 				case ITEM_STRING8:
-					buffer_pos += vnp_raw_unpack_string8(&buffer[buffer_pos],
+					buffer_pos += vnp_raw_unpack_string8_to_str(&buffer[buffer_pos],
 							buffer_len - buffer_pos,
 							(char**)&(cmd->data[cmd_struct[cmd->id].items[j].offset]));
 					break;

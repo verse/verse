@@ -46,8 +46,8 @@ size_t vnp_raw_unpack_real16(const void *buffer, real16 *data);
 size_t vnp_raw_unpack_real32(const void *buffer, real32 *data);
 size_t vnp_raw_unpack_real64(const void *buffer, real64 *data);
 
-size_t vnp_raw_unpack_string8_(const void *buffer, const size_t buffer_size, struct string8 *data);
-size_t vnp_raw_unpack_string8(const char *buffer, const size_t buffer_size, char **str);
+size_t vnp_raw_unpack_string8_to_string8(const void *buffer, const size_t buffer_size, struct string8 *data);
+size_t vnp_raw_unpack_string8_to_str(const char *buffer, const size_t buffer_size, char **str);
 
 #endif
 
