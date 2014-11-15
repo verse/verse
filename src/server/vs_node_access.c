@@ -61,8 +61,8 @@ int vs_node_can_write(struct VSession *vsession,
 			{
 				if(perm->permissions & VRS_PERM_NODE_WRITE) {
 					user_can_write = 1;
+					break;
 				}
-				break;
 			}
 			perm = perm->next;
 		}
@@ -392,6 +392,9 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 			ret = 0;
 		}
 	} else {
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"User: %d can not lock node: %d (can not write to the node)\n",
+				vsession->user_id, node->id);
 		ret = 0;
 	}
 
