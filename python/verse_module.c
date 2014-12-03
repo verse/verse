@@ -106,9 +106,14 @@ static void cb_c_receive_layer_unset_value(const uint8_t session_id,
 		const uint32_t item_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_layer_unset_value", "(IHI)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_layer_unset_value", "(IHI)",
 				node_id, layer_id, item_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -159,6 +164,7 @@ static void cb_c_receive_layer_set_value(const uint8_t session_id,
 	if(session != NULL) {
 		PyObject *tuple_values = NULL;
 		PyObject *py_value = NULL;
+		PyObject *result = NULL;
 		int i;
 
 		/* Create tuple for values */
@@ -200,8 +206,13 @@ static void cb_c_receive_layer_set_value(const uint8_t session_id,
 			}
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
-		PyObject_CallMethod((PyObject*)session, "cb_receive_layer_set_value", "(IHIO)",
+
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_layer_set_value", "(IHIO)",
 				node_id, layer_id, item_id, tuple_values);
+
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
 	}
 	return;
 }
@@ -427,9 +438,14 @@ static void cb_c_receive_layer_unsubscribe(const uint8_t session_id,
 		const uint32_t crc32)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_layer_unsubscribe", "(IHII)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_layer_unsubscribe", "(IHII)",
 				node_id, layer_id, version, crc32);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -475,9 +491,14 @@ static void cb_c_receive_layer_subscribe(const uint8_t session_id,
 		const uint32_t crc32)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_layer_subscribe", "(IHII)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_layer_subscribe", "(IHII)",
 				node_id, layer_id, version, crc32);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -522,9 +543,14 @@ static void cb_c_receive_layer_destroy(const uint8_t session_id,
 		const uint16_t layer_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_layer_destroy", "(IH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_layer_destroy", "(IH)",
 				node_id, layer_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -571,9 +597,14 @@ static void cb_c_receive_layer_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_layer_create", "(IHHBBH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_layer_create", "(IHHBBH)",
 				node_id, parent_layer_id, layer_id, data_type, count, custom_type);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1932,7 +1963,13 @@ static PyObject *Session_callback_update(PyObject *self)
 	int ret;
 
 	ret = vrs_callback_update(session->session_id);
-	if(ret != VRS_SUCCESS) {
+	if(ret == VRS_SUCCESS) {
+		/* Check if some error occurred */
+		if(PyErr_Occurred() != NULL) {
+			PyErr_Print();
+			return NULL;
+		}
+	} else {
 		PyErr_SetString(VerseError, "Session is not active");
 		return NULL;
 	}
