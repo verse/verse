@@ -753,15 +753,17 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				if(!PyInt_Check(py_value)) {
 #endif
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
 				l = PyLong_AsLong(py_value);
-				if(!(l>=0 && l<=UINT8_MAX)) {
-					PyErr_SetString(VerseError, "Long out of data_type range");
+				if(!(l >= 0 && l <= UINT8_MAX)) {
+					PyErr_SetString(VerseError,
+							"Long out of data_type range (uint8_t)");
 					free(values);
 					return NULL;
 				}
@@ -783,15 +785,17 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				if(!PyInt_Check(py_value)) {
 #endif
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
 				l = PyLong_AsLong(py_value);
-				if(!(l>=0 && l<=UINT16_MAX)) {
-					PyErr_SetString(VerseError, "Long out of data_type range");
+				if(!(l >= 0 && l <= UINT16_MAX)) {
+					PyErr_SetString(VerseError,
+							"Long out of data_type range (uint16_t)");
 					free(values);
 					return NULL;
 				}
@@ -813,15 +817,17 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				if(!PyInt_Check(py_value)) {
 #endif
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
 					return NULL;
 				}
 				l = PyLong_AsLong(py_value);
-				if(!(l>=0 && l<=UINT32_MAX)) {
-					PyErr_SetString(VerseError, "Long out of data_type range");
+				if(!(l >= 0 && l <= UINT32_MAX)) {
+					PyErr_SetString(VerseError,
+							"Long out of data_type range (uint32_t)");
 					free(values);
 					return NULL;
 				}
@@ -843,7 +849,8 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				if(!PyInt_Check(py_value)) {
 #endif
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not int. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not int. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
