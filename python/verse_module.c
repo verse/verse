@@ -293,7 +293,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 	if(!(size > 0 && size <= 4)) {
 		sprintf(err_message,
 				"Wrong size of tuple: %ld (node_id: %d, layer_id: %d, item_id: %d)",
-				node_id, layer_id, item_id, size);
+				size, node_id, layer_id, item_id);
 		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	} else {
@@ -457,7 +457,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 	default:
 		sprintf(err_message,
 				"Unsupported value type: %d (node_id: %d, layer_id: %d, item_id: %d)",
-				data_type);
+				data_type, node_id, layer_id, item_id);
 		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	}
