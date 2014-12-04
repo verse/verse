@@ -217,6 +217,38 @@ static void cb_c_receive_layer_set_value(const uint8_t session_id,
 	return;
 }
 
+/**
+ * \brief This function prints Python error (wrong value of layer item)
+ */
+static void _err_print_wrong_layer_item_value(uint32_t node_id,
+		uint16_t layer_id,
+		uint32_t item_id,
+		uint8_t data_type,
+		long value)
+{
+	char err_message[256];
+	switch(data_type) {
+	case VRS_VALUE_TYPE_UINT8:
+		sprintf(err_message,
+				"Long value: %ld of item: (node_id: %d, layer_id: %d, item_id: %d) is out of uint8_t range",
+				value, node_id, layer_id, item_id);
+		break;
+	case VRS_VALUE_TYPE_UINT16:
+		sprintf(err_message,
+				"Long value: %ld of item: (node_id: %d, layer_id: %d, item_id: %d) is out of uint16_t range",
+				value, node_id, layer_id, item_id);
+		break;
+	case VRS_VALUE_TYPE_UINT32:
+		sprintf(err_message,
+				"Long value: %ld of item: (node_id: %d, layer_id: %d, item_id: %d) is out of uint32_t range",
+				value, node_id, layer_id, item_id);
+		break;
+	default:
+		return;
+	}
+	PyErr_SetString(VerseError, err_message);
+}
+
 static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
@@ -264,13 +296,15 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
 				l = PyLong_AsLong(py_value);
-				if(!(l>=0 && l<=UINT8_MAX)) {
-					PyErr_SetString(VerseError, "Long out of data_type range");
+				if(!(l >= 0 && l <= UINT8_MAX)) {
+					_err_print_wrong_layer_item_value(node_id, layer_id,
+							item_id, data_type, l);
 					free(values);
 					return NULL;
 				}
@@ -292,8 +326,9 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 					return NULL;
 				}
 				l = PyLong_AsLong(py_value);
-				if(!(l>=0 && l<=UINT16_MAX)) {
-					PyErr_SetString(VerseError, "Long out of data_type range");
+				if(!(l >= 0 && l <= UINT16_MAX)) {
+					_err_print_wrong_layer_item_value(node_id, layer_id,
+												item_id, data_type, l);
 					free(values);
 					return NULL;
 				}
@@ -310,13 +345,15 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
 				l = PyLong_AsLong(py_value);
-				if(!(l>=0 && l<=UINT32_MAX)) {
-					PyErr_SetString(VerseError, "Long out of data_type range");
+				if(!(l >= 0 && l <= UINT32_MAX)) {
+					_err_print_wrong_layer_item_value(node_id, layer_id,
+												item_id, data_type, l);
 					free(values);
 					return NULL;
 				}
@@ -333,7 +370,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
@@ -351,7 +389,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not float)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not float)");
 					free(values);
 					return NULL;
 				}
@@ -370,7 +409,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not float)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not float)");
 					free(values);
 					return NULL;
 				}
@@ -388,7 +428,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not float)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not float)");
 					free(values);
 					return NULL;
 				}
@@ -407,7 +448,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 	}
 
 	/* Call C API function */
-	ret = vrs_send_layer_set_value(session->session_id, prio, node_id, layer_id, item_id, data_type, count, values);
+	ret = vrs_send_layer_set_value(session->session_id,
+			prio, node_id, layer_id, item_id, data_type, count, values);
 
 	/* Free memory allocated for values */
 	if(values != NULL) {
@@ -716,6 +758,38 @@ static void cb_c_receive_tag_set_value(const uint8_t session_id,
 	return;
 }
 
+/**
+ * \brief This function prints Python error (wrong value of layer item)
+ */
+static void _err_print_wrong_tag_value(uint32_t node_id,
+		uint16_t tg_id,
+		uint32_t tag_id,
+		uint8_t data_type,
+		long value)
+{
+	char err_message[256];
+	switch(data_type) {
+	case VRS_VALUE_TYPE_UINT8:
+		sprintf(err_message,
+				"Long value: %ld of item: (node_id: %d, taggroup_id: %d, tag_id: %d) is out of uint8_t range",
+				value, node_id, tg_id, tag_id);
+		break;
+	case VRS_VALUE_TYPE_UINT16:
+		sprintf(err_message,
+				"Long value: %ld of item: (node_id: %d, taggroup_id: %d, tag_id: %d) is out of uint16_t range",
+				value, node_id, tg_id, tag_id);
+		break;
+	case VRS_VALUE_TYPE_UINT32:
+		sprintf(err_message,
+				"Long value: %ld of item: (node_id: %d, taggroup_id: %d, tag_id: %d) is out of uint32_t range",
+				value, node_id, tg_id, tag_id);
+		break;
+	default:
+		return;
+	}
+	PyErr_SetString(VerseError, err_message);
+}
+
 static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 		uint8_t prio,
 		uint32_t node_id,
@@ -762,11 +836,7 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				}
 				l = PyLong_AsLong(py_value);
 				if(!(l >= 0 && l <= UINT8_MAX)) {
-					char err_message[256];
-					sprintf(err_message,
-							"Long: %ld out of data_type range (uint8_t)",
-							l);
-					PyErr_SetString(VerseError, err_message);
+					_err_print_wrong_tag_value(node_id, taggroup_id, tag_id, data_type, l);
 					free(values);
 					return NULL;
 				}
@@ -797,12 +867,7 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				}
 				l = PyLong_AsLong(py_value);
 				if(!(l >= 0 && l <= UINT16_MAX)) {
-					char err_message[256];
-					sprintf(err_message,
-							"Long: %ld out of data_type range (uint16_t)",
-							l);
-					PyErr_SetString(VerseError, err_message);
-					free(values);
+					_err_print_wrong_tag_value(node_id, taggroup_id, tag_id, data_type, l);
 					return NULL;
 				}
 				((uint16_t*)values)[i] = (uint16_t)l;
@@ -832,12 +897,7 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 				}
 				l = PyLong_AsLong(py_value);
 				if(!(l >= 0 && l <= UINT32_MAX)) {
-					char err_message[256];
-					sprintf(err_message,
-							"Long: %ld out of data_type range (uint32_t)",
-							l);
-					PyErr_SetString(VerseError, err_message);
-					free(values);
+					_err_print_wrong_tag_value(node_id, taggroup_id, tag_id, data_type, l);
 					return NULL;
 				}
 				((uint32_t*)values)[i] = (uint32_t)l;
