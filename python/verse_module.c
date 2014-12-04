@@ -669,16 +669,16 @@ static void cb_c_receive_tag_set_value(const uint8_t session_id,
 		for (i = 0; i < count; i++) {
 			switch(data_type) {
 			case VRS_VALUE_TYPE_UINT8:
-				py_value = PyLong_FromLong(((uint8_t*)value)[i]);
+				py_value = PyLong_FromUnsignedLong(((uint8_t*)value)[i]);
 				break;
 			case VRS_VALUE_TYPE_UINT16:
-				py_value = PyLong_FromLong(((uint16_t*)value)[i]);
+				py_value = PyLong_FromUnsignedLong(((uint16_t*)value)[i]);
 				break;
 			case VRS_VALUE_TYPE_UINT32:
-				py_value = PyLong_FromLong(((uint32_t*)value)[i]);
+				py_value = PyLong_FromUnsignedLong(((uint32_t*)value)[i]);
 				break;
 			case VRS_VALUE_TYPE_UINT64:
-				py_value = PyLong_FromLong(((uint64_t*)value)[i]);
+				py_value = PyLong_FromUnsignedLong(((uint64_t*)value)[i]);
 				break;
 			case VRS_VALUE_TYPE_REAL16:
 				py_value = PyFloat_FromDouble(((uint16_t*)value)[i]);
@@ -704,9 +704,14 @@ static void cb_c_receive_tag_set_value(const uint8_t session_id,
 			}
 			PyTuple_SetItem(tuple_values, i, py_value);
 		}
+		PyObject *result = NULL;
 
-		PyObject_CallMethod((PyObject*)session, "cb_receive_tag_set_values", "(IHHO)",
+		result = PyObject_CallMethod((PyObject*)session, "cb_receive_tag_set_values", "(IHHO)",
 				node_id, taggroup_id, tag_id, tuple_values);
+
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
 	}
 	return;
 }
@@ -1009,9 +1014,16 @@ static void cb_c_receive_tag_destroy(const uint8_t session_id,
 		const uint16_t tag_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_tag_destroy", "(IHH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_tag_destroy", "(IHH)",
 				node_id, taggroup_id, tag_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
+
 	return;
 }
 
@@ -1059,9 +1071,15 @@ static void cb_c_receive_tag_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_tag_create", "(IHHBBH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_tag_create", "(IHHBBH)",
 				node_id, taggroup_id, tag_id, data_type, count, custom_type);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1109,9 +1127,15 @@ static void cb_c_receive_taggroup_unsubscribe(const uint8_t session_id,
 		const uint32_t crc32)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_taggroup_unsubscribe", "(IHII)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_taggroup_unsubscribe", "(IHII)",
 				node_id, taggroup_id, version, crc32);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1157,9 +1181,15 @@ static void cb_c_receive_taggroup_subscribe(const uint8_t session_id,
 		const uint32_t crc32)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_taggroup_subscribe", "(IHII)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_taggroup_subscribe", "(IHII)",
 				node_id, taggroup_id, version, crc32);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1204,9 +1234,15 @@ static void cb_c_receive_taggroup_destroy(const uint8_t session_id,
 		const uint16_t taggroup_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_taggroup_destroy", "(IH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_taggroup_destroy", "(IH)",
 				node_id, taggroup_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1250,9 +1286,15 @@ static void cb_c_receive_taggroup_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_taggroup_create", "(IHH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_taggroup_create", "(IHH)",
 				node_id, taggroup_id, custom_type);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1295,9 +1337,15 @@ static void cb_c_receive_node_unlock(const uint8_t session_id,
 		const uint32_t avatar_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_unlock", "(II)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_unlock", "(II)",
 				node_id, avatar_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1339,9 +1387,15 @@ static void cb_c_receive_node_lock(const uint8_t session_id,
 		const uint32_t avatar_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_lock", "(II)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_lock", "(II)",
 				node_id, avatar_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1383,9 +1437,15 @@ static void cb_c_receive_node_owner(const uint8_t session_id,
 		const uint16_t user_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_owner", "(IH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_owner", "(IH)",
 				node_id, user_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1429,9 +1489,15 @@ static void cb_c_receive_node_perm(const uint8_t session_id,
 		const uint8_t perm)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_perm", "(IHB)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_perm", "(IHB)",
 				node_id, user_id, perm);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1475,9 +1541,15 @@ static void cb_c_receive_node_link(const uint8_t session_id,
 		const uint32_t child_node_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_link", "(II)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_link", "(II)",
 				parent_node_id, child_node_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1549,9 +1621,15 @@ static void cb_c_receive_node_unsubscribe(const uint8_t session_id,
 		const uint32_t crc32)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_unsubscribe", "(III)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_unsubscribe", "(III)",
 				node_id, version, crc32);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1595,9 +1673,15 @@ static void cb_c_receive_node_subscribe(const uint8_t session_id,
 		const uint32_t crc32)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_subscribe", "(III)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_subscribe", "(III)",
 				node_id, version, crc32);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1640,9 +1724,15 @@ static void cb_c_receive_node_destroy(const uint8_t session_id,
 		const uint32_t node_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_destroy", "(I)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_destroy", "(I)",
 				node_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1686,9 +1776,15 @@ static void cb_c_receive_node_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_node_create", "(IIHH)",
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_node_create", "(IIHH)",
 				node_id, parent_id, user_id, custom_type);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1836,8 +1932,15 @@ static void cb_c_receive_connect_accept(const uint8_t session_id,
 		const uint32_t avatar_id)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_connect_accept", "(HI)", user_id, avatar_id);
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_connect_accept", "(HI)",
+				user_id, avatar_id);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1855,8 +1958,15 @@ static void cb_c_receive_connect_terminate(const uint8_t session_id,
 		const uint8_t error_num)
 {
 	session_SessionObject *session = session_list[session_id];
-	if(session != NULL)
-		PyObject_CallMethod((PyObject*)session, "cb_receive_connect_terminate", "(B)", error_num);
+	if(session != NULL) {
+		PyObject *result = NULL;
+		result = PyObject_CallMethod((PyObject*)session,
+				"cb_receive_connect_terminate", "(B)",
+				error_num);
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
+		}
+	}
 	return;
 }
 
@@ -1911,10 +2021,14 @@ static void cb_c_receive_user_authenticate(const uint8_t session_id,
 	}
 
 	if(session != NULL) {
+		PyObject *result = NULL;
 		if(username == NULL) {
-			PyObject_CallMethod((PyObject*)session, "cb_receive_user_authenticate", "(sO)", "", tuple_methods);
+			result = PyObject_CallMethod((PyObject*)session, "cb_receive_user_authenticate", "(sO)", "", tuple_methods);
 		} else {
-			PyObject_CallMethod((PyObject*)session, "cb_receive_user_authenticate", "(sO)", username, tuple_methods);
+			result = PyObject_CallMethod((PyObject*)session, "cb_receive_user_authenticate", "(sO)", username, tuple_methods);
+		}
+		if(result == NULL || PyErr_Occurred() != NULL) {
+			PyErr_Print();
 		}
 	}
 
