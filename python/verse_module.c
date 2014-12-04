@@ -275,13 +275,25 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 
 	/* Check if value is tuple */
 	if(tuple_values == NULL || !PyTuple_Check(tuple_values)) {
-		PyErr_SetString(VerseError, "Value is not tuple");
+		char err_message[256];
+		if(values != NULL) {
+		sprintf(err_message,
+				"Value of item: (node_id: %d, layer_id: %d, item_id: %d) is not tuple. Type of value is: %s",
+				node_id, layer_id, item_id, tuple_values->ob_type->tp_name);
+		} else {
+			sprintf(err_message,
+				"Value of item: (node_id: %d, layer_id: %d, item_id: %d) is not tuple. Type of value is: NULL",
+				node_id, layer_id, item_id);
+		}
+		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	}
 
 	size = PyTuple_Size(tuple_values);
-	if(!(size>0 && size <=4)) {
-		sprintf(err_message, "Wrong size of tuple: %ld", size);
+	if(!(size > 0 && size <= 4)) {
+		sprintf(err_message,
+				"Wrong size of tuple: %ld (node_id: %d, layer_id: %d, item_id: %d)",
+				node_id, layer_id, item_id, size);
 		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	} else {
@@ -321,7 +333,8 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 			py_value = PyTuple_GetItem(tuple_values, i);
 			if(py_value != NULL) {
 				if(!PyLong_Check(py_value)) {
-					PyErr_SetString(VerseError, "Wrong type of tuple item (not int)");
+					PyErr_SetString(VerseError,
+							"Wrong type of tuple item (not int)");
 					free(values);
 					return NULL;
 				}
@@ -442,7 +455,9 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 		}
 		break;
 	default:
-		sprintf(err_message, "Unsupported value type: %d", data_type);
+		sprintf(err_message,
+				"Unsupported value type: %d (node_id: %d, layer_id: %d, item_id: %d)",
+				data_type);
 		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	}
@@ -808,8 +823,9 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 	int i, ret;
 
 	size = PyTuple_Size(tuple_values);
-	if(!(size>0 && size <=4)) {
-		PyErr_SetString(VerseError, "Wrong size of tuple");
+	if(!(size > 0 && size <= 4)) {
+		PyErr_SetString(VerseError,
+				"Wrong size of tuple");
 		return NULL;
 	} else {
 		count = size;
@@ -940,7 +956,8 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not float. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
@@ -962,7 +979,8 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not float. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
@@ -983,7 +1001,8 @@ static PyObject *_send_tag_set_tuple(session_SessionObject *session,
 			if(py_value != NULL) {
 				if(!PyFloat_Check(py_value)) {
 					char err_message[256];
-					sprintf(err_message, "Tuple item type is not float. Item type is: %s",
+					sprintf(err_message,
+							"Tuple item type is not float. Item type is: %s",
 							py_value->ob_type->tp_name);
 					PyErr_SetString(VerseError, err_message);
 					free(values);
@@ -1069,7 +1088,17 @@ static PyObject *Session_send_tag_set_values(PyObject *self, PyObject *args, PyO
 	if(values != NULL && PyTuple_Check(values)) {
 		return _send_tag_set_tuple(session, prio, node_id, taggroup_id, tag_id, data_type, values);
 	} else {
-		PyErr_SetString(VerseError, "Value is not tuple");
+		char err_message[256];
+		if(values != NULL) {
+		sprintf(err_message,
+				"Value of tag: (node_id: %d, taggroup_id: %d, tag_id: %d) is not tuple. Type of value is: %s",
+				node_id, taggroup_id, tag_id, values->ob_type->tp_name);
+		} else {
+			sprintf(err_message,
+				"Value of tag: (node_id: %d, taggroup_id: %d, tag_id: %d) is not tuple. Type of value is: NULL",
+				node_id, taggroup_id, tag_id);
+		}
+		PyErr_SetString(VerseError, err_message);
 		return NULL;
 	}
 
