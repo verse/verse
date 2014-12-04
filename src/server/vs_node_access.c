@@ -94,7 +94,6 @@ int vs_node_can_read(struct VSession *vsession,
 					user_can_read = 1;
 					break;
 				}
-			/* Can all other users read this node? */
 			}
 			perm = perm->next;
 		}
