@@ -155,7 +155,7 @@ extern "C" {
 #define VRS_SEC_DATA_TLS			2	/* Use TLS/DTLS at data exchange connection */
 #define VRS_TP_UDP					4	/* Transport protocol: UDP */
 #define VRS_TP_TCP					8	/* Transport protocol: TCP */
-#define VRS_TP_WEBSOCKET			16
+#define VRS_TP_WEBSOCKET			16	/* Transport protocol: WebSocket */
 #define VRS_CMD_CMPR_NONE			32	/* No command compression */
 #define VRS_CMD_CMPR_ADDR_SHARE		64	/* Share command addresses to compress commands */
 

@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <semaphore.h>
 #ifdef __linux__
 #include <linux/sockios.h>
 #endif
@@ -47,6 +48,7 @@
 #include "v_commands.h"
 #include "v_fake_commands.h"
 #include "v_session.h"
+#include "vs_main.h"
 
 
 /**
@@ -125,16 +127,18 @@ end:
  */
 int v_STREAM_pack_message(struct vContext *C)
 {
+	struct VS_CTX *vs_ctx = CTX_server_ctx(C);
 	struct VSession *vsession = CTX_current_session(C);
 	struct VStreamConn *conn = CTX_current_stream_conn(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	struct VMessage *s_message = CTX_s_message(C);
-	struct Generic_Cmd *cmd;
+	struct Generic_Cmd *cmd, *fake_cmd;
 	int ret = -1, queue_size = 0, buffer_pos = 0, prio_cmd_count, cmd_rank=0;
 	int8 cmd_share;
 	int16 prio, max_prio, min_prio;
 	uint16 cmd_count, cmd_len, prio_win, swin, sent_size, tot_cmd_size;
 	real32 prio_sum_high, prio_sum_low, r_prio;
+	int is_fake_cmd_received = 0;
 
 	/* Is here something to send? */
 	if((v_out_queue_get_count(vsession->out_queue) > 0) ||
@@ -241,7 +245,17 @@ int v_STREAM_pack_message(struct vContext *C)
 							sent_size += tot_cmd_size;
 						}
 
-						/* It is not neccessary to put cmd to history of sent commands,
+						fake_cmd = v_cmd_fake_ack(cmd);
+
+						if(fake_cmd != NULL) {
+							is_fake_cmd_received = 1;
+							/* Push command to the queue of incoming commands */
+							v_in_queue_push(vsession->in_queue, fake_cmd);
+							/* Print content of fake command */
+							v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, fake_cmd);
+						}
+
+						/* It is not necessary to put cmd to history of sent commands,
 						 * when TCP is used. */
 						v_cmd_destroy(&cmd);
 						prio_cmd_count--;
@@ -261,6 +275,12 @@ int v_STREAM_pack_message(struct vContext *C)
 		/* Debug print of command to be send */
 		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 			v_print_send_message(C);
+		}
+
+		/* When pure ack packet caused adding some fake commands to the queue, then
+		 * poke server data thread */
+		if( (vs_ctx != NULL) && (is_fake_cmd_received == 1)) {
+			sem_post(vs_ctx->data.sem);
 		}
 
 		ret = 1;

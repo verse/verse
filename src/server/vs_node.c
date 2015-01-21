@@ -679,7 +679,8 @@ static int vs_node_send_destroy(struct VSNode *node)
 			}
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
-					"Can't delete node %d, because it isn't in CREATED state\n");
+					"Can't delete node %d, because it isn't in CREATED state\n",
+					node->id);
 		}
 		node_follower = node_follower->next;
 	}
@@ -718,7 +719,6 @@ static struct VSNode *vs_node_new(struct VS_CTX *vs_ctx,
 		goto end;
 	}
 
-	/* Set initial state of this node */
 	node->state = ENTITY_CREATING;
 
 	/* Find node representing fake user other_users */
