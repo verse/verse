@@ -305,6 +305,6 @@ uint16 v_cmds_len(struct Generic_Cmd *cmd,
 		uint8 share,
 		uint16 len);
 struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket);
-
+struct Generic_Cmd *v_cmd_fake_ack(struct Generic_Cmd *cmd);
 
 #endif /* V_COMMANDS_H_ */

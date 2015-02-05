@@ -318,11 +318,11 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 		while(sent_cmd != NULL) {
 			/* Remove own command from hashed linked list if it wasn't already
 			 * removed, when command was obsoleted by some newer packet */
-			if(sent_cmd->vbucket!=NULL) {
+			if(sent_cmd->vbucket != NULL) {
 				struct Generic_Cmd *cmd = (struct Generic_Cmd*)sent_cmd->vbucket->data;
 
 				/* Bucket has to include some data */
-				assert(sent_cmd->vbucket->data!=NULL);
+				assert(sent_cmd->vbucket->data != NULL);
 
 				/* Decrease total size of commands that were sent and wasn't acknowladged yet*/
 				dgram_conn->sent_size -= v_cmd_size(cmd);
@@ -330,48 +330,11 @@ int v_packet_history_rem_packet(struct vContext *C, uint32 id)
 				/* Put fake command for create/destroy commands at verse server */
 				if(vs_ctx != NULL) {
 					struct VSession *vsession = CTX_current_session(C);
-					struct Generic_Cmd *fake_cmd = NULL;
-
-					switch(cmd->id) {
-					case CMD_NODE_CREATE:
-						fake_cmd = v_fake_node_create_ack_create(UINT32(cmd->data[UINT16_SIZE + UINT32_SIZE]));
-						break;
-					case CMD_NODE_DESTROY:
-						fake_cmd = v_fake_node_destroy_ack_create(UINT32(cmd->data[0]));
-						break;
-					case CMD_TAGGROUP_CREATE:
-						fake_cmd = v_fake_taggroup_create_ack_create(UINT32(cmd->data[0]),
-								UINT16(cmd->data[UINT32_SIZE]));
-						break;
-					case CMD_TAGGROUP_DESTROY:
-						fake_cmd = v_fake_taggroup_destroy_ack_create(UINT32(cmd->data[0]),
-								UINT16(cmd->data[UINT32_SIZE]));
-						break;
-					case CMD_TAG_CREATE:
-						fake_cmd = v_tag_create_ack_create(UINT32(cmd->data[0]),
-								UINT16(cmd->data[UINT32_SIZE]),
-								UINT16(cmd->data[UINT32_SIZE + UINT16_SIZE]));
-						break;
-					case CMD_TAG_DESTROY:
-						fake_cmd = v_tag_destroy_ack_create(UINT32(cmd->data[0]),
-								UINT16(cmd->data[UINT32_SIZE]),
-								UINT16(cmd->data[UINT32_SIZE + UINT16_SIZE]));
-						break;
-					case CMD_LAYER_CREATE:
-						fake_cmd = v_fake_layer_create_ack_create(UINT32(cmd->data[0]),
-								UINT16(cmd->data[UINT32_SIZE + UINT16_SIZE]));
-						break;
-					case CMD_LAYER_DESTROY:
-						fake_cmd = v_fake_layer_destroy_ack_create(UINT32(cmd->data[0]),
-								UINT16(cmd->data[UINT32_SIZE]));
-						break;
-					default:
-						break;
-					}
+					struct Generic_Cmd *fake_cmd = v_cmd_fake_ack(cmd);
 
 					if(fake_cmd != NULL) {
 						is_fake_cmd_received = 1;
-						/* Push command to the queue of incomming commands */
+						/* Push command to the queue of incoming commands */
 						v_in_queue_push(vsession->in_queue, fake_cmd);
 						/* Print content of fake command */
 						v_fake_cmd_print(VRS_PRINT_DEBUG_MSG, fake_cmd);

@@ -2335,3 +2335,55 @@ struct VCommandQueue *v_node_cmd_queue_create(uint8 id, uint8 copy_bucket)
 
 	return cmd_queue;
 }
+
+/**
+ * \brief This function will create fake ack command from create/destroy
+ * command.
+ *
+ * \param cmd
+ *
+ * \return
+ */
+struct Generic_Cmd *v_cmd_fake_ack(struct Generic_Cmd *cmd)
+{
+	struct Generic_Cmd *fake_cmd = NULL;
+
+	switch(cmd->id) {
+	case CMD_NODE_CREATE:
+		fake_cmd = v_fake_node_create_ack_create(UINT32(cmd->data[UINT16_SIZE + UINT32_SIZE]));
+		break;
+	case CMD_NODE_DESTROY:
+		fake_cmd = v_fake_node_destroy_ack_create(UINT32(cmd->data[0]));
+		break;
+	case CMD_TAGGROUP_CREATE:
+		fake_cmd = v_fake_taggroup_create_ack_create(UINT32(cmd->data[0]),
+				UINT16(cmd->data[UINT32_SIZE]));
+		break;
+	case CMD_TAGGROUP_DESTROY:
+		fake_cmd = v_fake_taggroup_destroy_ack_create(UINT32(cmd->data[0]),
+				UINT16(cmd->data[UINT32_SIZE]));
+		break;
+	case CMD_TAG_CREATE:
+		fake_cmd = v_tag_create_ack_create(UINT32(cmd->data[0]),
+				UINT16(cmd->data[UINT32_SIZE]),
+				UINT16(cmd->data[UINT32_SIZE + UINT16_SIZE]));
+		break;
+	case CMD_TAG_DESTROY:
+		fake_cmd = v_tag_destroy_ack_create(UINT32(cmd->data[0]),
+				UINT16(cmd->data[UINT32_SIZE]),
+				UINT16(cmd->data[UINT32_SIZE + UINT16_SIZE]));
+		break;
+	case CMD_LAYER_CREATE:
+		fake_cmd = v_fake_layer_create_ack_create(UINT32(cmd->data[0]),
+				UINT16(cmd->data[UINT32_SIZE + UINT16_SIZE]));
+		break;
+	case CMD_LAYER_DESTROY:
+		fake_cmd = v_fake_layer_destroy_ack_create(UINT32(cmd->data[0]),
+				UINT16(cmd->data[UINT32_SIZE]));
+		break;
+	default:
+		break;
+	}
+
+	return fake_cmd;
+}
