@@ -45,6 +45,8 @@
 
 #include "v_stream.h"
 
+#define DEBUG_WEB_SOCKET 0
+
 /*
  * Calculates SHA-1 hash of *src*. The size of *src* is *src_length* bytes.
  * *dst* must be at least SHA1_DIGEST_SIZE.
@@ -354,14 +356,18 @@ ssize_t vs_send_ws_callback_data(wslay_event_context_ptr ctx,
 	/* Try to send all data */
 	while((ret = send(io_ctx->sockfd, data, len, sflags)) == -1 &&
 			errno == EINTR) {
+#if DEBUG_WEB_SOCKET
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"WS Callback Send Data, len: %ld, flags: %d -> %ld\n",
 				len, sflags, ret);
+#endif
 	}
 
+#if DEBUG_WEB_SOCKET
 	v_print_log(VRS_PRINT_DEBUG_MSG,
 			"WS Callback Send Data, len: %ld, flags: %d -> ret: %ld\n",
 			len, sflags, ret);
+#endif
 
 	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -393,14 +399,18 @@ ssize_t vs_recv_ws_callback_data(wslay_event_context_ptr ctx,
 	/* Try to receive all data from TCP stack */
 	while((ret = recv(io_ctx->sockfd, buf, len, 0)) == -1 &&
 			errno == EINTR) {
+#if DEBUG_WEB_SOCKET
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"WS Callback Received Data, len: %ld, flags: %d -> ret: %ld\n",
 				len, flags, ret);
+#endif
 	}
 
+#if DEBUG_WEB_SOCKET
 	v_print_log(VRS_PRINT_DEBUG_MSG,
 			"WS Callback Received Data, len: %ld, flags: %d -> ret: %ld\n",
 			len, flags, ret);
+#endif
 
 	if(ret == -1) {
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -430,13 +440,15 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 	struct VSession *session = CTX_current_session(C);
 	struct IO_CTX *io_ctx = CTX_io_ctx(C);
 	int ret;
-	unsigned int i;
 
 	if(!wslay_is_ctrl_frame(arg->opcode)) {
 
 		/* Verse server uses only binary message for communication */
 		if(arg->opcode == WSLAY_BINARY_FRAME) {
 		    struct wslay_event_msg msgarg;
+
+#if DEBUG_WEB_SOCKET
+		    unsigned int i;
 
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"WS Callback received binary message\n");
@@ -449,6 +461,7 @@ void vs_ws_recv_msg_callback(wslay_event_context_ptr wslay_ctx,
 				v_print_log_simple(VRS_PRINT_DEBUG_MSG, "%d,", arg->msg[i]);
 			}
 			v_print_log_simple(VRS_PRINT_DEBUG_MSG, "\n");
+#endif
 
 			/* Copy received data to IO context */
 			memcpy(io_ctx->buf,	arg->msg, arg->msg_length);
@@ -587,7 +600,8 @@ void *vs_websocket_loop(void *arg)
 	if( getsockopt(io_ctx->sockfd, SOL_SOCKET, SO_RCVBUF,
 			(void *)&stream_conn->socket_buffer_size, &int_size) != 0)
 	{
-		v_print_log(VRS_PRINT_ERROR, "Unable to get TCP buffer size\n");
+		v_print_log(VRS_PRINT_ERROR,
+				"Unable to get TCP buffer size of WebSocket connection.\n");
 		goto end;
 	}
 
@@ -605,7 +619,7 @@ void *vs_websocket_loop(void *arg)
 	/* Try to initialize WebSocket server context */
 	if(wslay_event_context_server_init(&wslay_ctx, &callbacks, C) != 0) {
 		v_print_log(VRS_PRINT_ERROR,
-				"Unable to initialize webSocket server context\n");
+				"Unable to initialize WebSocket server context\n");
 		goto end;
 	}
 
@@ -614,7 +628,8 @@ void *vs_websocket_loop(void *arg)
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: RESPOND_methods\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG,
+				"Server WebSocket state: RESPOND_methods\n");
 		printf("%c[%dm", 27, 0);
 	}
 
@@ -653,8 +668,10 @@ void *vs_websocket_loop(void *arg)
 		/* Initialize write set */
 		FD_ZERO(&write_set);
 		if(wslay_event_want_write(wslay_ctx) == 1) {
+#if DEBUG_WEB_SOCKET
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"Going to write message to WebSocket ...\n");
+#endif
 			FD_SET(io_ctx->sockfd, &write_set);
 		}
 
@@ -726,7 +743,7 @@ void *vs_websocket_loop(void *arg)
 end:
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: CLOSING\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server WebSocket state: CLOSING\n");
 		printf("%c[%dm", 27, 0);
 	}
 
@@ -755,7 +772,7 @@ end:
 	/* Set TCP connection to CLOSED */
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: CLOSED\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server WebSocket state: CLOSED\n");
 		printf("%c[%dm", 27, 0);
 	}
 
@@ -775,7 +792,7 @@ end:
 
 	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 		printf("%c[%d;%dm", 27, 1, 31);
-		v_print_log(VRS_PRINT_DEBUG_MSG, "Server TCP state: LISTEN\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Server WebSocket state: LISTEN\n");
 		printf("%c[%dm", 27, 0);
 	}
 
