@@ -226,6 +226,10 @@ end:
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 	/* Close socket */
+	v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
+			__FILE__,
+			__LINE__,
+			io_ctx->sockfd);
 	close(io_ctx->sockfd);
 
 	/* This session could be used again for authentication */

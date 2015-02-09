@@ -148,7 +148,10 @@ int v_STREAM_pack_message(struct vContext *C)
 		/* Get current size of data in TCP outgoing buffer */
 #ifdef __linux__
 		if( ioctl(io_ctx->sockfd, SIOCOUTQ, &queue_size) == -1 ) {
-			perror("ioctl()");
+			v_print_log(VRS_PRINT_ERROR,
+					"ioctl(%d, SIOCOUTQ, ...): %s\n",
+					io_ctx->sockfd,
+					strerror(errno));
 			return 0;
 		}
 #endif

@@ -150,8 +150,9 @@ void v_conn_dgram_init(struct VDgramConn *dgram_conn)
 {
 	int i;
 
+	dgram_conn->io_ctx.sockfd = -1;
 	/* Allocate buffer for incoming packets */
-	if(dgram_conn->io_ctx.buf==NULL)
+	if(dgram_conn->io_ctx.buf == NULL)
 		dgram_conn->io_ctx.buf = (char*)calloc(MAX_PACKET_SIZE, sizeof(char));
 	else
 		memset(dgram_conn->io_ctx.buf, 0, MAX_PACKET_SIZE);
@@ -234,7 +235,12 @@ void v_conn_dgram_destroy(struct VDgramConn *dgram_conn)
 
 	v_ack_nak_history_clear(&dgram_conn->ack_nak);
 
+	v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
+			__FILE__,
+			__LINE__,
+			dgram_conn->io_ctx.sockfd);
 	close(dgram_conn->io_ctx.sockfd);
+	dgram_conn->io_ctx.sockfd = -1;
 }
 
 /* Clear datagram connection */
@@ -255,8 +261,11 @@ void v_conn_dgram_clear(struct VDgramConn *dgram_conn)
 	}
 #endif
 
+	v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
+			__FILE__,
+			__LINE__,
+			dgram_conn->io_ctx.sockfd);
 	close(dgram_conn->io_ctx.sockfd);
-
 	v_conn_dgram_init(dgram_conn);
 }
 
