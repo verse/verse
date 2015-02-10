@@ -235,12 +235,15 @@ void v_conn_dgram_destroy(struct VDgramConn *dgram_conn)
 
 	v_ack_nak_history_clear(&dgram_conn->ack_nak);
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
-			__FILE__,
-			__LINE__,
-			dgram_conn->io_ctx.sockfd);
-	close(dgram_conn->io_ctx.sockfd);
-	dgram_conn->io_ctx.sockfd = -1;
+	/* When socket is open, then close it */
+	if(dgram_conn->io_ctx.sockfd != -1) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
+				__FILE__,
+				__LINE__,
+				dgram_conn->io_ctx.sockfd);
+		close(dgram_conn->io_ctx.sockfd);
+		dgram_conn->io_ctx.sockfd = -1;
+	}
 }
 
 /* Clear datagram connection */

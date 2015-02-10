@@ -226,11 +226,14 @@ end:
 	pthread_mutex_unlock(&vs_ctx->data.mutex);
 
 	/* Close socket */
-	v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
-			__FILE__,
-			__LINE__,
-			io_ctx->sockfd);
-	close(io_ctx->sockfd);
+	if(io_ctx->sockfd != -1) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
+				__FILE__,
+				__LINE__,
+				io_ctx->sockfd);
+		close(io_ctx->sockfd);
+		io_ctx->sockfd = -1;
+	}
 
 	/* This session could be used again for authentication */
 	stream_conn->host_state = TCP_SERVER_STATE_LISTEN;
@@ -327,6 +330,10 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 
 			/* Save the IPv6 of the client as string in verse session */
 			inet_ntop(AF_INET6, &client_addr6->sin6_addr, current_session->peer_hostname, INET6_ADDRSTRLEN);
+		} else {
+			v_print_log(VRS_PRINT_ERROR, "Unsupported IP version: %d\n",
+					io_ctx->host_addr.ip_ver);
+			return 0;
 		}
 
 		/* Set to this socket flag "no delay" */
@@ -337,7 +344,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			v_print_log(VRS_PRINT_ERROR,
 					"setsockopt: TCP_NODELAY: %d\n",
 					strerror(errno));
-			return -1;;
+			return -1;
 		}
 
 		CTX_current_session_set(C, current_session);
@@ -398,6 +405,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			}
 			/* Close connection (no more free session slots) */
 			close(tmp_sockfd);
+			tmp_sockfd = -1;
 		} else if(io_ctx->host_addr.ip_ver == IPV6) {
 			/* Prepare IP6 variables for TCP handshake */
 			struct sockaddr_in6 client_addr6;
@@ -410,6 +418,7 @@ static int vs_new_stream_conn(struct vContext *C, void *(*conn_loop)(void*))
 			}
 			/* Close connection (no more free session slots) */
 			close(tmp_sockfd);
+			tmp_sockfd = -1;
 		}
 		/* TODO: Fix this */
 		sleep(1);

@@ -820,7 +820,10 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 	stream_conn->io_ctx.bio = NULL;
 #endif
 
-	close(stream_conn->io_ctx.sockfd);
+	if(stream_conn->io_ctx.sockfd != -1) {
+		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
+	}
 
 }
 
@@ -1135,6 +1138,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 				"calloc(): %s\n", strerror(errno));
 		freeaddrinfo(result);
 		close(sockfd);
+		sockfd = -1;
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
 	}
@@ -1185,6 +1189,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	{
 		v_print_log(VRS_PRINT_ERROR, "getsockopt(): %s\n", strerror(errno));
 		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1195,6 +1200,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	if( (fcntl(stream_conn->io_ctx.sockfd, F_SETFL, flag & ~O_NONBLOCK)) == -1) {
 		v_print_log(VRS_PRINT_ERROR, "fcntl(): %s\n", strerror(errno));
 		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1206,6 +1212,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
 		ERR_print_errors_fp(v_log_file());
 		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1218,6 +1225,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;
@@ -1231,6 +1239,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		ERR_print_errors_fp(v_log_file());
 		SSL_free(stream_conn->io_ctx.ssl);
 		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
 		free(stream_conn);
 		*error = VRS_CONN_TERM_ERROR;
 		return NULL;

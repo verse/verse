@@ -1227,6 +1227,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		freeaddrinfo(result);
 		if(sockfd != -1) {
 			close(sockfd);
+			sockfd = -1;
 		}
 		goto end;
 	}
@@ -1245,6 +1246,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		dgram_conn = NULL;
 		if(sockfd != -1) {
 			close(sockfd);
+			sockfd = -1;
 		}
 		freeaddrinfo(result);
 		goto end;
@@ -1257,6 +1259,7 @@ struct VDgramConn *vc_create_client_dgram_conn(struct vContext *C)
 		free(dgram_conn);
 		if(sockfd != -1) {
 			close(sockfd);
+			sockfd = -1;
 		}
 		dgram_conn = NULL;
 		goto end;

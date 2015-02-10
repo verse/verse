@@ -206,11 +206,14 @@ void vs_CLOSING(struct vContext *C)
 	if(stream_conn->io_ctx.ssl != NULL) vs_TLS_teardown(C);
 #endif
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
-			__FILE__,
-			__LINE__,
-			stream_conn->io_ctx.sockfd);
-	close(stream_conn->io_ctx.sockfd);
+	if(stream_conn->io_ctx.sockfd != -1) {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d close(%d)\n",
+				__FILE__,
+				__LINE__,
+				stream_conn->io_ctx.sockfd);
+		close(stream_conn->io_ctx.sockfd);
+		stream_conn->io_ctx.sockfd = -1;
+	}
 }
 
 
