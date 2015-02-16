@@ -2147,9 +2147,9 @@ static void cb_c_receive_user_authenticate(const uint8_t session_id,
 static PyObject *Session_send_user_authenticate(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	session_SessionObject *session = (session_SessionObject *)self;
-	char *username;
-	char *data;
-	uint8_t auth_type;
+	char *username = NULL;
+	char *data = NULL;
+	uint8_t auth_type = VRS_UA_METHOD_RESERVED;
 	int ret;
 
 	static char *kwlist[] = {"username", "auth_type", "data", NULL};

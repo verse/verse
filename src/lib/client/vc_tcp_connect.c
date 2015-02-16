@@ -97,6 +97,9 @@ static int vc_get_username_passwd(struct VSession *vsession,
 						free(user_credentials->username);
 					}
 					user_credentials->username = strdup(ua_cmd->username);
+				} else {
+					v_cmd_destroy(&cmd);
+					return 0;
 				}
 				if(ua_cmd->data != NULL) {
 					if(user_credentials->data != NULL) {
