@@ -262,6 +262,7 @@ message ("")
 
     message (" * Configuration: ${CMAKE_BUILD_TYPE}")
     message (" * Generator:     ${CMAKE_GENERATOR}")
+    message (" * System prefix: ${CMAKE_INSTALL_PREFIX}")
 
 if (VERSE_SERVER)
 	message (" * Build server   ON")
