@@ -71,7 +71,6 @@ If you want to build Verse with Clang, then you have to do more
 Folders
 -------
 
- * _./build_		is target directory for compiled binaries
  * _./config_		is directory with example of users.csv file
  * _./doc_			contains doxyfile for generated doxygen documentation
  * _./example_		contains source code of example Verse clients
