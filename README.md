@@ -77,15 +77,14 @@ Folders
  * _./example_		contains source code of example Verse clients
  * _./include_		contains all .h files
  * _./pki_			contains example of certificate and private key
- * _./python_		contains source code for Python module implemented in C
- * _./promela_		contains Promela source code used for protocol verification
  * _./src_			contains source code
   * _./lib_			source code for library (used by client as well by server)
   * _./lib/api_		source code of API
   * _./lib/client_	source code specific for Verse clients
   * _./lib/common_	source code shared with Verse server and Verse client
   * _./server_		source code specified for Verse server
-  * _./server/mongodb_	source code used for saving and loading data from MongoDB 
+  * _./server/mongodb_	source code used for saving and loading data from MongoDB
+  * _./python_		contains source code for Python module implemented in C
  * _./unittests_	contains source code of unit tests
 
 Installation
@@ -178,7 +177,7 @@ Verification
 ------------
 
 Main parts of Verse protocol were verified using Promela programming language
-and tool called Spin. For more details go to the directory ./promela.
+and tool called Spin. For more details go to the directory ./misc/promela.
 
 Testing
 -------
