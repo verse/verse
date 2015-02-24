@@ -110,7 +110,7 @@ if (VERSE_PYTHON2_MODULE)
 	# Set up optional subdirectory for Python 2
 	if (PYTHONLIBS_FOUND)
 		set (PYTHON_2_FOUND 1)
-		add_subdirectory ("python/2.x")
+		add_subdirectory ("src/python/2.x")
 	endif (PYTHONLIBS_FOUND)
 endif (VERSE_PYTHON2_MODULE)
 
@@ -142,10 +142,10 @@ if (VERSE_PYTHON3_MODULE)
 	# Set up optional subdirectory for Python 3
 	if (PYTHON_LIBRARY)
 		set (PYTHON_3_FOUND 1)
-		add_subdirectory ("python/3.x")
+		add_subdirectory ("src/python/3.x")
 	elseif (PYTHONLIBS_FOUND)
 		set (PYTHON_3_FOUND 1)
-		add_subdirectory ("python/3.x")
+		add_subdirectory ("src/python/3.x")
 	endif ()
 
 endif (VERSE_PYTHON3_MODULE)

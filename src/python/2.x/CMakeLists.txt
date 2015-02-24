@@ -9,7 +9,7 @@ if (CMAKE_COMPILER_IS_GNUCC)
 	endif()
 endif (CMAKE_COMPILER_IS_GNUCC)
 
-include_directories (../../include)
+include_directories (../../../include)
 include_directories (${PYTHON_INCLUDE_DIRS})
 
 # Modify output directory of library
