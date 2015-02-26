@@ -36,9 +36,9 @@ start() {
     [ -x $exec ] || exit 5
 
     echo -n $"Starting $prog: "
-    daemon --user $proguser $app -c $confile -d $loglevel >> $logfile &
+    daemon --user $proguser $app -c $confile -d $loglevel >> $logfile 2>&1 &
     RETVAL=$?
-    [ $RETVAL -eq 0 ] && touch $lockfile
+    [ $RETVAL -eq 0 ] && touch $lockfile; success || failure
     echo
     return $RETVAL
 }
