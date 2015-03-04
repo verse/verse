@@ -29,6 +29,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
+#include <getopt.h>
 
 #include "verse_types.h"
 
@@ -483,9 +484,10 @@ static void vs_print_help(char *prog_name)
 	printf("\n Usage: %s [OPTION...]\n\n", prog_name);
 	printf("  Start Verse server\n\n");
 	printf("  Options:\n");
-	printf("   -h               display this help and exit\n");
-	printf("   -c config_file   read configuration from config file\n");
-	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
+	printf("   -h  --help                    display this help and exit\n");
+	printf("   -c  --conf-file    filename   read configuration from config file\n");
+	printf("   -D  --debug-level  level      use debug level [none|info|error|warning|debug]\n");
+	printf("\n");
 }
 
 /**
@@ -500,29 +502,33 @@ int main(int argc, char *argv[])
 {
 	VS_CTX vs_ctx;
 	int opt;
-	char *config_file=NULL;
+	char *config_file = NULL;
 	int debug_level_set = 0;
 	void *res;
 	uid_t effective_user_id;
 	int semaphore_name_len;
+	static struct option long_options[] = {
+		{"conf-file", required_argument, 0, 'c'},
+		{"debug-level", required_argument, 0, 'D'},
+		{"help", no_argument, 0, 'h'},
+		{NULL, 0, 0, 0}
+	};
+	int option_index = 0;
 
 	/* Set up initial state */
 	vs_ctx.state = SERVER_STATE_CONF;
-
-	/* Print starting message */
-	printf("Starting Verse server, Version: %s\n", Verse_VERSION);
 
 	/* Default debug prints of verse server */
 	v_init_print_log(VRS_PRINT_WARNING, stdout);
 
 	/* When server received some arguments */
-	if(argc>1) {
-		while( (opt = getopt(argc, argv, "c:hd:")) != -1) {
+	if(argc > 1) {
+		while( (opt = getopt_long(argc, argv, "c:hD:", long_options, &option_index)) != -1) {
 			switch(opt) {
 			case 'c':
 				config_file = strdup(optarg);
 				break;
-			case 'd':
+			case 'D':
 				debug_level_set = vs_set_debug_level(optarg);
 				break;
 			case 'h':
@@ -535,6 +541,9 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
+
+	/* Print starting message */
+	printf("Starting Verse server, Version: %s\n", Verse_VERSION);
 
 	/* Initialize default values first */
 	vs_init(&vs_ctx);
