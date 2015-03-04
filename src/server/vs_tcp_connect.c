@@ -526,6 +526,8 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 #endif
 			}
 		}
+
+		fflush(vs_ctx->log_file);
 	}
 
 	count = 0;

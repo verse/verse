@@ -581,12 +581,16 @@ int main(int argc, char *argv[])
 	 * configuration from file */
 	if(debug_level_set != 1) {
 		v_init_log_level(vs_ctx.print_log_level);
+	} else {
+		vs_ctx.print_log_level = v_log_level();
 	}
 
 	/* When log file wasn't specified at command line, then use configuration
 	 * from file */
 	if(log_file_set != 1) {
 		v_init_log_file(vs_ctx.log_file);
+	} else {
+		vs_ctx.log_file = v_log_file();
 	}
 
 	/* Add superuser account to the list of users */
