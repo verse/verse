@@ -53,12 +53,19 @@ int is_log_level(const uint8 level)
 }
 
 /**
- * \brief Initialize printing to log file to certain level.
+ * \brief Initialize log level.
  */
-void v_init_print_log(const uint8 level, FILE *fd)
+void v_init_log_level(const uint8 level)
 {
 	log_print_level = level;
-	log_file = fd;
+}
+
+/**
+ * \brief Initialize log file.
+ */
+void v_init_log_file(FILE *file)
+{
+	log_file = file;
 }
 
 /**
@@ -89,7 +96,7 @@ void v_print_log(const uint8 level, const char *format, ...)
 {
 	va_list ap;
 
-	if(log_file==NULL) return;
+	if(log_file == NULL) return;
 
 	va_start(ap, format);
 
@@ -131,7 +138,7 @@ void v_print_log_simple(const uint8 level, const char *format, ...)
 {
 	va_list ap;
 
-	if(log_file==NULL) return;
+	if(log_file == NULL) return;
 
 	va_start(ap, format);
 

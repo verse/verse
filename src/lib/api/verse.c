@@ -92,8 +92,10 @@ int32_t vrs_set_debug_level(uint8_t debug_level)
 			break;
 	}
 
-	if(ret == VRS_SUCCESS)
-		v_init_print_log(vc_ctx->print_log_level, vc_ctx->log_file);
+	if(ret == VRS_SUCCESS) {
+		v_init_log_level(vc_ctx->print_log_level);
+		v_init_log_file(vc_ctx->log_file);
+	}
 
 	return ret;
 }
@@ -1497,7 +1499,8 @@ static int vc_init_VC_CTX(void)
 		vc_load_config_file(vc_ctx);
 
 		/* Initialize prints to the log file */
-		v_init_print_log(vc_ctx->print_log_level, vc_ctx->log_file);
+		v_init_log_level(vc_ctx->print_log_level);
+		v_init_log_file(vc_ctx->log_file);
 
 		/* Initialize of verse client context */
 		if(vc_init_ctx(vc_ctx) == 0) return 0;

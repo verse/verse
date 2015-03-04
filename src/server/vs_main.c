@@ -453,27 +453,42 @@ static int vs_config_signal_handling(void)
  */
 static int vs_set_debug_level(char *debug_level)
 {
-	FILE *log_file = v_log_file();
-
 	if( strcmp(debug_level, "debug") == 0) {
-		v_init_print_log(VRS_PRINT_DEBUG_MSG, log_file);
+		v_init_log_level(VRS_PRINT_DEBUG_MSG);
 		return 1;
 	} else if( strcmp(debug_level, "warning") == 0 ) {
-		v_init_print_log(VRS_PRINT_WARNING, log_file);
+		v_init_log_level(VRS_PRINT_WARNING);
 		return 1;
 	} else if( strcmp(debug_level, "error") == 0 ) {
-		v_init_print_log(VRS_PRINT_ERROR, log_file);
+		v_init_log_level(VRS_PRINT_ERROR);
 		return 1;
 	} else if( strcmp(debug_level, "info") == 0 ) {
-		v_init_print_log(VRS_PRINT_INFO, log_file);
+		v_init_log_level(VRS_PRINT_INFO);
 		return 1;
 	} else if( strcmp(debug_level, "none") == 0 ) {
-		v_init_print_log(VRS_PRINT_NONE, log_file);
+		v_init_log_level(VRS_PRINT_NONE);
 		return 1;
 	} else {
 		v_print_log(VRS_PRINT_ERROR, "Unsupported debug level: %s\n", debug_level);
 		return 0;
 	}
+}
+
+/**
+ * \brief This function tries to set log file
+ */
+static int vs_set_log_file(char *file_name)
+{
+	FILE *log_file = fopen(file_name, "a+");
+	if(log_file != NULL) {
+		v_init_log_file(log_file);
+	} else {
+		v_print_log(VRS_PRINT_ERROR, "Unable to open log file: %s\n",
+				file_name);
+		return 0;
+	}
+
+	return 1;
 }
 
 /**
@@ -487,6 +502,8 @@ static void vs_print_help(char *prog_name)
 	printf("   -h  --help                    display this help and exit\n");
 	printf("   -c  --conf-file    filename   read configuration from config file\n");
 	printf("   -D  --debug-level  level      use debug level [none|info|error|warning|debug]\n");
+	printf("   -l  --log-file     filename   write debug prints to log file\n");
+	printf("   -d  --daemon                  daemonize verse server\n");
 	printf("\n");
 }
 
@@ -503,14 +520,16 @@ int main(int argc, char *argv[])
 	VS_CTX vs_ctx;
 	int opt;
 	char *config_file = NULL;
-	int debug_level_set = 0;
+	int debug_level_set = 0, log_file_set = 0;
 	void *res;
 	uid_t effective_user_id;
 	int semaphore_name_len;
 	static struct option long_options[] = {
+		{"help", no_argument, 0, 'h'},
 		{"conf-file", required_argument, 0, 'c'},
 		{"debug-level", required_argument, 0, 'D'},
-		{"help", no_argument, 0, 'h'},
+		{"log-file", required_argument, 0, 'l'},
+		{"daemon", no_argument, 0, 'd'},
 		{NULL, 0, 0, 0}
 	};
 	int option_index = 0;
@@ -519,17 +538,24 @@ int main(int argc, char *argv[])
 	vs_ctx.state = SERVER_STATE_CONF;
 
 	/* Default debug prints of verse server */
-	v_init_print_log(VRS_PRINT_WARNING, stdout);
+	v_init_log_level(VRS_PRINT_WARNING);
+	v_init_log_file(stdout);
 
 	/* When server received some arguments */
 	if(argc > 1) {
-		while( (opt = getopt_long(argc, argv, "c:hD:", long_options, &option_index)) != -1) {
+		while( (opt = getopt_long(argc, argv, "c:hD:dl:", long_options, &option_index)) != -1) {
 			switch(opt) {
 			case 'c':
 				config_file = strdup(optarg);
 				break;
 			case 'D':
 				debug_level_set = vs_set_debug_level(optarg);
+				break;
+			case 'd':
+				daemon(0, 0);
+				break;
+			case 'l':
+				log_file_set = vs_set_log_file(optarg);
 				break;
 			case 'h':
 				vs_print_help(argv[0]);
@@ -553,11 +579,14 @@ int main(int argc, char *argv[])
 
 	/* When debug level wasn't specified as option at command line, then use
 	 * configuration from file */
-	if(debug_level_set == 1) {
-		uint8 log_level = v_log_level();
-		v_init_print_log(log_level, vs_ctx.log_file);
-	} else {
-		v_init_print_log(vs_ctx.print_log_level, vs_ctx.log_file);
+	if(debug_level_set != 1) {
+		v_init_log_level(vs_ctx.print_log_level);
+	}
+
+	/* When log file wasn't specified at command line, then use configuration
+	 * from file */
+	if(log_file_set != 1) {
+		v_init_log_file(vs_ctx.log_file);
 	}
 
 	/* Add superuser account to the list of users */

@@ -44,7 +44,8 @@ int is_log_level(const uint8 level);
 
 uint8 v_log_level(void);
 FILE *v_log_file(void);
-void v_init_print_log(const uint8 level, FILE *fd);
+void v_init_log_level(const uint8 level);
+void v_init_log_file(FILE *fd);
 void v_print_log(const uint8 level, const char *format, ...);
 void v_print_log_simple(const uint8 level, const char *format, ...);
 
