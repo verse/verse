@@ -262,7 +262,7 @@ static void vs_load_config_file(struct VS_CTX *vs_ctx, const char *config_file)
 #if WITH_INIPARSER
 	/* When no configuration file is specified, then load values from
 	 * default path */
-	if(config_file==NULL) {
+	if(config_file == NULL) {
 		/* Try to open default configuration file */
 		vs_read_config_file(vs_ctx, DEFAULT_SERVER_CONFIG_FILE);
 	} else {
@@ -519,8 +519,8 @@ int main(int argc, char *argv[])
 {
 	VS_CTX vs_ctx;
 	int opt;
-	char *config_file = NULL;
-	int debug_level_set = 0, log_file_set = 0;
+	char *config_file = NULL, *log_file = NULL;
+	int debug_level_set = 0;
 	void *res;
 	uid_t effective_user_id;
 	int semaphore_name_len;
@@ -555,7 +555,7 @@ int main(int argc, char *argv[])
 				daemon(0, 0);
 				break;
 			case 'l':
-				log_file_set = vs_set_log_file(optarg);
+				log_file = strdup(optarg);
 				break;
 			case 'h':
 				vs_print_help(argv[0]);
@@ -587,9 +587,10 @@ int main(int argc, char *argv[])
 
 	/* When log file wasn't specified at command line, then use configuration
 	 * from file */
-	if(log_file_set != 1) {
+	if(log_file == NULL) {
 		v_init_log_file(vs_ctx.log_file);
 	} else {
+		vs_set_log_file(log_file);
 		vs_ctx.log_file = v_log_file();
 	}
 
@@ -784,7 +785,9 @@ int main(int argc, char *argv[])
 		v_print_log(VRS_PRINT_ERROR, "sem_unlink(): %s\n", strerror(errno));
 	}
 
-	if(vs_ctx.data.sem_name) free(vs_ctx.data.sem_name);
+	if(vs_ctx.data.sem_name != NULL) free(vs_ctx.data.sem_name);
+	if(config_file != NULL) free(config_file);
+	if(log_file != NULL) free(log_file);
 
 	return EXIT_SUCCESS;
 }

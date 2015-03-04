@@ -158,6 +158,7 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 					vs_ctx->mongo_conn->err);
 			break;
 		}
+		mongo_destroy(vs_ctx->mongo_conn);
 		mongo_dealloc(vs_ctx->mongo_conn);
 		vs_ctx->mongo_conn = NULL;
 		return 0;
@@ -171,6 +172,7 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 	if(vs_ctx->mongodb_db_name == NULL) {
 		v_print_log(VRS_PRINT_ERROR,
 				"No database name defined\n");
+		mongo_destroy(vs_ctx->mongo_conn);
 		mongo_dealloc(vs_ctx->mongo_conn);
 		vs_ctx->mongo_conn = NULL;
 		return 0;
@@ -190,6 +192,7 @@ int vs_mongo_conn_init(struct VS_CTX *vs_ctx)
 					"Authentication to %s database failed, error: %s\n",
 					vs_ctx->mongodb_db_name,
 					mongo_get_server_err_string(vs_ctx->mongo_conn));
+			mongo_destroy(vs_ctx->mongo_conn);
 			mongo_dealloc(vs_ctx->mongo_conn);
 			vs_ctx->mongo_conn = NULL;
 			return 0;
@@ -228,6 +231,7 @@ void vs_mongo_conn_destroy(struct VS_CTX *vs_ctx)
 {
 	if(vs_ctx->mongo_conn != NULL) {
 		mongo_destroy(vs_ctx->mongo_conn);
+		mongo_dealloc(vs_ctx->mongo_conn);
 		vs_ctx->mongo_conn = NULL;
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"Connection to MongoDB server %s:%d destroyed\n",

@@ -151,6 +151,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 
 				if(csv_file_name !=NULL) {
 					vs_ctx->auth_type = AUTH_METHOD_CSV_FILE;
+					if(vs_ctx->csv_user_file != NULL) {
+						free(vs_ctx->csv_user_file);
+					}
 					vs_ctx->csv_user_file = strdup(csv_file_name);
 					v_print_log(VRS_PRINT_DEBUG_MSG,
 							"csv_file_name: %s\n", csv_file_name);
@@ -163,6 +166,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		if(certificate_file_name != NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"certificate_file_name: %s\n", certificate_file_name);
+			if(vs_ctx->public_cert_file != NULL) {
+				free(vs_ctx->public_cert_file);
+			}
 			vs_ctx->public_cert_file = strdup(certificate_file_name);
 		}
 
@@ -179,6 +185,9 @@ void vs_read_config_file(struct VS_CTX *vs_ctx, const char *ini_file_name)
 		if(private_key != NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"private_key: %s\n", private_key);
+			if(vs_ctx->private_cert_file != NULL) {
+				free(vs_ctx->private_cert_file);
+			}
 			vs_ctx->private_cert_file = strdup(private_key);
 		}
 
