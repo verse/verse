@@ -503,6 +503,7 @@ static void vs_print_help(char *prog_name)
 	printf("   -c  --conf-file    filename   read configuration from config file\n");
 	printf("   -D  --debug-level  level      use debug level [none|info|error|warning|debug]\n");
 	printf("   -l  --log-file     filename   write debug prints to log file\n");
+	printf("   -p  --pid-file     filename   write PID of daemon to specified file\n");
 	printf("   -d  --daemon                  daemonize verse server\n");
 	printf("\n");
 }
@@ -519,8 +520,8 @@ int main(int argc, char *argv[])
 {
 	VS_CTX vs_ctx;
 	int opt;
-	char *config_file = NULL, *log_file = NULL;
-	int debug_level_set = 0;
+	char *config_file = NULL, *log_file = NULL, *pid_file_name = NULL;
+	int debug_level_set = 0, run_daemonized = 0;
 	void *res;
 	uid_t effective_user_id;
 	int semaphore_name_len;
@@ -529,6 +530,7 @@ int main(int argc, char *argv[])
 		{"conf-file", required_argument, 0, 'c'},
 		{"debug-level", required_argument, 0, 'D'},
 		{"log-file", required_argument, 0, 'l'},
+		{"pid-file", required_argument, 0, 'p'},
 		{"daemon", no_argument, 0, 'd'},
 		{NULL, 0, 0, 0}
 	};
@@ -543,7 +545,7 @@ int main(int argc, char *argv[])
 
 	/* When server received some arguments */
 	if(argc > 1) {
-		while( (opt = getopt_long(argc, argv, "c:hD:dl:", long_options, &option_index)) != -1) {
+		while( (opt = getopt_long(argc, argv, "c:hD:dl:p:", long_options, &option_index)) != -1) {
 			switch(opt) {
 			case 'c':
 				config_file = strdup(optarg);
@@ -552,10 +554,13 @@ int main(int argc, char *argv[])
 				debug_level_set = vs_set_debug_level(optarg);
 				break;
 			case 'd':
-				daemon(0, 0);
+				run_daemonized = 1;
 				break;
 			case 'l':
 				log_file = strdup(optarg);
+				break;
+			case 'p':
+				pid_file_name = strdup(optarg);
 				break;
 			case 'h':
 				vs_print_help(argv[0]);
@@ -568,8 +573,35 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* Print starting message */
-	printf("Starting Verse server, Version: %s\n", Verse_VERSION);
+	if(run_daemonized == 1) {
+		/* When verse server is run as daemon, then it is run in background.
+		 * It is detached from terminal. Stdin, stdout and stderr are redirected
+		 * to /dev/null. For more details look at man 3 daemon. */
+		if( daemon(0, 0) == -1 ) {
+			v_print_log(VRS_PRINT_ERROR, "Running verse server as daemon failed: %s\n",
+					strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		/* Try to write PID of daemon to lockfile */
+		if(pid_file_name != NULL)
+		{
+			char str[256];
+			int pid_fd;
+			pid_fd = open(pid_file_name, O_RDWR|O_CREAT, 0640);
+			if(pid_fd < 0)
+			{
+				/* Can't open lockfile */
+				exit(EXIT_FAILURE);
+			}
+			/* TODO: lock lockfile */
+			/* Get current PID */
+			sprintf(str, "%d\n", getpid());
+			/* Write PID to lockfile */
+			write(pid_fd, str, strlen(str));
+			close(pid_fd);
+		}
+	}
 
 	/* Initialize default values first */
 	vs_init(&vs_ctx);
@@ -593,6 +625,10 @@ int main(int argc, char *argv[])
 		vs_set_log_file(log_file);
 		vs_ctx.log_file = v_log_file();
 	}
+
+	/* Print starting message */
+	v_print_log(VRS_PRINT_INFO, "Starting Verse server, Version: %s\n",
+			Verse_VERSION);
 
 	/* Add superuser account to the list of users */
 	vs_add_superuser_account(&vs_ctx);
@@ -709,11 +745,13 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	/* Try to create cli thread */
-	if(pthread_create(&vs_ctx.cli_thread, NULL, vs_server_cli, (void*)&vs_ctx) != 0) {
-		v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
-		vs_destroy_ctx(&vs_ctx);
-		exit(EXIT_FAILURE);
+	if(run_daemonized == 0) {
+		/* Try to create cli thread */
+		if(pthread_create(&vs_ctx.cli_thread, NULL, vs_server_cli, (void*)&vs_ctx) != 0) {
+			v_print_log(VRS_PRINT_ERROR, "pthread_create(): %s\n", strerror(errno));
+			vs_destroy_ctx(&vs_ctx);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 #if 0
@@ -788,6 +826,7 @@ int main(int argc, char *argv[])
 	if(vs_ctx.data.sem_name != NULL) free(vs_ctx.data.sem_name);
 	if(config_file != NULL) free(config_file);
 	if(log_file != NULL) free(log_file);
+	if(pid_file_name != NULL) free(pid_file_name);
 
 	return EXIT_SUCCESS;
 }
