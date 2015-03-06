@@ -50,9 +50,6 @@
 /* Default configuration file of verse server */
 #define DEFAULT_SERVER_CONFIG_FILE			"/etc/verse/server.ini"
 
-/* Flags vs_ctx->flags */
-#define SERVER_DEBUG_MODE					1		/* Server will not detach from terminal, etc. */
-
 #define MAX_USER_AUTH_ATTEMPTS				1		/* Maximal attempts of user authentication */
 
 #define LINE_LEN							65536	/* Maximal length of the length of the CSV file */

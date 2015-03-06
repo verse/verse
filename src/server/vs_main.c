@@ -152,7 +152,7 @@ static void vs_init(struct VS_CTX *vs_ctx)
 	vs_ctx->vsessions = NULL;
 	vs_ctx->max_sessions = 10;
 	vs_ctx->max_sockets = vs_ctx->max_sessions;
-	vs_ctx->flag = SERVER_DEBUG_MODE;		/* SERVER_MULTI_SOCKET_MODE | SERVER_REQUIRE_SECURE_CONNECTION */
+	vs_ctx->flag = 0;		/* SERVER_MULTI_SOCKET_MODE | SERVER_REQUIRE_SECURE_CONNECTION */
 	vs_ctx->stream_protocol = TCP;			/* For new connection attempts is used TCP protocol */
 	vs_ctx->dgram_protocol = VRS_TP_UDP;	/* For data exchange UDP protocol could be used */
 #if ( defined WITH_OPENSSL ) && OPENSSL_VERSION_NUMBER>=0x10000000
@@ -626,6 +626,12 @@ int main(int argc, char *argv[])
 		vs_ctx.log_file = v_log_file();
 	}
 
+	/* Set up signal handlers */
+	if(vs_config_signal_handling() == -1 ) {
+		vs_destroy_ctx(&vs_ctx);
+		exit(EXIT_FAILURE);
+	}
+
 	/* Print starting message */
 	v_print_log(VRS_PRINT_INFO, "Starting Verse server, Version: %s\n",
 			Verse_VERSION);
@@ -695,23 +701,6 @@ int main(int argc, char *argv[])
 	} else {
 		vs_destroy_ctx(&vs_ctx);
 		exit(EXIT_FAILURE);
-	}
-
-	if(vs_ctx.flag & SERVER_DEBUG_MODE) {
-		/* Set up signal handlers (only for debug mode, real server should ignore most of signals) */
-		if(vs_config_signal_handling() == -1 ) {
-			vs_destroy_ctx(&vs_ctx);
-			exit(EXIT_FAILURE);
-		}
-	} else {
-#if 0
-		/* Make from verse server real daemon:
-		 * - detach from standard file descriptors, terminals, PPID process etc. */
-		if(vs_init_server(&vs_ctx) == -1) {
-			vs_destroy_ctx(&vs_ctx);
-			exit(EXIT_FAILURE);
-		}
-#endif
 	}
 
 	/* Create unique semaphore name from constant and EUID */
