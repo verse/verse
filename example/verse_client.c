@@ -43,6 +43,7 @@
 #include <signal.h>
 #include <string.h>
 #include <stdint.h>
+#include <getopt.h>
 
 #include "verse.h"
 
@@ -904,13 +905,15 @@ static void print_help(char *prog_name)
 	printf("\n Usage: %s [OPTION...] server\n\n", prog_name);
 	printf("  This program is example of Verse client\n\n");
 	printf("  Options:\n");
-	printf("   -h               display this help and exit\n");
-	printf("   -u username      username used for login at Verse server\n");
-	printf("   -p password      password used for login at Verse server\n");
-	printf("   -t protocol      transport protocol [udp|tcp] used for data exchange\n");
-	printf("   -s security      security of data exchange [none|tls]\n");
-	printf("   -c compression   compression used for data exchange [none|addrshare]\n");
-	printf("   -d debug_level   use debug level [none|info|error|warning|debug]\n\n");
+	printf("   -h  --help                   Display this help and exit.\n");
+	printf("   -u  --username    USERNAME   Username used for login at Verse server.\n");
+	printf("   -p  --password    PASSWORD   Password used for login at Verse server.\n");
+	printf("   -t  --protocol    [udp|tcp]  Transport protocol used for data exchange (default=udp).\n");
+	printf("   -s  --security    [none|tls] Security of data exchange (default=tls).\n");
+	printf("   -c  --compression [none|addrshare]\n");
+	printf("                                Compression used for data exchange (default=addshare)\n");
+	printf("   -D  --debug-level [none|info|error|warning|debug]\n");
+	printf("                                Use debug level (default=none).\n\n");
 }
 
 /**
@@ -931,11 +934,22 @@ static void print_help(char *prog_name)
 int main(int argc, char *argv[])
 {
 	int error_num, opt, ret, flags = VRS_SEC_DATA_NONE;
+	static struct option long_options[] = {
+		{"help", no_argument, 0, 'h'},
+		{"username", required_argument, 0, 'u'},
+		{"password", required_argument, 0, 'p'},
+		{"protocol", required_argument, 0, 'p'},
+		{"security", required_argument, 0, 's'},
+		{"compression", required_argument, 0, 'c'},
+		{"debug-level", required_argument, 0, 'D'},
+		{NULL, 0, 0, 0}
+	};
+	int option_index = 0;
 
 	/* When client was started with some arguments */
-	if(argc>1) {
+	if(argc > 1) {
 		/* Parse all options */
-		while( (opt = getopt(argc, argv, "hu:p:s:t:d:")) != -1) {
+		while( (opt = getopt_long(argc, argv, "hu:p:s:t:D:", long_options, &option_index)) != -1) {
 			switch(opt) {
 				case 's':
 					if(strcmp(optarg, "none") == 0) {
@@ -982,7 +996,7 @@ int main(int argc, char *argv[])
 						exit(EXIT_FAILURE);
 					}
 					break;
-				case 'd':
+				case 'D':
 					ret = set_debug_level(optarg);
 					if(ret != VRS_SUCCESS) {
 						print_help(argv[0]);
