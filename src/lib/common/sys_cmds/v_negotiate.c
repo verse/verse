@@ -160,34 +160,34 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 
 	switch(negotiate_cmd->feature) {
 		case FTR_FC_ID:
-			v_print_log_simple(level, "feature: FC_ID, ");
+			v_print_log_simple(level, "feature FC_ID: ");
 			break;
 		case FTR_CC_ID:
-			v_print_log_simple(level, "feature: CC_ID, ");
+			v_print_log_simple(level, "feature CC_ID: ");
 			break;
 		case FTR_HOST_URL:
-			v_print_log_simple(level, "feature: HOST_URL, ");
+			v_print_log_simple(level, "feature HOST_URL: ");
 			break;
 		case FTR_TOKEN:
-			v_print_log_simple(level, "feature: TOKEN, ");
+			v_print_log_simple(level, "feature TOKEN: ");
 			break;
 		case FTR_DED:
-			v_print_log_simple(level, "feature: DED, ");
+			v_print_log_simple(level, "feature DED: ");
 			break;
 		case FTR_RWIN_SCALE:
-			v_print_log_simple(level, "feature: RWIN_SCALE, ");
+			v_print_log_simple(level, "feature RWIN_SCALE: ");
 			break;
 		case FTR_FPS:
-			v_print_log_simple(level, "feature: FPS, ");
+			v_print_log_simple(level, "feature FPS: ");
 			break;
 		case FTR_CMD_COMPRESS:
-			v_print_log_simple(level, "feature: CMD_COMPRESS, ");
+			v_print_log_simple(level, "feature CMD_COMPRESS: ");
 			break;
 		case FTR_CLIENT_NAME:
-			v_print_log_simple(level, "feature: CLIENT_NAME, ");
+			v_print_log_simple(level, "feature CLIENT_NAME: ");
 			break;
 		case FTR_CLIENT_VERSION:
-			v_print_log_simple(level, "feature: CLIENT_VERSION, ");
+			v_print_log_simple(level, "feature CLIENT_VERSION: ");
 			break;
 		default:
 			v_print_log_simple(level, "unknown feature, ");
@@ -197,9 +197,36 @@ void v_print_negotiate_cmd(const unsigned char level, struct Negotiate_Cmd *nego
 	for(i = 0; i < negotiate_cmd->count; i++) {
 		switch(negotiate_cmd->feature) {
 			case FTR_FC_ID:
+				switch(negotiate_cmd->value[i].uint8) {
+				case FC_NONE:
+					v_print_log_simple(level, "NONE, ");
+					break;
+				case FC_TCP_LIKE:
+					v_print_log_simple(level, "TCP_LIKE, ");
+					break;
+				}
+				break;
 			case FTR_CC_ID:
-			case FTR_RWIN_SCALE:
+				switch(negotiate_cmd->value[i].uint8) {
+				case CC_NONE:
+					v_print_log_simple(level, "NONE, ");
+					break;
+				case CC_TCP_LIKE:
+					v_print_log_simple(level, "TCP_LIKE, ");
+					break;
+				}
+				break;
 			case FTR_CMD_COMPRESS:
+				switch(negotiate_cmd->value[i].uint8) {
+				case CMPR_NONE:
+					v_print_log_simple(level, "NONE, ");
+					break;
+				case CMPR_ADDR_SHARE:
+					v_print_log_simple(level, "ADDR_SHARE, ");
+					break;
+				}
+				break;
+			case FTR_RWIN_SCALE:
 				v_print_log_simple(level, "%d, ",
 						negotiate_cmd->value[i].uint8);
 				break;
