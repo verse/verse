@@ -1,0 +1,21 @@
+stages:
+ - configure
+ - build
+ - test
+
+configure:
+ - stage: configure
+ - script:
+   - mkdir build
+   - cd build
+   - cmake ../ -DCMAKE_BUILD_TYPE=Debug
+
+build:
+ - stage: build
+ - script:
+   - make
+
+test:
+ - stage: test
+ - script:
+   - make test
