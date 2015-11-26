@@ -4,18 +4,18 @@ stages:
  - test
 
 configure:
- - stage: configure
- - script:
-   - mkdir build
-   - cd build
-   - cmake ../ -DCMAKE_BUILD_TYPE=Debug
+ stage: configure
+ script:
+  - mkdir build
+  - cd build
+  - cmake ../ -DCMAKE_BUILD_TYPE=Debug
 
 build:
- - stage: build
- - script:
-   - make
+ stage: build
+ script:
+  - make
 
 test:
- - stage: test
- - script:
-   - make test
+ stage: test
+ script:
+  - make test
