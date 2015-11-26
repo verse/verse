@@ -3,10 +3,9 @@ stages:
  - build
  - test
 
-cache:
-  untracked: true
-  paths:
-  - build/
+artifacts:
+paths:
+- build/
 
 configure:
  stage: configure
