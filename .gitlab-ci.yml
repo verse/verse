@@ -10,6 +10,7 @@ paths:
 configure:
  stage: configure
  script:
+  - rf -rf build
   - mkdir build
   - cd build
   - cmake ../ -DCMAKE_BUILD_TYPE=Debug
