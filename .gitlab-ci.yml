@@ -3,6 +3,11 @@ stages:
  - build
  - test
 
+cache:
+  untracked: true
+  paths:
+  - build/
+
 configure:
  stage: configure
  script:
