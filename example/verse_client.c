@@ -933,7 +933,8 @@ static void print_help(char *prog_name)
  */
 int main(int argc, char *argv[])
 {
-	int error_num, opt, ret, flags = VRS_SEC_DATA_NONE;
+	int error_num, opt, ret, port_number, flags = VRS_SEC_DATA_NONE;
+	char hostname[256];
 	static struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
 		{"username", required_argument, 0, 'u'},
@@ -1065,7 +1066,13 @@ int main(int argc, char *argv[])
 	/* Send connect request to the server (it will also create independent thread for connection) */
 #ifdef WITH_OPENSSL
 	/* 12345 is secured port */
-	error_num = vrs_send_connect_request(argv[optind], "12345", flags, &session_id);
+	if (sscanf(argv[optind], "%[^:]:%d", hostname, &port_number) != 2) {
+		error_num = vrs_send_connect_request(argv[optind], "12345", flags, &session_id);
+	} else {
+		char port_number_char[256];
+		sprintf(port_number_char, "%d", port_number);
+		error_num = vrs_send_connect_request(hostname, port_number_char, flags, &session_id);
+	}
 #else
 	/* 12344 is unsecured port */
 	error_num = vrs_send_connect_request(argv[optind], "12344", flags, &session_id);

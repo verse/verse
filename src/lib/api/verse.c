@@ -917,6 +917,11 @@ int32_t vrs_send_connect_request(const char *hostname,
 		return VRS_FAILURE;
 	}
 
+	/* TODO: This should be improved */
+	if(strcmp("12345", service) == 0) {
+		vc_init_tls(vc_ctx);
+	}
+
 	vsession->session_id = vc_ctx->session_counter++;
 	*session_id = vsession->session_id;
 

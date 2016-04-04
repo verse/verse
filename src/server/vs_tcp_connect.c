@@ -107,8 +107,10 @@ void *vs_tcp_conn_loop(void *arg)
 
 #ifdef WITH_OPENSSL
 	/* Try to do TLS handshake with client */
-	if(vs_TLS_handshake(C) != 1) {
-		goto end;
+	if(vs_ctx->tls_ctx != NULL) {
+		if(vs_TLS_handshake(C) != 1) {
+			goto end;
+		}
 	}
 #endif
 
@@ -564,19 +566,30 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 
 
 #ifdef WITH_OPENSSL
-/**
- * \brief Destroy stream part of verse context
- */
-void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
+
+void vs_destroy_tls_ctx(VS_CTX *vs_ctx)
 {
 	if(vs_ctx->tls_ctx != NULL) {
 		SSL_CTX_free(vs_ctx->tls_ctx);
 		vs_ctx->tls_ctx = NULL;
 	}
+}
+
+void vs_destroy_dtls_ctx(VS_CTX *vs_ctx)
+{
 	if(vs_ctx->dtls_ctx != NULL) {
 		SSL_CTX_free(vs_ctx->dtls_ctx);
 		vs_ctx->dtls_ctx = NULL;
 	}
+}
+
+/**
+ * \brief Destroy stream part of verse context
+ */
+void vs_destroy_stream_ctx(VS_CTX *vs_ctx)
+{
+	vs_destroy_tls_ctx(vs_ctx);
+	vs_destroy_dtls_ctx(vs_ctx);
 }
 
 
@@ -595,33 +608,36 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 	if( (vs_ctx->tls_ctx = SSL_CTX_new(TLSv1_server_method())) == NULL ) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
 		ERR_print_errors_fp(v_log_file());
-		return -1;
+		return 0;
 	}
 
-	/* Load certificate chain file from CA */
+	/* Try to load certificate chain file from CA */
 	if(vs_ctx->ca_cert_file != NULL) {
 		if(SSL_CTX_use_certificate_chain_file(vs_ctx->tls_ctx, vs_ctx->ca_cert_file) != 1) {
 			v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate chain file: %s failed.\n",
 					vs_ctx->ca_cert_file);
 			ERR_print_errors_fp(v_log_file());
-			return -1;
+			vs_destroy_tls_ctx(vs_ctx);
+			return 0;
 		}
 	}
 
-	/* Load certificate with public key for TLS */
+	/* Try to load certificate with public key for TLS */
 	if(SSL_CTX_use_certificate_file(vs_ctx->tls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "TLS: Loading certificate file: %s failed.\n",
 				vs_ctx->public_cert_file);
 		ERR_print_errors_fp(v_log_file());
-		return -1;
+		vs_destroy_tls_ctx(vs_ctx);
+		return 0;
 	}
 
-	/* Load private key for TLS */
+	/* Try to load private key for TLS */
 	if(SSL_CTX_use_PrivateKey_file(vs_ctx->tls_ctx, vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "TLS: Loading private key file: %s failed.\n",
 				vs_ctx->private_cert_file);
 		ERR_print_errors_fp(v_log_file());
-		return -1;
+		vs_destroy_tls_ctx(vs_ctx);
+		return 0;
 	}
 
 	/* Check the consistency of a private key with the corresponding
@@ -629,6 +645,7 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 	if(SSL_CTX_check_private_key(vs_ctx->tls_ctx) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "TLS: Private key does not match the certificate public key\n");
 		ERR_print_errors_fp(v_log_file());
+		vs_destroy_tls_ctx(vs_ctx);
 		return -1;
 	}
 
@@ -638,7 +655,8 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 			v_print_log(VRS_PRINT_ERROR, "TLS: Loading CA certificate file: %s failed.\n",
 					vs_ctx->ca_cert_file);
 			ERR_print_errors_fp(v_log_file());
-			return -1;
+			vs_destroy_tls_ctx(vs_ctx);
+			return 0;
 		}
 	}
 
@@ -648,32 +666,35 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 	if( (vs_ctx->dtls_ctx = SSL_CTX_new(DTLSv1_server_method())) == NULL ) {
 		v_print_log(VRS_PRINT_ERROR, "Setting up SSL_CTX failed.\n");
 		ERR_print_errors_fp(v_log_file());
-		return -1;
+		return 0;
 	}
 
-	/* Load certificate chain file from CA */
+	/* Try to load certificate chain file from CA */
 	if(vs_ctx->ca_cert_file != NULL) {
 		if(SSL_CTX_use_certificate_chain_file(vs_ctx->dtls_ctx, vs_ctx->ca_cert_file) != 1) {
 			v_print_log(VRS_PRINT_ERROR, "DTLS: Loading certificate chain file: %s failed.\n",
 					vs_ctx->ca_cert_file);
 			ERR_print_errors_fp(v_log_file());
-			return -1;
+			vs_destroy_dtls_ctx(vs_ctx);
+			return 0;
 		}
 	}
 
-	/* Load certificate with public key for DTLS */
+	/* Try to load certificate with public key for DTLS */
 	if (SSL_CTX_use_certificate_file(vs_ctx->dtls_ctx, vs_ctx->public_cert_file, SSL_FILETYPE_PEM) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "DTLS: Loading certificate file: %s failed.\n",
 						vs_ctx->public_cert_file);
 		ERR_print_errors_fp(v_log_file());
-		return -1;
+		vs_destroy_dtls_ctx(vs_ctx);
+		return 0;
 	}
 
-	/* Load private key for DTLS */
+	/* Try to load private key for DTLS */
 	if(SSL_CTX_use_PrivateKey_file(vs_ctx->dtls_ctx, vs_ctx->private_cert_file, SSL_FILETYPE_PEM) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "DTLS: Loading private key file: %s failed.\n",
 						vs_ctx->private_cert_file);
 		ERR_print_errors_fp(v_log_file());
+		vs_destroy_dtls_ctx(vs_ctx);
 		return -1;
 	}
 
@@ -682,7 +703,8 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 	if(SSL_CTX_check_private_key(vs_ctx->dtls_ctx) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "DTLS: Private key does not match the certificate public key\n");
 		ERR_print_errors_fp(v_log_file());
-		return -1;
+		vs_destroy_dtls_ctx(vs_ctx);
+		return 0;
 	}
 
 	/* When CA certificate file was set, then try to load it */
@@ -691,7 +713,8 @@ static int vs_init_ssl(VS_CTX *vs_ctx)
 			v_print_log(VRS_PRINT_ERROR, "DTLS: Loading CA certificate file: %s failed.\n",
 					vs_ctx->ca_cert_file);
 			ERR_print_errors_fp(v_log_file());
-			return -1;
+			vs_destroy_dtls_ctx(vs_ctx);
+			return 0;
 		}
 	}
 
@@ -885,7 +908,8 @@ int vs_init_stream_ctx(VS_CTX *vs_ctx)
 #ifdef WITH_OPENSSL
 	ret = vs_init_ssl(vs_ctx);
 	if(ret != 1) {
-		return ret;
+		v_print_log(VRS_PRINT_WARNING, "Unable to set up TLS/DTLS. Using unsecured connections.\n");
+		vs_ctx->tcp_port = VRS_DEFAULT_TCP_PORT;
 	}
 #endif
 

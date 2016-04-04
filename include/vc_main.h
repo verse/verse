@@ -194,6 +194,7 @@ typedef struct VC_CTX {
 /* Function prototypes */
 void vc_init_func_storage(struct VFuncStorage *vfs);
 void vc_load_config_file(struct VC_CTX *ctx);
+int vc_init_tls(struct VC_CTX *vc_ctx);
 int vc_init_ctx(struct VC_CTX *ctx);
 void vc_free_ctx(struct VC_CTX *ctx);
 

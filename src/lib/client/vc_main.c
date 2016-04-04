@@ -150,21 +150,10 @@ void vc_load_config_file(VC_CTX *ctx)
 }
 
 /**
- * \brief Initialize verse client context
+ * \brief Initialize SSL for verse client
  */
-int vc_init_ctx(struct VC_CTX *vc_ctx)
+int vc_init_tls(struct VC_CTX *vc_ctx)
 {
-	int i;
-
-	/* Allocate memory for session slots and make session slots NULL */
-	vc_ctx->vsessions = (struct VSession**)malloc(sizeof(struct VSession*)*vc_ctx->max_sessions);
-	vc_ctx->session_counter = 0;
-	for(i=0; i<vc_ctx->max_sessions; i++) {
-		vc_ctx->vsessions[i] = NULL;
-	}
-	/* Initialize callback function */
-	vc_init_func_storage(&vc_ctx->vfs);
-
 #ifdef WITH_OPENSSL
 	/* Set up the library */
 	SSL_library_init();
@@ -183,6 +172,7 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 	if(SSL_CTX_load_verify_locations(vc_ctx->tls_ctx, NULL, vc_ctx->ca_path) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "Loading path with CA certificates failed.\n");
 		ERR_print_errors_fp(v_log_file());
+		return 0;
 	} else {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Path %s with CA certificates loaded successfully.\n",
 				vc_ctx->ca_path);
@@ -201,6 +191,7 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 	if(SSL_CTX_load_verify_locations(vc_ctx->dtls_ctx, NULL, vc_ctx->ca_path) != 1) {
 		v_print_log(VRS_PRINT_ERROR, "Loading path with CA certificates failed.\n");
 		ERR_print_errors_fp(v_log_file());
+		return 0;
 	} else {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "Path %s with CA certificates loaded successfully.\n",
 				vc_ctx->ca_path);
@@ -217,9 +208,30 @@ int vc_init_ctx(struct VC_CTX *vc_ctx)
 
 	/* This is necessary for DTLS */
 	SSL_CTX_set_read_ahead(vc_ctx->dtls_ctx, 1);
-#else
-	vc_ctx->dtls_ctx = NULL;
+
 #endif
+	return 1;
+}
+
+/**
+ * \brief Initialize verse client context
+ */
+int vc_init_ctx(struct VC_CTX *vc_ctx)
+{
+	int i;
+
+	/* Allocate memory for session slots and make session slots NULL */
+	vc_ctx->vsessions = (struct VSession**)malloc(sizeof(struct VSession*)*vc_ctx->max_sessions);
+	vc_ctx->session_counter = 0;
+	for(i=0; i<vc_ctx->max_sessions; i++) {
+		vc_ctx->vsessions[i] = NULL;
+	}
+	/* Initialize callback function */
+	vc_init_func_storage(&vc_ctx->vfs);
+
+	/* Default TLS/DTLS */
+	vc_ctx->tls_ctx = NULL;
+	vc_ctx->dtls_ctx = NULL;
 
 	/* Default name and version */
 	vc_ctx->client_name = NULL;

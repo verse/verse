@@ -796,31 +796,33 @@ static int vc_USRAUTH_none_loop(struct vContext *C,
 void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 {
 #ifdef WITH_OPENSSL
-	int ret;
+	if(stream_conn->io_ctx.ssl != NULL) {
+		int ret;
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
+		v_print_log(VRS_PRINT_DEBUG_MSG, "Try to shut down SSL connection.\n");
 
-	ret = SSL_shutdown(stream_conn->io_ctx.ssl);
-	if(ret!=1) {
 		ret = SSL_shutdown(stream_conn->io_ctx.ssl);
-	}
+		if(ret!=1) {
+			ret = SSL_shutdown(stream_conn->io_ctx.ssl);
+		}
 
-	switch(ret) {
-	case 1:
-		/* SSL was successfully closed */
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was shut down.\n");
-		break;
-	case 0:
-	case -1:
-	default:
-		/* some error occured */
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was not able to shut down.\n");
-		break;
-	}
+		switch(ret) {
+		case 1:
+			/* SSL was successfully closed */
+			v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was shut down.\n");
+			break;
+		case 0:
+		case -1:
+		default:
+			/* some error occured */
+			v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was not able to shut down.\n");
+			break;
+		}
 
-	SSL_free(stream_conn->io_ctx.ssl);
-	stream_conn->io_ctx.ssl = NULL;
-	stream_conn->io_ctx.bio = NULL;
+		SSL_free(stream_conn->io_ctx.ssl);
+		stream_conn->io_ctx.ssl = NULL;
+		stream_conn->io_ctx.bio = NULL;
+	}
 #endif
 
 	if(stream_conn->io_ctx.sockfd != -1) {
@@ -1210,51 +1212,53 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 	}
 
 #ifdef WITH_OPENSSL
-	/* Set up SSL */
-	if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
-		v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
-		ERR_print_errors_fp(v_log_file());
-		close(stream_conn->io_ctx.sockfd);
-		stream_conn->io_ctx.sockfd = -1;
-		free(stream_conn);
-		*error = VRS_CONN_TERM_ERROR;
-		return NULL;
-	}
+	if(ctx->tls_ctx != NULL) {
+		/* Set up SSL */
+		if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
+			v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
+			ERR_print_errors_fp(v_log_file());
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
 
-	/* Bind socket and SSL */
-	if (SSL_set_fd(stream_conn->io_ctx.ssl, stream_conn->io_ctx.sockfd) == 0) {
-		v_print_log(VRS_PRINT_ERROR,
-				"Failed binding socket descriptor and SSL.\n");
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		close(stream_conn->io_ctx.sockfd);
-		stream_conn->io_ctx.sockfd = -1;
-		free(stream_conn);
-		*error = VRS_CONN_TERM_ERROR;
-		return NULL;
-	}
+		/* Bind socket and SSL */
+		if (SSL_set_fd(stream_conn->io_ctx.ssl, stream_conn->io_ctx.sockfd) == 0) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Failed binding socket descriptor and SSL.\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
 
-	SSL_set_mode(stream_conn->io_ctx.ssl, SSL_MODE_AUTO_RETRY);
+		SSL_set_mode(stream_conn->io_ctx.ssl, SSL_MODE_AUTO_RETRY);
 
-	/* Do TLS handshake and negotiation */
-	if( SSL_connect(stream_conn->io_ctx.ssl) == -1) {
-		v_print_log(VRS_PRINT_ERROR, "SSL connection failed\n");
-		ERR_print_errors_fp(v_log_file());
-		SSL_free(stream_conn->io_ctx.ssl);
-		close(stream_conn->io_ctx.sockfd);
-		stream_conn->io_ctx.sockfd = -1;
-		free(stream_conn);
-		*error = VRS_CONN_TERM_ERROR;
-		return NULL;
-	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection established.\n");
-	}
+		/* Do TLS handshake and negotiation */
+		if( SSL_connect(stream_conn->io_ctx.ssl) == -1) {
+			v_print_log(VRS_PRINT_ERROR, "SSL connection failed\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection established.\n");
+		}
 
-	/* Debug print: ciphers, certificates, etc. */
-	if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
-		v_print_log(VRS_PRINT_DEBUG_MSG,
-				"SSL connection uses: %s cipher.\n",
-				SSL_get_cipher(stream_conn->io_ctx.ssl));
+		/* Debug print: ciphers, certificates, etc. */
+		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
+			v_print_log(VRS_PRINT_DEBUG_MSG,
+					"SSL connection uses: %s cipher.\n",
+					SSL_get_cipher(stream_conn->io_ctx.ssl));
+		}
 	}
 #else
 	(void)ctx;
@@ -1304,7 +1308,9 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 
 #ifdef WITH_OPENSSL
 	/* Verify server certificate */
-	vc_verify_certificate(C);
+	if(vc_ctx->tls_ctx != NULL) {
+		vc_verify_certificate(C);
+	}
 #endif
 
 	/* Update client and server states */

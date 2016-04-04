@@ -635,14 +635,18 @@ static int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
 int v_tcp_read(struct IO_CTX *io_ctx, int *error_num)
 {
 #ifdef WITH_OPENSSL
-	return v_SSL_read(io_ctx, error_num);
-#else
-	if( (io_ctx->buf_size = recv(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0)) == -1) {
-		*error_num = errno;
-		v_print_log(VRS_PRINT_ERROR, "recv(): %s\n", strerror(*error_num));
-		return 0;
+	if(io_ctx->ssl != NULL) {
+		return v_SSL_read(io_ctx, error_num);
+	} else {
+#endif
+		if( (io_ctx->buf_size = recv(io_ctx->sockfd, io_ctx->buf, MAX_PACKET_SIZE, 0)) == -1) {
+			*error_num = errno;
+			v_print_log(VRS_PRINT_ERROR, "recv(): %s\n", strerror(*error_num));
+			return 0;
+		}
+		return io_ctx->buf_size;
+#ifdef WITH_OPENSSL
 	}
-	return io_ctx->buf_size;
 #endif
 }
 
@@ -689,18 +693,22 @@ static int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
 int v_tcp_write(struct IO_CTX *io_ctx, int *error_num)
 {
 #ifdef WITH_OPENSSL
-	return v_SSL_write(io_ctx, error_num);
-#else
-	int ret;
-	if((ret = send(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0)) == -1) {
-		if(error_num != NULL) *error_num = errno;
-		v_print_log(VRS_PRINT_ERROR, "send(%d, %p, %d, 0): %s\n",
-				io_ctx->sockfd, (void*)io_ctx->buf, io_ctx->buf_size, strerror(errno));
-		return 0;
+	if(io_ctx->ssl != NULL) {
+		return v_SSL_write(io_ctx, error_num);
 	} else {
-		v_print_log(VRS_PRINT_DEBUG_MSG, "send() %d bytes\n", ret);
+#endif
+		int ret;
+		if((ret = send(io_ctx->sockfd, io_ctx->buf, io_ctx->buf_size, 0)) == -1) {
+			if(error_num != NULL) *error_num = errno;
+			v_print_log(VRS_PRINT_ERROR, "send(%d, %p, %d, 0): %s\n",
+					io_ctx->sockfd, (void*)io_ctx->buf, io_ctx->buf_size, strerror(errno));
+			return 0;
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "send() %d bytes\n", ret);
+		}
+		return ret;
+#ifdef WITH_OPENSSL
 	}
-	return ret;
 #endif
 }
 
