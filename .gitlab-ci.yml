@@ -1,28 +1,12 @@
 stages:
- - configure
- - build
- - test
+ - everything
 
-artifacts:
-paths:
-- build/
-
-configure:
- stage: configure
+everything:
+ stage: everything
  script:
   - rm -rf build
   - mkdir build
   - cd build
   - cmake ../ -DCMAKE_BUILD_TYPE=Debug
-
-build:
- stage: build
- script:
-  - cd build
   - make
-
-test:
- stage: test
- script:
-  - cd build
   - make test

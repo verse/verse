@@ -1,0 +1,4 @@
+The source code of Verse library is licensed under BSD license. This library
+could be used for implementation of Verse client. The source code of Verse
+server is licensed under GNU GPL 2.0 license. For details look at files
+BSD-LICENSE and GPL-LICENSE.
