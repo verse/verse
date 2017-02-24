@@ -169,7 +169,7 @@ static int vc_STREAM_OPEN_loop(struct vContext *C)
 		/* Wait for received data */
 		if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1) {
 			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
-					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+					__FILE__, __func__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
@@ -560,7 +560,7 @@ static int vc_USRAUTH_data_loop(struct vContext *C,
 
 	/* Wait for the event on the socket */
 	if( (ret = select(stream_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1) {
-		v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+		v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __func__,  __LINE__, strerror(errno));
 		return 0;
 	/* Was event on the TCP socket of this session */
 	} else if(ret>0 && FD_ISSET(stream_conn->io_ctx.sockfd, &set)) {

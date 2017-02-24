@@ -145,7 +145,7 @@ void *vs_tcp_conn_loop(void *arg)
 
 		if( (ret = select(io_ctx->sockfd + 1, &set, NULL, NULL, &tv)) == -1) {
 			v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
-					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+					__FILE__, __func__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
 		} else if(ret>0 && FD_ISSET(io_ctx->sockfd, &set)) {
@@ -508,7 +508,7 @@ int vs_main_listen_loop(VS_CTX *vs_ctx)
 				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR,
 						"%s:%s():%d select(): %s\n",
 						__FILE__,
-						__FUNCTION__,
+						__func__,
 						__LINE__,
 						strerror(err));
 				return -1;

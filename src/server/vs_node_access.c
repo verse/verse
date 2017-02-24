@@ -279,7 +279,7 @@ int vs_handle_node_unlock(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -349,7 +349,7 @@ int vs_handle_node_lock(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -420,7 +420,7 @@ int vs_handle_node_owner(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -488,7 +488,7 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -573,7 +573,7 @@ int vs_handle_node_perm(struct VS_CTX *vs_ctx,
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s(): user: %s can't change permissions of node: %d\n",
-					__FUNCTION__, user->username, node->id);
+					__func__, user->username, node->id);
 			ret = 0;
 		}
 	}

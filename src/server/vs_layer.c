@@ -212,7 +212,7 @@ int vs_layer_unsubscribe(struct VSLayer *layer, struct VSession *vsession)
 	if(layer_subscriber == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() client not subscribed to the layer (id: %d)\n",
-				__FUNCTION__, layer->id);
+				__func__, layer->id);
 		return 0;
 	}
 
@@ -432,7 +432,7 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, layer_create_cmd_ack->node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, layer_create_cmd_ack->node_id);
+				__func__, layer_create_cmd_ack->node_id);
 		return 0;
 	}
 
@@ -442,7 +442,7 @@ int vs_handle_layer_create_ack(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_create_cmd_ack->layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__,
+				__func__,
 				layer_create_cmd_ack->layer_id,
 				layer_create_cmd_ack->node_id);
 		goto end;
@@ -529,7 +529,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -548,7 +548,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		if(parent_layer == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() parent layer (id: %d) in node (id: %d) not found\n",
-					__FUNCTION__, parent_layer_id, node_id);
+					__func__, parent_layer_id, node_id);
 			goto end;
 		}
 	}
@@ -557,7 +557,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
 		goto end;
@@ -567,7 +567,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	 * the value 0xFFFF */
 	if(layer_id != VRS_RESERVED_LAYER_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() layer_id: %d is not 0xFFFF\n",
-				__FUNCTION__, layer_id);
+				__func__, layer_id);
 		goto end;
 	}
 
@@ -575,7 +575,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_REAL64)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() data_type: %d is not supported\n",
-				__FUNCTION__, data_type);
+				__func__, data_type);
 		goto end;
 	}
 
@@ -586,7 +586,7 @@ int vs_handle_layer_create(struct VS_CTX *vs_ctx,
 		if(layer->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() layer type: %d is already used in layer: %d\n",
-					__FUNCTION__, type, layer->id);
+					__func__, type, layer->id);
 			goto end;
 		}
 		vbucket = vbucket->next;
@@ -638,7 +638,7 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, layer_destroy_cmd->node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, layer_destroy_cmd->node_id);
+				__func__, layer_destroy_cmd->node_id);
 		return 0;
 	}
 
@@ -648,7 +648,7 @@ int vs_handle_layer_destroy_ack(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_destroy_cmd->layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__,
+				__func__,
 				layer_destroy_cmd->layer_id,
 				layer_destroy_cmd->node_id);
 		goto end;
@@ -695,7 +695,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -710,7 +710,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
 		goto end;
@@ -720,7 +720,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_id, node_id);
+				__func__, layer_id, node_id);
 		goto end;
 	}
 
@@ -728,7 +728,7 @@ int vs_handle_layer_destroy(struct VS_CTX *vs_ctx,
 	if(! (layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
-				__FUNCTION__, layer->id, node->id, node->state);
+				__func__, layer->id, node->id, node->state);
 		goto end;
 	}
 
@@ -761,7 +761,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -776,7 +776,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	if(vs_node_can_read(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't read the node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
 		goto end;
@@ -795,7 +795,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	if(node_subscriber == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): client has to be subscribed to the node: %d before subscribing to the layer: %d\n",
-				__FUNCTION__, node_id, layer_id);
+				__func__, node_id, layer_id);
 		goto end;
 	}
 
@@ -803,7 +803,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_id, node_id);
+				__func__, layer_id, node_id);
 		goto end;
 	}
 
@@ -811,7 +811,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 	if(! (layer->state == ENTITY_CREATING || layer->state == ENTITY_CREATED)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %u) in node (id: %d) is not in CREATED state: %d\n",
-				__FUNCTION__, layer->id, node->id, node->state);
+				__func__, layer->id, node->id, node->state);
 		goto end;
 	}
 
@@ -821,7 +821,7 @@ int vs_handle_layer_subscribe(struct VS_CTX *vs_ctx,
 		if(layer_subscriber->node_sub->session->session_id == vsession->session_id) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() client already subscribed to the layer (id: %d) in node (id: %d)\n",
-					__FUNCTION__, layer_id, node_id);
+					__func__, layer_id, node_id);
 			goto end;
 		}
 		layer_subscriber = layer_subscriber->next;
@@ -864,7 +864,7 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -874,7 +874,7 @@ int vs_handle_layer_unsubscribe(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_id, node_id);
+				__func__, layer_id, node_id);
 		goto end;
 	}
 
@@ -946,7 +946,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -956,7 +956,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to the node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
 		goto end;
@@ -966,7 +966,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_id, node_id);
+				__func__, layer_id, node_id);
 		goto end;
 	}
 
@@ -974,7 +974,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	if( data_type != layer->data_type ) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() data type (%d) of layer (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
-				__FUNCTION__, layer->data_type, layer_id, node_id, data_type);
+				__func__, layer->data_type, layer_id, node_id, data_type);
 		goto end;
 	}
 
@@ -982,7 +982,7 @@ int vs_handle_layer_set_value(struct VS_CTX *vs_ctx,
 	if( count != layer->num_vec_comp ) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() count of values (%d) of layer (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
-				__FUNCTION__, layer->num_vec_comp, layer_id, node_id, count);
+				__func__, layer->num_vec_comp, layer_id, node_id, count);
 		goto end;
 	}
 
@@ -1134,7 +1134,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -1144,7 +1144,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to the node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)(vsession->user))->username,
 				node->id);
 		goto end;
@@ -1154,7 +1154,7 @@ int vs_handle_layer_unset_value(struct VS_CTX *vs_ctx,
 	if( (layer = vs_layer_find(node, layer_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() layer (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, layer_id, node_id);
+				__func__, layer_id, node_id);
 		goto end;
 	}
 

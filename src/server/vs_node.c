@@ -575,14 +575,14 @@ static int vs_node_destroy(struct VS_CTX *vs_ctx, struct VSNode *node)
 			/* This should never happen */
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s(): node (id: %d) with child nodes can't be destroyed\n",
-					__FUNCTION__, node->id);
+					__func__, node->id);
 			return 0;
 		}
 	} else {
 		/* This should never happen */
 		v_print_log(VRS_PRINT_WARNING,
 				"%(): node (id: %d) with followers can't be destroyed\n",
-				__FUNCTION__, node->id);
+				__func__, node->id);
 		return 0;
 	}
 }
@@ -757,7 +757,7 @@ int vs_node_is_created(struct VSNode *node)
 	if(! (node->state == ENTITY_CREATED || node->state == ENTITY_CREATING)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"node, id: %d is not in CREATED/CREATING state: %d\n",
-				__FUNCTION__, node->id, node->state);
+				__func__, node->id, node->state);
 		return 0;
 	}
 
@@ -780,7 +780,7 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -800,7 +800,7 @@ int vs_handle_node_prio(struct VS_CTX *vs_ctx,
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() client not subscribed to this node (id: %d)\n",
-					__FUNCTION__, node_id);
+					__func__, node_id);
 			ret = 0;
 		}
 	}
@@ -827,7 +827,7 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -850,7 +850,7 @@ int vs_handle_node_unsubscribe(struct VS_CTX *vs_ctx,
 		} else {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() client not subscribed to this node (id: %d)\n",
-					__FUNCTION__, node_id);
+					__func__, node_id);
 			ret = 0;
 		}
 	} else {
@@ -880,7 +880,7 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -895,7 +895,7 @@ int vs_handle_node_subscribe(struct VS_CTX *vs_ctx,
 		if(node_subscriber != NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() client %d is already subscribed to the node (id: %d)\n",
-					__FUNCTION__, vsession->session_id, node->id);
+					__func__, vsession->session_id, node->id);
 		} else {
 			ret = vs_node_subscribe(vsession, node, version);
 		}
@@ -927,7 +927,7 @@ int vs_handle_node_destroy_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_destroy_ack->node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_destroy_ack->node_id);
+				__func__, node_destroy_ack->node_id);
 		return 0;
 	}
 	
@@ -973,7 +973,7 @@ int vs_handle_node_destroy(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -1019,7 +1019,7 @@ int vs_handle_node_create_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_create_ack->node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_create_ack->node_id);
+				__func__, node_create_ack->node_id);
 		return 0;
 	}
 
@@ -1091,7 +1091,7 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	 * the value 0xFFFFFFFF */
 	if(node_id != VRS_RESERVED_NODE_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node_id is 0xFFFFFFFF\n",
-				__FUNCTION__);
+				__func__);
 		return 0;
 	}
 
@@ -1099,7 +1099,7 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	if(parent_id != vsession->avatar_id) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() parent_id: %d is not equal to session avatar id %d\n",
-				__FUNCTION__, parent_id, vsession->avatar_id);
+				__func__, parent_id, vsession->avatar_id);
 		return 0;
 	}
 
@@ -1107,7 +1107,7 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	if(user_id != vsession->user_id) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() user_id: %d is not equal to session user id %d\n",
-				__FUNCTION__, user_id, vsession->user_id);
+				__func__, user_id, vsession->user_id);
 		return 0;
 	}
 
@@ -1116,7 +1116,7 @@ int vs_handle_node_create(struct VS_CTX *vs_ctx,
 	if( custom_type < 32 ) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() custom_type: %d is smaller then 32\n",
-				__FUNCTION__, custom_type);
+				__func__, custom_type);
 		return 0;
 	}
 

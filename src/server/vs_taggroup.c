@@ -434,14 +434,14 @@ int vs_handle_taggroup_destroy_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, cmd_tg_destroy_ack->node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, cmd_tg_destroy_ack->node_id);
+				__func__, cmd_tg_destroy_ack->node_id);
 		return 0;
 	}
 
 	if( (tg = vs_taggroup_find(node, cmd_tg_destroy_ack->taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__,
+				__func__,
 				cmd_tg_destroy_ack->taggroup_id,
 				cmd_tg_destroy_ack->node_id);
 		return 0;
@@ -480,7 +480,7 @@ int vs_handle_taggroup_create_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, cmd_tg_create_ack->node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, cmd_tg_create_ack->node_id);
+				__func__, cmd_tg_create_ack->node_id);
 		return 0;
 	}
 
@@ -489,7 +489,7 @@ int vs_handle_taggroup_create_ack(struct VS_CTX *vs_ctx,
 	if( (tg = vs_taggroup_find(node, cmd_tg_create_ack->taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__,
+				__func__,
 				cmd_tg_create_ack->taggroup_id,
 				cmd_tg_create_ack->node_id);
 	} else {
@@ -563,14 +563,14 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	 * the value 0xFFFF */
 	if(taggroup_id != VRS_RESERVED_TAGGROUP_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() taggroup_id: %d is not 0xFFFF\n",
-				__FUNCTION__, taggroup_id);
+				__func__, taggroup_id);
 		return 0;
 	}
 
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -588,7 +588,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 		if(tg->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() taggroup type: %d is already used in node: %d\n",
-					__FUNCTION__, type, node->id);
+					__func__, type, node->id);
 			goto end;
 		}
 		vbucket = vbucket->next;
@@ -598,7 +598,7 @@ int vs_handle_taggroup_create(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
 		goto end;
@@ -653,7 +653,7 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -670,7 +670,7 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() tag_group (id: %d) in node (id: %d) not found\n",
-					__FUNCTION__, taggroup_id, node_id);
+					__func__, taggroup_id, node_id);
 			goto end;
 		}
 
@@ -678,7 +678,7 @@ int vs_handle_taggroup_destroy(struct VS_CTX *vs_ctx,
 	} else {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
 	}
@@ -705,7 +705,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -737,7 +737,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		if(node_subscriber == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s(): client has to be subscribed to the node: %d before subscribing to the tag_group: %d\n",
-					__FUNCTION__, node_id, taggroup_id);
+					__func__, node_id, taggroup_id);
 			goto end;
 		}
 
@@ -745,7 +745,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"%s() tag_group (id: %d) in node (id: %d) not found\n",
-					__FUNCTION__, taggroup_id, node_id);
+					__func__, taggroup_id, node_id);
 			goto end;
 		}
 
@@ -755,7 +755,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 			if(tg_subscriber->node_sub->session->session_id == vsession->session_id) {
 				v_print_log(VRS_PRINT_DEBUG_MSG,
 						"%s() client already subscribed to the tag_group (id: %d) in node (id: %d)\n",
-						__FUNCTION__, taggroup_id, node_id);
+						__func__, taggroup_id, node_id);
 				goto end;
 			}
 			tg_subscriber = tg_subscriber->next;
@@ -786,7 +786,7 @@ int vs_handle_taggroup_subscribe(struct VS_CTX *vs_ctx,
 	} else {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s doesn't have permissions to subscribe to taggroup: %d in node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)vsession->user)->username,
 				taggroup_id, node->id);
 	}
@@ -814,7 +814,7 @@ int vs_handle_taggroup_unsubscribe(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -827,7 +827,7 @@ int vs_handle_taggroup_unsubscribe(struct VS_CTX *vs_ctx,
 		/* Try to find TagGroup */
 		if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-					__FUNCTION__, taggroup_id, node_id);
+					__func__, taggroup_id, node_id);
 			ret = 0;
 		} else {
 			ret = vs_taggroup_unsubscribe(tg, vsession);

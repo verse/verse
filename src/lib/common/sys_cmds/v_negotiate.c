@@ -372,7 +372,7 @@ int v_raw_unpack_negotiate_cmd(const char *buffer, ssize_t buffer_size,
 	/* Check if length and buffer_pos match */
 	if(buffer_pos != cmd_length) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, cmd_length);
+				__func__, buffer_pos, cmd_length);
 		return cmd_length;
 	}
 

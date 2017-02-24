@@ -516,7 +516,7 @@ static int vs_LISTEN_handle_packet(struct vContext *C)
 	struct VPacket *r_packet = CTX_r_packet(C);
 
 	if(dgram_conn->host_state != UDP_SERVER_STATE_LISTEN) {
-		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __FUNCTION__);
+		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __func__);
 		return RECEIVE_PACKET_ERROR;
 	}
 
@@ -760,7 +760,7 @@ static int vs_RESPOND_handle_packet(struct vContext *C)
 	struct VPacket *r_packet = CTX_r_packet(C);
 
 	if(dgram_conn->host_state != UDP_SERVER_STATE_RESPOND) {
-		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __FUNCTION__);
+		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __func__);
 		return RECEIVE_PACKET_ERROR;
 	}
 
@@ -885,7 +885,7 @@ static int vs_OPEN_CLOSEREQ_handle_packet(struct vContext *C)
 	struct VPacket *r_packet = CTX_r_packet(C);
 
 	if(!(dgram_conn->host_state == UDP_SERVER_STATE_OPEN || dgram_conn->host_state == UDP_SERVER_STATE_CLOSEREQ)) {
-		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __FUNCTION__);
+		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __func__);
 		return 0;
 	}
 
@@ -1027,7 +1027,7 @@ static int vs_CLOSED_handle_packet(struct vContext *C)
 	struct VPacket *r_packet = CTX_r_packet(C);
 
 	if(dgram_conn->host_state != UDP_SERVER_STATE_CLOSED) {
-		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __FUNCTION__);
+		v_print_log(VRS_PRINT_WARNING, "Bad call of function: %s()\n", __func__);
 		return 0;
 	}
 
@@ -1458,7 +1458,7 @@ hello:
 
 			/* Wait for event on socket sockfd */
 			if( (ret = select(dgram_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
-				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+				if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __func__,  __LINE__, strerror(errno));
 				break;
 			}
 			/* Check if the event occurred on sockfd */
@@ -1556,7 +1556,7 @@ again:
 
 		/* Wait for event on socket sockfd */
 		if( (ret = select(dgram_conn->io_ctx.sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
-			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+			if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",  __FILE__, __func__,  __LINE__, strerror(errno));
 			break;
 		}
 		/* Check if the event occurred on sockfd */

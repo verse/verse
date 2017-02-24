@@ -205,7 +205,7 @@ static int http_handshake(int sockfd)
 
 		if( (ret = select(sockfd + 1, &set, NULL, NULL, &timeout_tv)) == -1 ) {
 			v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
-					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+					__FILE__, __func__,  __LINE__, strerror(errno));
 			return -1;
 		/* Was event on the listen socket */
 		} else if(ret > 0) {
@@ -692,7 +692,7 @@ void *vs_websocket_loop(void *arg)
 				NULL,			/* Don't care about exception */
 				&tv)) == -1) {
 			v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n",
-					__FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+					__FILE__, __func__,  __LINE__, strerror(errno));
 			goto end;
 			/* Was event on the listen socket */
 		} else if(ret > 0) {

@@ -346,7 +346,7 @@ int vs_tag_destroy(struct VSTagGroup *tg, struct VSTag *tag)
 	} else {
 		/* This should never happen */
 		v_print_log(VRS_PRINT_WARNING, "%s(): tag (id: %d) with followers can't be destroyed\n",
-				__FUNCTION__, tag->id);
+				__func__, tag->id);
 		return 0;
 	}
 
@@ -376,7 +376,7 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -385,14 +385,14 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, taggroup_id, node_id);
+				__func__, taggroup_id, node_id);
 		goto end;
 	}
 
 	/* Try to find Tag */
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
-				__FUNCTION__, tag_id, taggroup_id, node_id);
+				__func__, tag_id, taggroup_id, node_id);
 		goto end;
 	}
 
@@ -440,7 +440,7 @@ int vs_handle_tag_create_ack(struct VS_CTX *vs_ctx,
 	if(tag_found == 0) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_follower of tag (id: %d) in tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, tag_id, tg->id, node->id);
+				__func__, tag_id, tg->id, node->id);
 	} else {
 		ret = 1;
 	}
@@ -475,7 +475,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -490,7 +490,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
 		goto end;
@@ -499,14 +499,14 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, taggroup_id, node_id);
+				__func__, taggroup_id, node_id);
 		goto end;
 	}
 
 	/* Tag Group has to be created too (it can't be in DELETING or DELETED state ) */
 	if(!(tg->state == ENTITY_CREATED || tg->state == ENTITY_CREATING)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag group (id: %d) from node (id: %d) is not in CREATING or CREATED state: %d\n",
-				__FUNCTION__, tg->id, node->id, tg->state);
+				__func__, tg->id, node->id, tg->state);
 		goto end;
 	}
 
@@ -514,14 +514,14 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 	 * the value 0xFFFF */
 	if(tag_id != RESERVED_TAG_ID) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_id: %d is not 0xFFFF\n",
-				__FUNCTION__, tag_id);
+				__func__, tag_id);
 		goto end;
 	}
 
 	/* Is type of Tag supported? */
 	if(!(data_type>VRS_VALUE_TYPE_RESERVED && data_type<=VRS_VALUE_TYPE_STRING8)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_type: %d is not supported\n",
-				__FUNCTION__, data_type);
+				__func__, data_type);
 		goto end;
 	}
 
@@ -531,7 +531,7 @@ int vs_handle_tag_create(struct VS_CTX *vs_ctx,
 		tag = vbucket->data;
 		if(tag->custom_type == type) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag type: %d is already used in taggroup: %d\n",
-					__FUNCTION__, type, tg->id);
+					__func__, type, tg->id);
 			goto end;
 		}
 		vbucket = vbucket->next;
@@ -589,7 +589,7 @@ int vs_handle_tag_destroy_ack(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -598,14 +598,14 @@ int vs_handle_tag_destroy_ack(struct VS_CTX *vs_ctx,
 	/* Try to find TagGroup */
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, taggroup_id, node_id);
+				__func__, taggroup_id, node_id);
 		goto end;
 	}
 
 	/* Try to find Tag */
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
-				__FUNCTION__, tag_id, taggroup_id, node_id);
+				__func__, tag_id, taggroup_id, node_id);
 		goto end;
 	}
 
@@ -653,7 +653,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -668,7 +668,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
 		goto end;
@@ -678,7 +678,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, taggroup_id, node_id);
+				__func__, taggroup_id, node_id);
 		goto end;
 	}
 
@@ -686,7 +686,7 @@ int vs_handle_tag_destroy(struct VS_CTX *vs_ctx,
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
-				__FUNCTION__, tag_id, taggroup_id, node_id);
+				__func__, tag_id, taggroup_id, node_id);
 		goto end;
 	}
 
@@ -724,7 +724,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	/* Try to find node */
 	if((node = vs_node_find(vs_ctx, node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s() node (id: %d) not found\n",
-				__FUNCTION__, node_id);
+				__func__, node_id);
 		return 0;
 	}
 
@@ -739,7 +739,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s(): user: %s can't write to node: %d\n",
-				__FUNCTION__,
+				__func__,
 				((struct VSUser *)vsession->user)->username,
 				node->id);
 		goto end;
@@ -749,7 +749,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	if( (tg = vs_taggroup_find(node, taggroup_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag_group (id: %d) in node (id: %d) not found\n",
-				__FUNCTION__, taggroup_id, node_id);
+				__func__, taggroup_id, node_id);
 		goto end;
 	}
 
@@ -757,7 +757,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	if ( (tag = vs_tag_find(tg, tag_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() tag (id: %d) in tag_group (id: %d), node (id: %d) not found\n",
-				__FUNCTION__, tag_id, taggroup_id, node_id);
+				__func__, tag_id, taggroup_id, node_id);
 		goto end;
 	}
 
@@ -765,7 +765,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	if(data_type != tag->data_type) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() data type (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match data type of received command (%d)\n",
-				__FUNCTION__, tag->data_type, tag_id,
+				__func__, tag->data_type, tag_id,
 				taggroup_id, node_id, data_type);
 		goto end;
 	}
@@ -774,7 +774,7 @@ int vs_handle_tag_set(struct VS_CTX *vs_ctx,
 	if(count != tag->count) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s() count of values (%d) of tag (id: %d) in tg (id: %d) in node (id: %d) does not match count of values of received command (%d)\n",
-				__FUNCTION__, tag->count, tag_id, taggroup_id, node_id, count);
+				__func__, tag->count, tag_id, taggroup_id, node_id, count);
 		goto end;
 	}
 
