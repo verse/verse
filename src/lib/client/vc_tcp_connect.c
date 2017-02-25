@@ -37,6 +37,7 @@
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#define CA_CERT_FILE "/etc/pki/tls/certs/ca-bundle.crt"
 #ifdef __APPLE__
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
@@ -832,239 +833,6 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 
 }
 
-#ifdef WITH_OPENSSL
-/**
- * \brief This function verify certificate presented by server
- *
- * \param[in]	*C		The pointer at verse context
- */
-void vc_verify_certificate(struct vContext *C)
-{
-	struct VStreamConn *stream_conn = CTX_current_stream_conn(C);
-	char *result;
-	long int verify;
-
-	verify = SSL_get_verify_result(stream_conn->io_ctx.ssl);
-
-	switch(verify) {
-	case X509_V_OK:
-		result = strdup("The verification succeeded or no peer certificate was presented.");
-		break;
-	case X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT:
-		result = strdup(
-				"Unable to get issuer certificate.\nThe issuer"
-				" certificate of a looked up certificate could not"
-				" be found. This normally means the list of "
-				"trusted certificates is not complete.");
-		break;
-	case X509_V_ERR_UNABLE_TO_GET_CRL:
-		result = strdup(
-				"Unable to get certificate CRL\n"
-				"The CRL of a certificate could not be found.");
-		break;
-	case X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE:
-		result = strdup(
-				"Unable to decrypt certificate’s signature\n"
-				"The certificate signature could not be decrypted. "
-				"This means that the actual signature value could "
-				"not be determined rather thanit not matching the "
-				"expected value, this is only meaningful for RSA keys.");
-		break;
-	case X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE:
-		result = strdup(
-				"Unable to decrypt CRL’s signature\n"
-				"The CRL signature could not be decrypted: this means "
-				"that the actual signature value could not be "
-				"determined rather than it not matching the expected "
-				"value. Unused.");
-		break;
-	case X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY:
-		result = strdup(
-				"Unable to decode issuer public key\n"
-				"The public key in the certificate "
-				"SubjectPublicKeyInfo could not be read.");
-		break;
-	case X509_V_ERR_CERT_SIGNATURE_FAILURE:
-		result = strdup(
-				"Certificate signature failure\n"
-				"The signature of the certificate is invalid.");
-		break;
-	case X509_V_ERR_CRL_SIGNATURE_FAILURE:
-		result = strdup(
-				"CRL signature failure\n"
-				"The signature of the certificate is invalid.");
-		break;
-	case X509_V_ERR_CERT_NOT_YET_VALID:
-		result = strdup(
-				"Certificate is not yet valid\n"
-				"The certificate is not yet valid: the notBefore date "
-				"is after the current time.");
-		break;
-	case X509_V_ERR_CERT_HAS_EXPIRED:
-		result = strdup(
-				"Certificate has expired\n"
-				"The certificate has expired: that is the notAfter "
-				"date is before the current time.");
-		break;
-	case X509_V_ERR_CRL_NOT_YET_VALID:
-		result = strdup(
-				"CRL is not yet valid\n"
-				"The CRL is not yet valid.");
-		break;
-	case X509_V_ERR_CRL_HAS_EXPIRED:
-		result = strdup(
-				"CRL has expired\n"
-				"The CRL has expired.");
-		break;
-	case X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD:
-		result = strdup(
-				"Format error in certificate’s notBefore field\n"
-				"The certificate notBefore field contains an "
-				"invalid time.");
-		break;
-	case X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD:
-		result = strdup(
-				"Format error in certificate’s notAfter field\n"
-				"The certificate notAfter field contains an "
-				"invalid time.");
-		break;
-	case X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD:
-		result = strdup(
-				"Format error in CRL’s lastUpdate field\n"
-				"The CRL lastUpdate field contains an invalid time.");
-		break;
-	case X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD:
-		result = strdup(
-				"Format error in CRL’s nextUpdate field\n"
-				"The CRL nextUpdate field contains an invalid time.");
-		break;
-	case X509_V_ERR_OUT_OF_MEM:
-		result = strdup(
-				"Out of memory\n"
-				"An error occurred trying to allocate memory. "
-				"This should never happen.");
-		break;
-	case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-		result = strdup(
-				"Self signed certificate\nThe passed "
-				"certificate is self signed and the same certificate "
-				"cannot be found in the list of trusted certificates.");
-		break;
-	case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-		result = strdup(
-				"Self signed certificate in certificate chain\n"
-				"The certificate chain could be built up using "
-				"the untrusted certificates but the root could not"
-				" be found locally.");
-		break;
-	case X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY:
-		result = strdup(
-				"Unable to get local issuer certificate\n"
-				"The issuer certificate could not be found: "
-				"this occurs if the issuer certificate of an untrusted "
-				"certificate cannot be found.");
-		break;
-	case X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE:
-		result = strdup(
-				"Unable to verify the first certificate\n"
-				"No signatures could be verified because the chain "
-				"contains only one certificate and it is not self "
-				"signed.");
-		break;
-	case X509_V_ERR_CERT_CHAIN_TOO_LONG:
-		result = strdup(
-				"Certificate chain too long\n"
-				"The certificate chain length is greater than "
-				"the supplied maximum depth. Unused.");
-		break;
-	case X509_V_ERR_CERT_REVOKED:
-		result = strdup(
-				"Certificate revoked\n"
-				"The certificate has been revoked.");
-		break;
-	case X509_V_ERR_INVALID_CA:
-		result = strdup(
-				"Invalid CA certificate\n"
-				"A CA certificate is invalid. Either it is not a CA or "
-				"its extensions are not consistent with the supplied "
-				"purpose.");
-		break;
-	case X509_V_ERR_PATH_LENGTH_EXCEEDED:
-		result = strdup(
-				"Path length constraint exceeded\n"
-				"The basicConstraints path length parameter has "
-				"been exceeded.");
-		break;
-	case X509_V_ERR_INVALID_PURPOSE:
-		result = strdup(
-				"Unsupported certificate purpose\n"
-				"The supplied certificate cannot be used for "
-				"the specified purpose.");
-		break;
-	case X509_V_ERR_CERT_UNTRUSTED:
-		result = strdup(
-				"Certificate not trusted\n"
-				"The root CA is not marked as trusted for "
-				"the specified purpose.");
-		break;
-	case X509_V_ERR_CERT_REJECTED:
-		result = strdup(
-				"Certificate rejected\n"
-				"The root CA is marked to reject the specified purpose.");
-		break;
-	case X509_V_ERR_SUBJECT_ISSUER_MISMATCH:
-		result = strdup(
-				"Subject issuer mismatch\n"
-				"The current candidate issuer certificate was rejected "
-				"because its subject name did not match the issuer "
-				"name of the current certificate. Only displayed when "
-				"the -issuer_checks option is set.");
-		break;
-	case X509_V_ERR_AKID_SKID_MISMATCH:
-		result = strdup(
-				"Authority and subject key identifier mismatch\n"
-				"The current candidate issuer certificate was "
-				"rejected because its subject key identifier was "
-				"present and did not match the authority key "
-				"identifier current certificate. Only displayed "
-				"when the -issuer_checks option is set.");
-		break;
-	case X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH:
-		result = strdup(
-				"Authority and issuer serial number mismatch\n"
-				"The current candidate issuer certificate was "
-				"rejected because its issuer name and serial "
-				"number was present and did not match the authority "
-				"key identifier of the current certificate. "
-				"Only displayed when the "
-				"-issuer_checks option is set.");
-		break;
-	case X509_V_ERR_KEYUSAGE_NO_CERTSIGN:
-		result = strdup(
-				"Key usage does not include certificate signing\n"
-				"The current candidate issuer certificate was "
-				"rejected because its keyUsage extension does "
-				"not permit certificate signing.");
-		break;
-	case X509_V_ERR_APPLICATION_VERIFICATION:
-		result = strdup(
-				"Application verification failure\n"
-				"An application specific error.");
-		break;
-	default:
-		result = strdup(
-				"Unknown certificate error");
-		break;
-	}
-
-	v_print_log(VRS_PRINT_DEBUG_MSG, "%s\n", result);
-
-	free(result);
-
-	/* TODO: appropriate callback function */
-}
-#endif
-
 /**
  * \brief Create new TCP connection to the server
  *
@@ -1230,6 +998,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 					"Failed binding socket descriptor and SSL.\n");
 			ERR_print_errors_fp(v_log_file());
 			SSL_free(stream_conn->io_ctx.ssl);
+			stream_conn->io_ctx.ssl = NULL;
 			close(stream_conn->io_ctx.sockfd);
 			stream_conn->io_ctx.sockfd = -1;
 			free(stream_conn);
@@ -1239,11 +1008,26 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 
 		SSL_set_mode(stream_conn->io_ctx.ssl, SSL_MODE_AUTO_RETRY);
 
+		/* Set certificates of CA */
+		if(SSL_CTX_load_verify_locations(ctx->tls_ctx, CA_CERT_FILE, NULL) != 1) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Failed to set CA certificates file.\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			stream_conn->io_ctx.ssl = NULL;
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
+
 		/* Do TLS handshake and negotiation */
 		if( SSL_connect(stream_conn->io_ctx.ssl) == -1) {
 			v_print_log(VRS_PRINT_ERROR, "SSL connection failed\n");
 			ERR_print_errors_fp(v_log_file());
 			SSL_free(stream_conn->io_ctx.ssl);
+			stream_conn->io_ctx.ssl = NULL;
 			close(stream_conn->io_ctx.sockfd);
 			stream_conn->io_ctx.sockfd = -1;
 			free(stream_conn);
@@ -1253,11 +1037,46 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection established.\n");
 		}
 
+		/* Verify a server certificate was presented during the handshake */
+		X509* cert = SSL_get_peer_certificate(stream_conn->io_ctx.ssl);
+		if(NULL == cert) {
+			v_print_log(VRS_PRINT_ERROR, "Server did not sent certificate\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			stream_conn->io_ctx.ssl = NULL;
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
+
+		/* Verify the result of chain verification
+		 * Verification performed according to RFC 4158. */
+		if(X509_V_OK != SSL_get_verify_result(stream_conn->io_ctx.ssl)) {
+			v_print_log(VRS_PRINT_ERROR, "Server sent wrong certificate\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			stream_conn->io_ctx.ssl = NULL;
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			return NULL;
+		}
+
+		/* TODO: Get hostname from X509 certificate and check
+		 * if certificate contains desired hostname. */
+
 		/* Debug print: ciphers, certificates, etc. */
 		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
 			v_print_log(VRS_PRINT_DEBUG_MSG,
 					"SSL connection uses: %s cipher.\n",
 					SSL_get_cipher(stream_conn->io_ctx.ssl));
+		}
+
+		if(cert != NULL) {
+			X509_free(cert);
 		}
 	}
 #else
@@ -1305,13 +1124,6 @@ void vc_main_stream_loop(struct VC_CTX *vc_ctx, struct VSession *vsession)
 	CTX_r_message_set(C, r_message);
 	CTX_s_message_set(C, s_message);
 	vsession->stream_conn = stream_conn;
-
-#ifdef WITH_OPENSSL
-	/* Verify server certificate */
-	if(vc_ctx->tls_ctx != NULL) {
-		vc_verify_certificate(C);
-	}
-#endif
 
 	/* Update client and server states */
 	stream_conn->host_state = TCP_CLIENT_STATE_USRAUTH_NONE;
