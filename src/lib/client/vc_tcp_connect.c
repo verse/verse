@@ -37,6 +37,8 @@
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#include <openssl/conf.h>
+#include <openssl/x509v3.h>
 #define CA_CERT_FILE "/etc/pki/tls/certs/ca-bundle.crt"
 #ifdef __APPLE__
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -833,6 +835,80 @@ void vc_destroy_stream_conn(struct VStreamConn *stream_conn)
 
 }
 
+#ifdef WITH_OPENSSL
+
+/**
+ * \brief Verify if hostname specified in certificate is the same as required
+ * hostname
+ *
+ * \param[in]	*cert		Pointer at certificate of server.
+ * \param[in]	*hostname	The hostname of server we are connecting to.
+ *
+ * \return This function return 1, when hostnames are same. Otherwise it
+ * returns 0.
+ */
+int verify_cert_hostname(X509 *cert, const char *hostname)
+{
+	int extcount, i, j, ret = 0;
+	char name[256];
+	X509_NAME *subj;
+	const char *extstr;
+	CONF_VALUE *nval;
+	const unsigned char *data;
+	X509_EXTENSION *ext;
+	const X509V3_EXT_METHOD *meth;
+	STACK_OF(CONF_VALUE) *val;
+
+	if( (extcount = X509_get_ext_count(cert)) > 0) {
+		for(i = 0; ret != 1 && i < extcount;  i++) {
+			ext = X509_get_ext(cert, i);
+			extstr = OBJ_nid2sn(OBJ_obj2nid(X509_EXTENSION_get_object(ext)));
+			if(strcasecmp(extstr, "subjectAltName") == 0) {
+				if( (meth = X509V3_EXT_get(ext)) == NULL) {
+					break;
+				}
+				data = ext->value->data;
+
+				val = meth->i2v(meth, meth->d2i(0, &data, ext->value->length), 0);
+				for(j = 0;  j < sk_CONF_VALUE_num(val);  j++) {
+					nval = sk_CONF_VALUE_value(val, j);
+					if(strcasecmp(nval->name, "DNS") == 0) {
+						if(strcasecmp(nval->value, hostname) == 0) {
+							v_print_log(VRS_PRINT_DEBUG_MSG,
+									"subjectAltName: %s == %s\n",
+									nval->value, hostname);
+							ret = 1;
+							break;
+						} else {
+							v_print_log(VRS_PRINT_DEBUG_MSG,
+									"subjectAltName: %s != %s\n",
+									nval->value, hostname);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if(ret != 1 && (subj = X509_get_subject_name(cert)) != NULL &&
+			X509_NAME_get_text_by_NID(subj, NID_commonName, name, sizeof(name)) > 0) {
+		name[sizeof(name) - 1] = '\0';
+		if(strcasecmp(name, hostname) == 0 ) {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "%s == %s\n",
+					name, hostname);
+			ret = 1;
+		} else {
+			v_print_log(VRS_PRINT_DEBUG_MSG, "%s != %s\n",
+					name, hostname);
+		}
+	} else {
+		v_print_log(VRS_PRINT_DEBUG_MSG, "No hostname in certificate\n");
+	}
+
+	return ret;
+}
+#endif
+
 /**
  * \brief Create new TCP connection to the server
  *
@@ -981,6 +1057,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 
 #ifdef WITH_OPENSSL
 	if(ctx->tls_ctx != NULL) {
+		long cert_verify_res;
 		/* Set up SSL */
 		if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
@@ -1053,8 +1130,11 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 
 		/* Verify the result of chain verification
 		 * Verification performed according to RFC 4158. */
-		if(X509_V_OK != SSL_get_verify_result(stream_conn->io_ctx.ssl)) {
-			v_print_log(VRS_PRINT_ERROR, "Server sent wrong certificate\n");
+		cert_verify_res = SSL_get_verify_result(stream_conn->io_ctx.ssl);
+		if(cert_verify_res != X509_V_OK) {
+			v_print_log(VRS_PRINT_ERROR,
+					"Server sent wrong certificate: %s.\n",
+					X509_verify_cert_error_string(cert_verify_res));
 			ERR_print_errors_fp(v_log_file());
 			SSL_free(stream_conn->io_ctx.ssl);
 			stream_conn->io_ctx.ssl = NULL;
@@ -1062,11 +1142,28 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 			stream_conn->io_ctx.sockfd = -1;
 			free(stream_conn);
 			*error = VRS_CONN_TERM_ERROR;
+			if(cert != NULL) {
+				X509_free(cert);
+			}
 			return NULL;
 		}
 
-		/* TODO: Get hostname from X509 certificate and check
+		/* Get hostname from X509 certificate and check
 		 * if certificate contains desired hostname. */
+		if(verify_cert_hostname(cert, node) != 1) {
+			v_print_log(VRS_PRINT_ERROR, "Certificate with wrong hostname.\n");
+			ERR_print_errors_fp(v_log_file());
+			SSL_free(stream_conn->io_ctx.ssl);
+			stream_conn->io_ctx.ssl = NULL;
+			close(stream_conn->io_ctx.sockfd);
+			stream_conn->io_ctx.sockfd = -1;
+			free(stream_conn);
+			*error = VRS_CONN_TERM_ERROR;
+			if(cert != NULL) {
+				X509_free(cert);
+			}
+			return NULL;
+		}
 
 		/* Debug print: ciphers, certificates, etc. */
 		if(is_log_level(VRS_PRINT_DEBUG_MSG)) {
