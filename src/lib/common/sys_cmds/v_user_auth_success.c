@@ -75,7 +75,7 @@ int v_raw_unpack_user_auth_success(const char *buffer,
 	/* Check if length and buffer_pos match (It has to be always 8!) */
 	if(length!=(1+1+2+4)) {
 		v_print_log(VRS_PRINT_WARNING, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, length);
+				__func__, buffer_pos, length);
 		ua_suc->user_id = VRS_RESERVED_USER_ID;
 		ua_suc->avatar_id = VRS_RESERVED_AVATAR_ID;
 		return (1+1+2+4);
@@ -90,7 +90,7 @@ int v_raw_unpack_user_auth_success(const char *buffer,
 	/* Check if length and buffer_pos match (It has to be always 8!) */
 	if(buffer_pos!=length) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, length);
+				__func__, buffer_pos, length);
 		return (1+1+2+4);
 	}
 

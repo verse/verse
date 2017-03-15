@@ -59,7 +59,7 @@ int vs_pam_conv(int num_msg,
 	if( appdata_ptr == NULL )
 		return PAM_CONV_ERR;
 
-	v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s called with %d messages\n", __FUNCTION__, num_msg);
+	v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s called with %d messages\n", __func__, num_msg);
 
 	if( (num_msg <= 0) || (num_msg > PAM_MAX_NUM_MSG))
 		return PAM_CONV_ERR;
@@ -74,11 +74,11 @@ int vs_pam_conv(int num_msg,
 		switch(msg[i]->msg_style) {
 			case PAM_PROMPT_ECHO_ON:
 				v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s:%d PAM_PROMPT_ECHO_ON %s\n",
-						__FUNCTION__, __LINE__, msg[i]->msg);
+						__func__, __LINE__, msg[i]->msg);
 				break;
 			case PAM_PROMPT_ECHO_OFF:
 				v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s:%d PAM_PROMPT_ECHO_OFF %s\n",
-						__FUNCTION__, __LINE__, msg[i]->msg);
+						__func__, __LINE__, msg[i]->msg);
 				if(strncmp("Password:",msg[i]->msg,9)==0) {
 					r[i].resp = strdup((char*)appdata_ptr);
 					if(r[i].resp == NULL)
@@ -88,11 +88,11 @@ int vs_pam_conv(int num_msg,
 				break;
 			case PAM_ERROR_MSG:
 				v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s:%d PAM_ERROR_MSG %s\n",
-						__FUNCTION__, __LINE__, msg[i]->msg);
+						__func__, __LINE__, msg[i]->msg);
 				break;
 			case PAM_TEXT_INFO:
 				v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s:%d PAM_TEXT_INFO %s\n",
-						__FUNCTION__, __LINE__, msg[i]->msg);
+						__func__, __LINE__, msg[i]->msg);
 				break;
 			default:
 				goto fail;
@@ -125,7 +125,7 @@ fail:
 static int vs_pam_null_conv(int num_msg, const struct pam_message **msg,
     struct pam_response **resp, void *data)
 {
-	v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s called with %d messages\n", __FUNCTION__, num_msg);
+	v_print_log(VRS_PRINT_DEBUG_MSG, "PAM: %s called with %d messages\n", __func__, num_msg);
 	return PAM_CONV_ERR;
 }
 

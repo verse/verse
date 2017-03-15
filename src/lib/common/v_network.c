@@ -613,14 +613,14 @@ static int v_SSL_read(struct IO_CTX *io_ctx, int *error_num)
 		}
 		/* Print debug */
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_read() buf_size: %d, error: %d\n",
-				__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
+				__func__, __LINE__, (int)io_ctx->buf_size, error);
 		return io_ctx->buf_size=0;
 	} else if(io_ctx->buf_size < 0) {
 		/* Get error code from SSL */
 		int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
 		/* Print debug */
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_read() buf_size: %d, error: %d\n",
-				__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
+				__func__, __LINE__, (int)io_ctx->buf_size, error);
 		*error_num = error;
 		return io_ctx->buf_size=0;
 	}
@@ -662,14 +662,14 @@ static int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
 	if(ret > 0) {
 		if(ret != io_ctx->buf_size) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_write() buf_size: %d != ret: %d\n",
-					__FUNCTION__, __LINE__, io_ctx->buf_size, ret);
+					__func__, __LINE__, io_ctx->buf_size, ret);
 		}
 		*error_num = 0;
 		return ret;
 	} else if(ret == 0) {
 		int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_write() buf_size: %d, error: %d\n",
-				__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
+				__func__, __LINE__, (int)io_ctx->buf_size, error);
 		*error_num = error;
 		if(error==SSL_ERROR_ZERO_RETURN) {
 			v_print_log(VRS_PRINT_DEBUG_MSG, "SSL connection was closed.\n");
@@ -678,7 +678,7 @@ static int v_SSL_write(struct IO_CTX *io_ctx, int *error_num)
 	} else if(ret < 0) {
 		int error = SSL_get_error(io_ctx->ssl, io_ctx->buf_size);
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_read() buf_size: %d, error: %d\n",
-				__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
+				__func__, __LINE__, (int)io_ctx->buf_size, error);
 		*error_num = error;
 		return 0;
 	}
@@ -741,7 +741,7 @@ again:
 			*error_num = error;
 			/* Print debug */
 			v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_read() buf_size: %d, error: %d\n",
-					__FUNCTION__, __LINE__, (int)io_ctx->buf_size, error);
+					__func__, __LINE__, (int)io_ctx->buf_size, error);
 			return 0;
 		}
 
@@ -806,7 +806,7 @@ again:
 		if(ret > 0) {
 			if(ret != io_ctx->buf_size) {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "%s:%d SSL_write() buf_size: %d != ret: %d\n",
-						__FUNCTION__, __LINE__, io_ctx->buf_size, ret);
+						__func__, __LINE__, io_ctx->buf_size, ret);
 			} else {
 				v_print_log(VRS_PRINT_DEBUG_MSG, "SSL_write() %d bytes\n", ret);
 			}
@@ -822,7 +822,7 @@ again:
 			ERR_print_errors_fp(stderr);
 			if(error_num != NULL) *error_num = error;
 			v_print_log(VRS_PRINT_ERROR, "%s:%d SSL_write(%p, %p, %d): %d\n",
-					__FUNCTION__, __LINE__,
+					__func__, __LINE__,
 					(void*)io_ctx->ssl, (void*)io_ctx->buf, io_ctx->buf_size,
 					error);
 			return SEND_PACKET_ERROR;

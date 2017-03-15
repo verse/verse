@@ -56,7 +56,7 @@ int vs_node_destroy_avatar_node(struct VS_CTX *vs_ctx,
 		return vs_node_destroy_branch(vs_ctx, avatar_node, 1);
 	} else {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s(): avatar node (id: %d) not found\n",
-				__FUNCTION__, session->avatar_id);
+				__func__, session->avatar_id);
 	}
 	session->avatar_id = -1;
 

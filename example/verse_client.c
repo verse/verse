@@ -120,7 +120,7 @@ static void handle_signal(int sig)
 {
 	if(sig == SIGINT) {
 		printf("%s() try to terminate connection: %d\n",
-				__FUNCTION__, session_id);
+				__func__, session_id);
 		vrs_send_connect_terminate(session_id);
 		/* Reset signal handling to default behavior */
 		signal(SIGINT, SIG_DFL);
@@ -136,7 +136,7 @@ static void cb_receive_layer_unset_value(const uint8_t session_id,
 	     const uint32_t item_id)
 {
 	printf("%s(): session_id: %u, node_id: %u, layer_id: %d, item_id: %d \n",
-			__FUNCTION__, session_id, node_id, layer_id, item_id);
+			__func__, session_id, node_id, layer_id, item_id);
 	if(node_id == my_test_node_id && layer_id == my_test_layer_id) {
 		/* Test of unsubscribing from layer */
 		vrs_send_layer_unsubscribe(session_id, my_test_node_prio, node_id, layer_id, 0);
@@ -157,7 +157,7 @@ static void cb_receive_layer_set_value(const uint8_t session_id,
 	int i;
 
 	printf("%s(): session_id: %u, node_id: %u, layer_id: %d, item_id: %d, data_type: %d, count: %d, value(s): ",
-			__FUNCTION__, session_id, node_id, layer_id, item_id, data_type, count);
+			__func__, session_id, node_id, layer_id, item_id, data_type, count);
 
 	switch(data_type) {
 	case VRS_VALUE_TYPE_UINT8:
@@ -220,7 +220,7 @@ static void cb_receive_layer_destroy(const uint8_t session_id,
 		const uint16_t layer_id)
 {
 	printf("%s(): session_id: %u, node_id: %u, layer_id: %d\n",
-			__FUNCTION__, session_id, node_id, layer_id);
+			__func__, session_id, node_id, layer_id);
 }
 
 static void cb_receive_layer_create(const uint8_t session_id,
@@ -232,7 +232,7 @@ static void cb_receive_layer_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	printf("%s(): session_id: %u, node_id: %u, parent_layer_id: %d, layer_id: %d, data_type: %d, count: %d, custom_type: %d\n",
-			__FUNCTION__, session_id, node_id, parent_layer_id, layer_id, data_type, count, custom_type);
+			__func__, session_id, node_id, parent_layer_id, layer_id, data_type, count, custom_type);
 
 	if(node_id == my_test_node_id && custom_type == MY_TEST_LAYER_CT) {
 		uint8_t uint8_t_val[4] = {123, 124, 125, 126};
@@ -310,7 +310,7 @@ static void cb_receive_tag_set_value(const uint8_t session_id,
 	int i;
 
 	printf("%s() session_id: %u, node_id: %u, taggroup_id: %u, tag_id: %u, data_type: %d, count: %d, value(s): ",
-				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, data_type, count);
+				__func__, session_id, node_id, taggroup_id, tag_id, data_type, count);
 
 	switch(data_type) {
 	case VRS_VALUE_TYPE_UINT8:
@@ -375,7 +375,7 @@ static void cb_receive_tag_destroy(const uint8_t session_id,
 		const uint16_t tag_id)
 {
 	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, tag_id: %d\n",
-				__FUNCTION__, session_id, node_id, taggroup_id, tag_id);
+				__func__, session_id, node_id, taggroup_id, tag_id);
 
 	if(node_id == my_test_node_id && taggroup_id == my_test_taggroup_id) {
 		/* Test of unsubscribing from the tag group */
@@ -395,7 +395,7 @@ static void cb_receive_tag_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, tag_id: %d, data_type: %d, count: %d, custom_type: %d\n",
-				__FUNCTION__, session_id, node_id, taggroup_id, tag_id, data_type, count, custom_type);
+				__func__, session_id, node_id, taggroup_id, tag_id, data_type, count, custom_type);
 
 	if(node_id == my_test_node_id && taggroup_id == my_test_taggroup_id) {
 		void *value = NULL;
@@ -450,7 +450,7 @@ static void cb_receive_taggroup_destroy(const uint8_t session_id,
 		const uint16_t taggroup_id)
 {
 	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d\n",
-				__FUNCTION__, session_id, node_id, taggroup_id);
+				__func__, session_id, node_id, taggroup_id);
 
 	if(node_id == my_test_node_id && taggroup_id == my_test_taggroup_id) {
 		/* Try to lock my own node */
@@ -464,7 +464,7 @@ static void cb_receive_taggroup_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	printf("%s() session_id: %d, node_id: %d, taggroup_id: %d, custom_type: %d\n",
-				__FUNCTION__, session_id, node_id, taggroup_id, custom_type);
+				__func__, session_id, node_id, taggroup_id, custom_type);
 
 	if(node_id == my_test_node_id && custom_type == MY_TEST_TAGGROUP_CT) {
 		/* Set up name of my tag group */
@@ -505,7 +505,7 @@ static void cb_receive_node_create(const uint8_t session_id,
 		const uint16_t custom_type)
 {
 	printf("%s() session_id: %d, node_id: %d, parent_id: %d, user_id: %d, custom_type: %d\n",
-			__FUNCTION__, session_id, node_id, parent_id, user_id, custom_type);
+			__func__, session_id, node_id, parent_id, user_id, custom_type);
 
 	/* Is node special node? */
 	if(node_id == VRS_ROOT_NODE_ID) {
@@ -592,7 +592,7 @@ static void cb_receive_node_destroy(const uint8_t session_id,
 		const uint32_t node_id)
 {
 	printf("%s() session_id: %d, node_id: %d\n",
-			__FUNCTION__, session_id, node_id);
+			__func__, session_id, node_id);
 
 	/* Everything was tested. Exit. */
 	if(node_id == my_test_node_id) {
@@ -608,7 +608,7 @@ static void cb_receive_node_owner(const uint8_t session_id,
 		const uint16_t user_id)
 {
 	printf("%s() session_id: %d, node_id: %d, user_id of new owner: %d\n",
-			__FUNCTION__, session_id, node_id, user_id);
+			__func__, session_id, node_id, user_id);
 
 	if(node_id == my_test_node_id) {
 		/* Try to delete "my" own node */
@@ -625,7 +625,7 @@ static void cb_receive_node_perm(const uint8_t session_id,
 		const uint8_t perm)
 {
 	printf("%s() session_id: %d, node_id: %d, user_id: %d, permission: %d\n",
-			__FUNCTION__, session_id, node_id, user_id, perm);
+			__func__, session_id, node_id, user_id, perm);
 
 	if(user_id == my_user_id) {
 		printf("\tPermission for me\n");
@@ -652,7 +652,7 @@ static void cb_receive_node_lock(const uint8_t session_id,
 		const uint32_t avatar_id)
 {
 	printf("%s() session_id: %d, node_id: %d, avatar_id: %d\n",
-			__FUNCTION__, session_id, node_id, avatar_id);
+			__func__, session_id, node_id, avatar_id);
 
 	if(node_id == my_test_node_id && avatar_id == my_avatar_id) {
 		vrs_send_node_unlock(session_id, my_test_node_prio, node_id);
@@ -667,7 +667,7 @@ static void cb_receive_node_unlock(const uint8_t session_id,
 		const uint32_t avatar_id)
 {
 	printf("%s() session_id: %d, node_id: %d, avatar_id: %d\n",
-			__FUNCTION__, session_id, node_id, avatar_id);
+			__func__, session_id, node_id, avatar_id);
 
 	if(node_id == my_test_node_id) {
 		/* Test of changing owner of the node */
@@ -690,7 +690,7 @@ static void cb_receive_node_link(const uint8_t session_id,
 		const uint32_t child_node_id)
 {
 	printf("%s() session_id: %d, parent_node_id: %d, child_node_id: %d\n",
-			__FUNCTION__, session_id, parent_node_id, child_node_id);
+			__func__, session_id, parent_node_id, child_node_id);
 
 	if(parent_node_id == VRS_SCENE_PARENT_NODE_ID && child_node_id == my_test_node_id) {
 
@@ -717,7 +717,7 @@ static void cb_receive_connect_accept(const uint8_t session_id,
 	int in_size, out_size, in_free, out_free;
 
 	printf("%s() session_id: %d, user_id: %d, avatar_id: %d\n",
-			__FUNCTION__, session_id, user_id, avatar_id);
+			__func__, session_id, user_id, avatar_id);
 
 	my_avatar_id = avatar_id;
 	my_user_id = user_id;
@@ -763,7 +763,7 @@ static void cb_receive_connect_terminate(const uint8_t session_id,
 		const uint8_t error_num)
 {
 	printf("%s() session_id: %d, error_num: %d\n",
-			__FUNCTION__, session_id, error_num);
+			__func__, session_id, error_num);
 	switch(error_num) {
 	case VRS_CONN_TERM_AUTH_FAILED:
 		printf("User authentication failed\n");
@@ -823,7 +823,7 @@ static void cb_receive_user_authenticate(const uint8_t session_id,
 
 	/* Debug print */
 	printf("%s() username: %s, auth_methods_count: %d, methods: ",
-			__FUNCTION__, username, auth_methods_count);
+			__func__, username, auth_methods_count);
 	for(i = 0; i < auth_methods_count; i++) {
 		printf("%d, ", methods[i]);
 		if(methods[i] == VRS_UA_METHOD_PASSWORD)

@@ -158,7 +158,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	/* Try to find child node */
 	if((child_node = vs_node_find(vs_ctx, child_node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d node (id: %d) not found\n",
-				__FUNCTION__, __LINE__, child_node_id);
+				__func__, __LINE__, child_node_id);
 		return 0;
 	}
 
@@ -166,7 +166,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if(! (child_node->state == ENTITY_CREATED || child_node->state == ENTITY_CREATING)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d node id: %d is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, __LINE__, child_node->id, child_node->state);
+				__func__, __LINE__, child_node->id, child_node->state);
 		return 0;
 	}
 
@@ -174,7 +174,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, child_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d user: %s can't write to child node: %d (owner: %s)\n",
-				__FUNCTION__, __LINE__, user->username, child_node->id,
+				__func__, __LINE__, user->username, child_node->id,
 				child_node->owner->username);
 		return 0;
 	}
@@ -189,7 +189,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, old_parent_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d user: %s can't write to old parent node: %d (owner: %s)\n",
-				__FUNCTION__, __LINE__, user->username, old_parent_node->id,
+				__func__, __LINE__, user->username, old_parent_node->id,
 				old_parent_node->owner->username);
 		return 0;
 	}
@@ -197,7 +197,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	/* Try to find new parent node */
 	if((parent_node = vs_node_find(vs_ctx, parent_node_id)) == NULL) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s():%d node (id: %d) not found\n",
-				__FUNCTION__, __LINE__, parent_node_id);
+				__func__, __LINE__, parent_node_id);
 		return 0;
 	}
 
@@ -205,7 +205,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if(! (parent_node->state == ENTITY_CREATED || parent_node->state == ENTITY_CREATING)) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d node (id: %d) is not in NODE_CREATED state: %d\n",
-				__FUNCTION__, __LINE__, parent_node->id, parent_node->state);
+				__func__, __LINE__, parent_node->id, parent_node->state);
 		return 0;
 	}
 
@@ -213,7 +213,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if( parent_node == old_parent_node) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d link between nodes (parent_id: %d) (child_id: %d) already exists\n",
-				__FUNCTION__, __LINE__, parent_node->id, child_node->id);
+				__func__, __LINE__, parent_node->id, child_node->id);
 		return 0;
 	}
 
@@ -221,7 +221,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if(vs_node_can_write(vsession, parent_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d user: %s can't write to parent node: %d (owner: %s)\n",
-				__FUNCTION__, __LINE__, user->username, parent_node->id,
+				__func__, __LINE__, user->username, parent_node->id,
 				parent_node->owner->username);
 		return 0;
 	}
@@ -230,7 +230,7 @@ int vs_handle_link_change(struct VS_CTX *vs_ctx,
 	if(vs_link_test_nodes(parent_node, child_node) != 1) {
 		v_print_log(VRS_PRINT_DEBUG_MSG,
 				"%s():%d node: %d can't be child of node: %d\n",
-				__FUNCTION__, __LINE__, child_node->id, parent_node->id);
+				__func__, __LINE__, child_node->id, parent_node->id);
 		return 0;
 	}
 

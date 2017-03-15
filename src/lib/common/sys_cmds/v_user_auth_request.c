@@ -204,7 +204,7 @@ int v_raw_unpack_user_auth_request(const char *buffer, ssize_t buffer_size, stru
 	/* Check if length and buffer_pos match */
 	if(buffer_pos!=length) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, length);
+				__func__, buffer_pos, length);
 		return length;
 	}
 
@@ -264,7 +264,7 @@ int v_raw_pack_user_auth_request(char *buffer, const struct User_Authentication_
 	/* Check if length and buffer_pos match */
 	if(buffer_pos!=length) {
 		v_print_log(VRS_PRINT_DEBUG_MSG, "%s: buffer_pos: %d != length: %d\n",
-				__FUNCTION__, buffer_pos, length);
+				__func__, buffer_pos, length);
 		return length;
 	}
 

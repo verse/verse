@@ -97,7 +97,7 @@ static PyObject *_print_callback_arguments(const char *func_name, PyObject *self
 /* Layer UnSet */
 static PyObject *Session_cb_receive_layer_unset_value(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_layer_unset_value(const uint8_t session_id,
@@ -149,7 +149,7 @@ static PyObject *Session_send_layer_unset_value(PyObject *self, PyObject *args, 
 /* Layer Set Value */
 static PyObject *Session_cb_receive_layer_set_value(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_layer_set_value(const uint8_t session_id,
@@ -485,7 +485,7 @@ static PyObject *Session_send_layer_set_value(PyObject *self, PyObject *args, Py
 /* Layer UnSubscribe */
 static PyObject *Session_cb_receive_layer_unsubscribe(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_layer_unsubscribe(const uint8_t session_id,
@@ -538,7 +538,7 @@ static PyObject *Session_send_layer_unsubscribe(PyObject *self, PyObject *args, 
 /* Layer Subscribe */
 static PyObject *Session_cb_receive_layer_subscribe(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_layer_subscribe(const uint8_t session_id,
@@ -592,7 +592,7 @@ static PyObject *Session_send_layer_subscribe(PyObject *self, PyObject *args, Py
 /* Layer Destroy */
 static PyObject *Session_cb_receive_layer_destroy(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_layer_destroy(const uint8_t session_id,
@@ -642,7 +642,7 @@ static PyObject *Session_send_layer_destroy(PyObject *self, PyObject *args, PyOb
 /* Layer Create */
 static PyObject *Session_cb_receive_layer_create(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_layer_create(const uint8_t session_id,
@@ -699,7 +699,7 @@ static PyObject *Session_send_layer_create(PyObject *self, PyObject *args, PyObj
 /* Tag Set Value */
 static PyObject *Session_cb_receive_tag_set_values(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_tag_set_value(const uint8_t session_id,
@@ -1109,7 +1109,7 @@ static PyObject *Session_send_tag_set_values(PyObject *self, PyObject *args, PyO
 /* Tag Destroy */
 static PyObject *Session_cb_receive_tag_destroy(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 
@@ -1164,7 +1164,7 @@ static PyObject *Session_send_tag_destroy(PyObject *self, PyObject *args, PyObje
 /* Tag Create */
 static PyObject *Session_cb_receive_tag_create(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_tag_create(const uint8_t session_id,
@@ -1222,7 +1222,7 @@ static PyObject *Session_send_tag_create(PyObject *self, PyObject *args, PyObjec
 /* TagGroup UnSubscribe */
 static PyObject *Session_cb_receive_taggroup_unsubscribe(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_taggroup_unsubscribe(const uint8_t session_id,
@@ -1276,7 +1276,7 @@ static PyObject *Session_send_taggroup_unsubscribe(PyObject *self, PyObject *arg
 /* TagGroup Subscribe */
 static PyObject *Session_cb_receive_taggroup_subscribe(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_taggroup_subscribe(const uint8_t session_id,
@@ -1331,7 +1331,7 @@ static PyObject *Session_send_taggroup_subscribe(PyObject *self, PyObject *args,
 /* TagGroup Destroy */
 static PyObject *Session_cb_receive_taggroup_destroy(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_taggroup_destroy(const uint8_t session_id,
@@ -1382,7 +1382,7 @@ static PyObject *Session_send_taggroup_destroy(PyObject *self, PyObject *args, P
 /* TagGroup Create */
 static PyObject *Session_cb_receive_taggroup_create(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_taggroup_create(const uint8_t session_id,
@@ -1434,7 +1434,7 @@ static PyObject *Session_send_taggroup_create(PyObject *self, PyObject *args, Py
 /* Node UnLock */
 static PyObject *Session_cb_receive_node_unlock(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_unlock(const uint8_t session_id,
@@ -1484,7 +1484,7 @@ static PyObject *Session_send_node_unlock(PyObject *self, PyObject *args, PyObje
 /* Node Lock */
 static PyObject *Session_cb_receive_node_lock(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_lock(const uint8_t session_id,
@@ -1534,7 +1534,7 @@ static PyObject *Session_send_node_lock(PyObject *self, PyObject *args, PyObject
 /* Node Owner */
 static PyObject *Session_cb_receive_node_owner(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_owner(const uint8_t session_id,
@@ -1585,7 +1585,7 @@ static PyObject *Session_send_node_owner(PyObject *self, PyObject *args, PyObjec
 /* Node Perm */
 static PyObject *Session_cb_receive_node_perm(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_perm(const uint8_t session_id,
@@ -1638,7 +1638,7 @@ static PyObject *Session_send_node_perm(PyObject *self, PyObject *args, PyObject
 /* Node Link */
 static PyObject *Session_cb_receive_node_link(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_link(const uint8_t session_id,
@@ -1717,7 +1717,7 @@ static PyObject *Session_send_node_priority(PyObject *self, PyObject *args, PyOb
 /* Node UnSubscribe */
 static PyObject *Session_cb_receive_node_unsubscribe(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_unsubscribe(const uint8_t session_id,
@@ -1769,7 +1769,7 @@ static PyObject *Session_send_node_unsubscribe(PyObject *self, PyObject *args, P
 /* Node Subscribe */
 static PyObject *Session_cb_receive_node_subscribe(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_subscribe(const uint8_t session_id,
@@ -1822,7 +1822,7 @@ static PyObject *Session_send_node_subscribe(PyObject *self, PyObject *args, PyO
 /* Node Destroy */
 static PyObject *Session_cb_receive_node_destroy(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_destroy(const uint8_t session_id,
@@ -1871,7 +1871,7 @@ static PyObject *Session_send_node_destroy(PyObject *self, PyObject *args, PyObj
 /* Node Create */
 static PyObject *Session_cb_receive_node_create(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 static void cb_c_receive_node_create(const uint8_t session_id,
@@ -2025,7 +2025,7 @@ static PyObject *Sesssion_set(PyObject *self, PyObject *args, PyObject *kwds)
  */
 static PyObject *Session_cb_receive_connect_accept(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 /**
@@ -2055,7 +2055,7 @@ static void cb_c_receive_connect_accept(const uint8_t session_id,
  */
 static PyObject *Session_cb_receive_connect_terminate(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 /* Connect Terminate */
@@ -2096,7 +2096,7 @@ static PyObject *Session_send_connect_terminate(PyObject *self)
  */
 static PyObject *Session_cb_receive_user_authenticate(PyObject *self, PyObject *args)
 {
-	return _print_callback_arguments(__FUNCTION__, self, args);
+	return _print_callback_arguments(__func__, self, args);
 }
 
 /* User Authenticate callback function */

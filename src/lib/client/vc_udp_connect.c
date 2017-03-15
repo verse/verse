@@ -875,7 +875,7 @@ int vc_receive_and_handle_packet(struct vContext *C, int handle_packet(struct vC
 
 	/* Wait on response from server */
 	if( (ret = select(io_ctx->sockfd+1, &set, NULL, NULL, &tv)) == -1 ) {
-		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __FUNCTION__,  __LINE__, strerror(errno));
+		if(is_log_level(VRS_PRINT_ERROR)) v_print_log(VRS_PRINT_ERROR, "%s:%s():%d select(): %s\n", __FILE__, __func__,  __LINE__, strerror(errno));
 		return RECEIVE_PACKET_ERROR;
 	}
 	/* Check if the event occurred on sockfd */
