@@ -45,6 +45,7 @@ set ( verse_server_libs ${CMAKE_THREAD_LIBS_INIT} )
 if (OPENSSL_FOUND)
     set (verse_server_libs ${verse_server_libs} ${OPENSSL_LIBRARIES})
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DWITH_OPENSSL")
+    include_directories (${OPENSSL_INCLUDE_DIR})
 endif (OPENSSL_FOUND)
 
 
