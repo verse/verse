@@ -1058,6 +1058,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 #ifdef WITH_OPENSSL
 	if(ctx->tls_ctx != NULL) {
 		long cert_verify_res;
+		X509* cert = NULL;
 		/* Set up SSL */
 		if( (stream_conn->io_ctx.ssl=SSL_new(ctx->tls_ctx)) == NULL) {
 			v_print_log(VRS_PRINT_ERROR, "Setting up SSL failed.\n");
@@ -1115,7 +1116,7 @@ struct VStreamConn *vc_create_client_stream_conn(const struct VC_CTX *ctx,
 		}
 
 		/* Verify a server certificate was presented during the handshake */
-		X509* cert = SSL_get_peer_certificate(stream_conn->io_ctx.ssl);
+		cert = SSL_get_peer_certificate(stream_conn->io_ctx.ssl);
 		if(NULL == cert) {
 			v_print_log(VRS_PRINT_ERROR, "Server did not sent certificate\n");
 			ERR_print_errors_fp(v_log_file());
